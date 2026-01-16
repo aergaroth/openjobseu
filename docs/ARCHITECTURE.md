@@ -15,7 +15,7 @@ It intentionally prioritizes infrastructure and platform design over user-facing
 
 ## High-Level Architecture
 
-![Architecture diagram] (./architecture.png)
+![Architecture diagram](./architecture.png)
 
 >>Availability Checker runs asynchronously as a background worker 
 >>and does not block ingestion or API requests.
