@@ -1,0 +1,13 @@
+# Data Sources
+
+OpenJobsEU integrates only legally accessible job data sources.
+
+## Planned Sources
+- Public employment APIs
+- Open job feeds (JSON / RSS)
+- Open-source job repositories
+- Company-provided feeds or submissions
+
+Each source is integrated through a dedicated adapter with rate limiting and validation.
+
+Specific sources will be documented here as they are added.

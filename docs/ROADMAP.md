@@ -1,0 +1,21 @@
+# OpenJobsEU Roadmap
+
+## MVP v1
+- Single canonical job data model
+- Ingestion from legally accessible sources
+- Background availability verification
+- Search and filtering API
+- Infrastructure as Code
+- CI/CD pipeline
+- Observability and health checks
+
+## v2 (Design Only)
+- Company self-publishing workflow
+- Job publishing orchestration (no automated posting)
+- AI-assisted metadata enrichment
+- Managed deployment options
+
+## Explicit Non-Goals
+- Scraping closed job boards
+- Automated posting to third-party platforms
+- Candidate accounts or profiling
