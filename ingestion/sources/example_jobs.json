@@ -1,0 +1,34 @@
+{
+  "jobs": [
+    {
+      "id": "ext-12345",
+      "title": "DevOps Engineer",
+      "company": {
+        "name": "ExampleTech"
+      },
+      "location": "Remote",
+      "remote": true,
+      "remote_scope": "EU",
+      "employment_type": "full-time",
+      "description": "We are looking for a DevOps Engineer to work on cloud infrastructure and CI/CD pipelines.",
+      "technologies": ["AWS", "Terraform", "Docker", "Kubernetes"],
+      "url": "https://example.com/jobs/devops-engineer",
+      "posted_at": "2026-01-10T09:00:00Z"
+    },
+    {
+      "id": "ext-67890",
+      "title": "Cloud Platform Engineer",
+      "company": {
+        "name": "RemoteOps EU"
+      },
+      "location": "Remote",
+      "remote": true,
+      "remote_scope": "Selected EU countries",
+      "employment_type": "contract",
+      "description": "Platform engineering role focused on reliability and automation.",
+      "technologies": ["GCP", "Terraform", "Python"],
+      "url": "https://remoteops.example/jobs/platform-engineer",
+      "posted_at": "2026-01-08T12:30:00Z"
+    }
+  ]
+}
