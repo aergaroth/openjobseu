@@ -19,3 +19,8 @@
 - Scraping closed job boards
 - Automated posting to third-party platforms
 - Candidate accounts or profiling
+
+## Current state
+- Architecture and core domain model defined
+- Ingestion and validation pipeline implemented
+- CI pipeline with tests enabled
