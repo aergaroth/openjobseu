@@ -1,3 +1,5 @@
+[![Tests](https://github.com/aergaroth/openjobseu/actions/workflows/tests.yml/badge.svg)](https://github.com/aergaroth/openjobseu/actions/workflows/tests.yml)
+
 # OpenJobsEU
 
 Project website: https://openjobseu.org (work in progress)
