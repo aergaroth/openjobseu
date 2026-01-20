@@ -40,6 +40,11 @@ All ingestion adapters must normalize incoming data to this model.
 - last_verified_at: timestamp
 - verification_failures: integer
 
+>first_seen_at and last_seen_at are initially set during ingestion.
+>last_seen_at is expected to be updated on subsequent successful ingestions of the same job.
+>last_verified_at represents the last successful availability verification performed by the validator component.
+
+
 ## Metadata
 - created_at: timestamp
 - updated_at: timestamp
@@ -50,6 +55,6 @@ Each ingestion adapter must:
 - fetch job data from a single source
 - map source fields to the canonical job model
 - provide source identifier and source job ID
-- not modify job status directly
+- set only the initial job status during ingestion
 
 Adapters are not responsible for availability verification.
