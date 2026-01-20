@@ -14,7 +14,7 @@ REQUIRED_FIELDS = [
 ]
 
 
-def test_example_source_adapter_contract():
+def test_adapter_produces_canonical_jobs():
     adapter = ExampleSourceAdapter()
     jobs = adapter.run()
 
@@ -24,3 +24,7 @@ def test_example_source_adapter_contract():
     for job in jobs:
         for field in REQUIRED_FIELDS:
             assert field in job
+
+def get_jobs():
+    return ExampleSourceAdapter().run()
+

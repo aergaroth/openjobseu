@@ -1,3 +1,9 @@
+# Adapter responsibility:
+# - fetch raw job data
+# - normalize to canonical model
+# - MUST NOT set job lifecycle status or perform availability checks
+
+
 import json
 import uuid
 from datetime import datetime, timezone

@@ -16,6 +16,8 @@ OpenJobsEU prioritizes job freshness and availability over raw volume.
 - unreachable
   The job source could not be reached during verification.
 
+>A job marked as ```stale``` is not re-verified until explicitly scheduled.
+
 ## State Transitions
 
 new → active 

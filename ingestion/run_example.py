@@ -1,3 +1,6 @@
+# Development helper script
+# Not used in production or CI
+
 from ingestion.adapters.example_source import ExampleSourceAdapter
 import json
 
