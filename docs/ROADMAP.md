@@ -24,3 +24,9 @@
 - Architecture and core domain model defined
 - Ingestion and validation pipeline implemented
 - CI pipeline with tests enabled
+
+## Project direction
+
+OpenJobsEU is developed incrementally, starting from a strong infrastructure and domain foundation.
+The long-term goal is a fully deployed, production-grade platform running in real cloud infrastructure,
+rather than a purely demonstrational or mock project.
