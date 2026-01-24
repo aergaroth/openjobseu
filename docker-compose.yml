@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: openjobseu:dev
+    container_name: openjobseu-app
+    command: pytest -q
+    volumes:
+      - .:/app
+    environment:
+      PYTHONUNBUFFERED: "1"
