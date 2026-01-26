@@ -1,13 +1,8 @@
 
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: openjobseu:dev
-    container_name: openjobseu-app
-    command: pytest -q
-    volumes:
-      - .:/app
-    environment:
-      PYTHONUNBUFFERED: "1"
+    build: .
+    image: openjobseu:runtime
+    ports:
+      - "8000:8000"
+

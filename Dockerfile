@@ -15,4 +15,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # default: run tests (can be overridden)
-CMD ["pytest", "-q"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
