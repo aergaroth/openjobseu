@@ -8,6 +8,10 @@ OpenJobsEU is an open-source, compliance-first platform for aggregating remote j
 
 The project is built primarily as a DevOps and cloud-focused initiative, showcasing production-grade infrastructure, data ingestion pipelines, and observability patterns rather than a consumer job board.
 
+## Live runtime (Cloud Run)
+
+https://openjobseu-anobnjle6q-lz.a.run.app
+
 ## Goals
 - Aggregate only legally accessible job data
 - Focus exclusively on remote roles within the EU
