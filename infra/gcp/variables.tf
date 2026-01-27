@@ -19,3 +19,9 @@ variable "image" {
   type        = string
   description = "Container image URL"
 }
+
+variable "scheduler_region" {
+  type        = string
+  description = "Region for Cloud Scheduler"
+  default     = "europe-west1"
+}
