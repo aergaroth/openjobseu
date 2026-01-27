@@ -13,6 +13,10 @@ jobs:
   terraform-plan:
     runs-on: ubuntu-latest
 
+    env:
+      TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_image: ${{ secrets.TF_VAR_image }}
+
     defaults:
       run:
         working-directory: infra/gcp
