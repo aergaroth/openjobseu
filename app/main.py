@@ -1,7 +1,11 @@
 from fastapi import FastAPI
 from datetime import datetime, timezone
+import logging
 
 from app.internal import router as internal_router
+
+logging.basicConfig(level=logging.INFO)
+
 
 app = FastAPI(title="OpenJobsEU Runtime", version="0.1.0")
 
