@@ -41,5 +41,10 @@ Commercial use is not a current goal, but the architecture allows future extensi
 - docs/COMPLIANCE.md
 - docs/ROADMAP.md
 
+### Hint:
+
+>cp infra/gcp/terraform.tfvars.example infra/gcp/terraform.tfvars
+
+
 ## License
 Apache License 2.0
