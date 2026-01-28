@@ -30,3 +30,13 @@
 OpenJobsEU is developed incrementally, starting from a strong infrastructure and domain foundation.
 The long-term goal is a fully deployed, production-grade platform running in real cloud infrastructure,
 rather than a purely demonstrational or mock project.
+
+
+## Milestone: Runtime heartbeat (Cloud Scheduler)
+
+- Cloud Run runtime managed via Terraform
+- Remote Terraform state in GCS with locking
+- Cloud Scheduler triggers `/internal/tick`
+- CI enforces `terraform plan` on PRs
+
+Status: live
