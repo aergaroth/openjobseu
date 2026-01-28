@@ -16,6 +16,6 @@ def tick():
 
     return {
         "status": "ok",
-        "message": "scheduler tick received"
+        "message": "scheduler tick received",
         **result
     }
