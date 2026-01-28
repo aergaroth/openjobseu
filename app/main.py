@@ -3,6 +3,9 @@ from datetime import datetime, timezone
 import logging
 
 from app.internal import router as internal_router
+from app.logging import configure_logging
+
+configure_logging()
 
 logging.basicConfig(level=logging.INFO)
 
