@@ -11,6 +11,10 @@ resource "google_cloud_run_v2_service" "this" {
     containers {
       image = var.image
 
+      env {
+        name  = "INGESTION_MODE"
+        value = "rss"
+      }
       ports {
         container_port = 8000
       }
