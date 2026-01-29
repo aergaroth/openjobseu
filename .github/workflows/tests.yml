@@ -68,10 +68,10 @@ jobs:
         run: |
           TAG_SHA=$(git rev-parse --short HEAD)
 
-          docker build -t $IMAGE_BASE:$TAG_SHA .
-          docker push $IMAGE_BASE:$TAG_SHA
+          docker build -t $IMAGE_BASE:${{ github.sha }} .
+          docker push $IMAGE_BASE:${{ github.sha }}
 
-          docker tag $IMAGE_BASE:$TAG_SHA $IMAGE_BASE:latest
+          docker tag $IMAGE_BASE:${{ github.sha }} $IMAGE_BASE:latest
           docker push $IMAGE_BASE:latest
 
   deploy:
