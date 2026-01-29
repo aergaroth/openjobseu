@@ -33,6 +33,21 @@ Each external job source is integrated through a dedicated ingestion adapter res
 
 Adapters are isolated to ensure failures in one source do not affect the rest of the system.
 
+### Ingestion mode
+
+OpenJobsEU supports two ingestion modes:
+
+- `rss` (default) – real job ingestion via RSS feeds
+- `local` – development-only ingestion from local JSON file
+
+The mode is controlled via the `INGESTION_MODE` environment variable.
+
+Example (development fallback):
+```INGESTION_MODE=local```
+
+Local ingestion is intended for debugging and testing only and is not used in production.
+
+
 ---
 
 ### Normalization Layer
