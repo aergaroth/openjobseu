@@ -80,10 +80,10 @@ def run_rss_tick():
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
-        logger.info(
-            "rss tick finished",
-            extra={
-                "actions": actions,
-            }
-        )
+    logger.info(
+        "rss tick finished",
+        extra={
+            "actions": actions,
+        }
+    )
     return result
