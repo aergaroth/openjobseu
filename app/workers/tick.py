@@ -39,6 +39,8 @@ RSS_URL = "https://weworkremotely.com/categories/remote-programming-jobs.rss"
 
 def run_rss_tick():
     logger.info("rss tick worker started")
+    # test:
+    logger.info("RSS VERSION MARKER 12345")
 
     init_db()
 
