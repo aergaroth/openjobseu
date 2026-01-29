@@ -15,7 +15,7 @@ router = APIRouter(prefix="/internal", tags=["internal"])
 def tick():
     if INGESTION_MODE =="local":
         result = run_tick()
-    else
+    else:
         result = run_rss_tick()
 
     logger.info("scheduler tick received")
