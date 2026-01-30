@@ -1,0 +1,28 @@
+name: Deploy
+
+permissions:
+  contents: read
+  id-token: write
+
+on:
+  workflow_run:
+    workflows: ["Build image"]
+    types: [completed]
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run services update openjobseu \
+            --region europe-north1 \
+            --image europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu:${{ github.event.workflow_run.head_sha }}
