@@ -1,0 +1,40 @@
+name: Build image
+
+permissions:
+  contents: read
+  id-token: write
+
+on:
+  workflow_run:
+    workflows: ["Tests"]
+    types: [completed]
+
+jobs:
+  build:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker europe-north1-docker.pkg.dev
+
+      - name: Build & push
+        env:
+          IMAGE: europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          docker build -t $IMAGE:$SHA .
+          docker push $IMAGE:$SHA
+
+          docker tag $IMAGE:$SHA $IMAGE:latest
+          docker push $IMAGE:latest
