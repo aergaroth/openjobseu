@@ -4,6 +4,17 @@ from ingestion.loaders.local_json import load_local_jobs
 from ingestion.adapters.rss_feed import RssFeedAdapter
 from storage.sqlite import init_db, upsert_job
 
+from storage.sqlite import (
+    get_jobs_for_verification,
+    update_job_availability,
+)
+
+from app.workers.availability import (
+    check_job_availability,
+)
+
+
+
 logger = logging.getLogger("openjobseu.tick")
 
 
@@ -89,4 +100,42 @@ def run_rss_tick():
             "actions": actions,
         }
     )
+
+    # Availability check (A3)
+    try:
+        jobs_to_check = get_jobs_for_verification(limit=20)
+
+        stats = {
+            "checked": 0,
+            "active": 0,
+            "expired": 0,
+            "unreachable": 0,
+        }
+
+        now = datetime.now(timezone.utc).isoformat()
+
+        for job in jobs_to_check:
+            status = check_job_availability(job)
+
+            update_job_availability(
+                job_id=job["job_id"],
+                status=status,
+                verified_at=now,
+                failure=(status == "unreachable"),
+            )
+
+            stats["checked"] += 1
+            stats[status] += 1
+
+        actions.append(f"availability_checked:{stats['checked']}")
+
+        logger.info(
+            "availability check completed",
+            extra=stats,
+        )
+
+    except Exception as exc:
+        actions.append("availability_check_failed")
+        logger.error("availability check failed", exc_info=exc)
+
     return result
