@@ -4,19 +4,17 @@ OpenJobsEU prioritizes job freshness and availability over raw volume.
 
 ## Status Definitions
 
-- active
-  The job offer is available and has been recently verified.
+Jobs move through the following lifecycle states:
 
-- stale 
-  The job offer has not been verified within the expected time window.
-
-- expired
-  The job offer is no longer available (e.g. HTTP 404/410).
-
-- unreachable
-  The job source could not be reached during verification.
+- **NEW** – freshly discovered job (first 24h after first_seen_at)
+- **ACTIVE** – confirmed, visible job
+- **STALE** – not verified for more than 7 days
+- **EXPIRED** – unreachable or outdated job
+- **UNREACHABLE** - the job source could not be reached during verification.
 
 >A job marked as ```stale``` is not re-verified until explicitly scheduled.
+
+From a user perspective, **NEW and ACTIVE jobs are treated as visible**.
 
 ## State Transitions
 

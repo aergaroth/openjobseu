@@ -47,6 +47,9 @@ Example (development fallback):
 
 Local ingestion is intended for debugging and testing only and is not used in production.
 
+The system operates as a periodic worker:
+ingestion → persistence → availability → lifecycle → read API.
+
 
 ---
 
@@ -86,6 +89,20 @@ The Search API exposes job data for consumers and supports:
 - sorting by freshness
 
 The API is designed to be stateless and horizontally scalable.
+
+### API (v1)
+
+#### List jobs
+
+GET /jobs
+
+Query parameters:
+- status: visible | new | active | stale | expired
+- limit: default 20
+- offset: default 0
+
+Example:
+GET /jobs?status=visible
 
 ---
 

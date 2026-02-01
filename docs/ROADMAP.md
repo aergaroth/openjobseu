@@ -39,4 +39,34 @@ rather than a purely demonstrational or mock project.
 - Cloud Scheduler triggers `/internal/tick`
 - CI enforces `terraform plan` on PRs
 
+
+## Roadmap done:
+
+### A1 – Ingestion
+- [x] Local JSON ingestion
+- [x] RSS ingestion (WeWorkRemotely)
+
+### A2 – Persistence
+- [x] SQLite storage
+- [x] Idempotent upsert
+
+### A3 – Availability checking
+- [x] HTTP-based availability checks
+- [x] Failure tracking
+
+### A4 – Lifecycle management
+- [x] NEW / ACTIVE / STALE / EXPIRED states
+- [x] Time-based and failure-based transitions
+
+### A5 – Read API
+- [x] GET /jobs endpoint
+- [x] Status filtering
+- [x] Visible jobs abstraction (new + active)
+
+### Next
+- A6: Advanced filtering (tech, role, company)
+- A7: Minimal frontend / JSON feed
+- A8: Storage upgrade (Postgres)
+
+
 Status: live

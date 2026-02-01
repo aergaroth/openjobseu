@@ -35,6 +35,16 @@ https://openjobseu-anobnjle6q-lz.a.run.app
 This is an early-stage open-source project developed as a portfolio and learning initiative.
 Commercial use is not a current goal, but the architecture allows future extensions such as managed services or company publishing tools.
 
+Implemented features:
+- RSS ingestion (WeWorkRemotely as initial source)
+- Persistent storage (SQLite)
+- Job availability checking (HTTP-based)
+- Lifecycle management (NEW -> ACTIVE -> STALE -> EXPIRED)
+- Read-only Jobs API
+- Automated scheduler (Cloud Run)
+
+The system is designed as a tick-based worker, executed periodically.
+
 ## Documentation
 - docs/ARCHITECTURE.md
 - docs/DATA_SOURCES.md
