@@ -1,24 +1,39 @@
 # Job Lifecycle and Status Transitions
 
-OpenJobsEU prioritizes job freshness and availability over raw volume.
+OpenJobsEU prioritizes **job freshness and availability** over raw job volume.
 
-## Status Definitions
+Each job progresses through a well-defined lifecycle driven by periodic verification and ingestion events.
+
+---
+
+## Status definitions
 
 Jobs move through the following lifecycle states:
 
-- **NEW** – freshly discovered job (first 24h after first_seen_at)
-- **ACTIVE** – confirmed, visible job
-- **STALE** – not verified for more than 7 days
-- **EXPIRED** – unreachable or outdated job
-- **UNREACHABLE** - the job source could not be reached during verification.
+- **NEW** 
+  Freshly discovered job, within the first 24 hours after `first_seen_at`.
 
->A job marked as ```stale``` is not re-verified until explicitly scheduled.
+- **ACTIVE**
+  Verified and visible job.
 
-From a user perspective, **NEW and ACTIVE jobs are treated as visible**.
+- **STALE** 
+  Job that has not been successfully verified within its expected verification window.
 
-## State Transitions
+- **UNREACHABLE**
+  Job whose source could not be reached during availability verification (temporary state).
 
-new → active 
+- **EXPIRED**
+  Job confirmed unavailable or outdated after repeated failed verifications.
+
+From an API consumer perspective, **NEW and ACTIVE jobs are treated as visible**.
+
+---
+
+## State transitions
+
+The lifecycle supports the following transitions:
+
+new → active
 active → stale
 stale → active
 stale → expired
@@ -26,12 +41,29 @@ active → unreachable
 unreachable → active
 unreachable → expired
 
-Expired jobs are not deleted immediately and may be retained for audit or analytics purposes.
+Expired jobs are not deleted immediately and may be retained for audit or analytical purposes.
 
-## Verification Rules
+---
 
-- Newly ingested jobs are marked as active.
-- Jobs are re-verified periodically based on source-specific TTL.
-- A job is marked as stale if it exceeds its verification window.
-- After multiple failed verification attempts, the job is marked as expired.
-- Unreachable status is used when the source cannot be contacted, not when the job is gone.
+## Verification and transition rules
+
+- Newly ingested jobs are initially marked as **NEW**.
+- Jobs are periodically re-verified based on source-specific TTL rules.
+- If a job exceeds its verification window, it transitions to **STALE**.
+- A successful verification returns a **STALE** or **UNREACHABLE** job to **ACTIVE**.
+- Temporary connectivity issues result in **UNREACHABLE** status.
+- After multiple consecutive verification failures, a job transitions to **EXPIRED**.
+
+Lifecycle transitions are handled asynchronously by the availability worker and do not block ingestion or API access.
+
+---
+
+## Scheduling model
+
+Lifecycle updates are executed as part of a periodic **tick-based worker**, triggered by the scheduler.
+
+This design ensures:
+- predictable system behavior
+- separation of ingestion and verification concerns
+- resilience to transient source failures
+

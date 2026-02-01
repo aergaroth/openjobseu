@@ -1,19 +1,45 @@
 # Compliance and Data Usage
 
-OpenJobsEU is designed with compliance and transparency as first-class concerns.
+OpenJobsEU is designed with **compliance, transparency, and legal clarity** as first-class concerns.
 
-## Data Sources
-The platform only processes job data obtained from:
-- Public APIs
-- Open job feeds (JSON/RSS)
-- Explicit company submissions
+The platform intentionally limits its scope to avoid legal ambiguity and unethical data usage patterns common in commercial job aggregation.
 
-## What We Do Not Do
-- No scraping of closed or commercial job platforms 
-- No bypassing of third-party protections
-- No storage or redistribution of proprietary content
+---
 
-## Legal Boundaries
-OpenJobsEU does not automate job posting to external platforms and does not interact with third-party systems on behalf of users.
+## Data sources
 
-Any future publishing-related functionality is designed as assisted, manual workflows only.
+OpenJobsEU processes job data exclusively from sources that are:
+
+- publicly accessible without authentication
+- explicitly intended for public distribution
+
+Current and planned source types include:
+- public APIs
+- open job feeds (JSON / RSS)
+- explicitly shared company submissions
+
+Each source is evaluated individually before integration.
+
+---
+
+## Explicit non-actions
+
+OpenJobsEU does **not** engage in any of the following:
+
+- scraping closed, protected, or commercial job platforms
+- bypassing technical or legal access restrictions
+- automating interactions with third-party systems
+- storing or redistributing proprietary or copyrighted content
+
+---
+
+## Legal boundaries
+
+OpenJobsEU does not automate job posting to external platforms and does not act on behalf of companies or candidates.
+
+Any future publishing-related functionality, if introduced, will be limited to:
+- assisted workflows
+- explicit, manual user actions
+- clearly defined legal boundaries
+
+The project prioritizes long-term legal sustainability over short-term data volume.
