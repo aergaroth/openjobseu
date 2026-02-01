@@ -1,72 +1,81 @@
 # OpenJobsEU Roadmap
 
-## MVP v1
-- Single canonical job data model
-- Ingestion from legally accessible sources
-- Background availability verification
-- Search and filtering API
-- Infrastructure as Code
-- CI/CD pipeline
-- Observability and health checks
+## Project scope
 
-## v2 (Design Only)
-- Company self-publishing workflow
-- Job publishing orchestration (no automated posting)
-- AI-assisted metadata enrichment
-- Managed deployment options
+OpenJobsEU is an open-source, compliance-first platform for aggregating remote job offers within the EU.
 
-## Explicit Non-Goals
-- Scraping closed job boards
+The project is developed incrementally, with a strong focus on:
+- clean domain modeling
+- operational correctness
+- real cloud deployment
+
+It is not a demo or mock system — all components are designed to run in production infrastructure.
+
+---
+
+## Explicit non-goals
+
+- Scraping closed or protected job boards
 - Automated posting to third-party platforms
-- Candidate accounts or profiling
+- Candidate accounts, profiles, or tracking
 
-## Current state
-- Architecture and core domain model defined
-- Ingestion and validation pipeline implemented
-- CI pipeline with tests enabled
+---
 
-## Project direction
-
-OpenJobsEU is developed incrementally, starting from a strong infrastructure and domain foundation.
-The long-term goal is a fully deployed, production-grade platform running in real cloud infrastructure,
-rather than a purely demonstrational or mock project.
-
-
-## Milestone: Runtime heartbeat (Cloud Scheduler)
-
-- Cloud Run runtime managed via Terraform
-- Remote Terraform state in GCS with locking
-- Cloud Scheduler triggers `/internal/tick`
-- CI enforces `terraform plan` on PRs
-
-
-## Roadmap done:
+## MVP v1 — DONE ✅
 
 ### A1 – Ingestion
-- [x] Local JSON ingestion
+- [x] Canonical job data model
+- [x] Local JSON ingestion (dev)
 - [x] RSS ingestion (WeWorkRemotely)
 
 ### A2 – Persistence
 - [x] SQLite storage
-- [x] Idempotent upsert
+- [x] Idempotent job upsert
+- [x] First-seen and last-seen tracking
 
 ### A3 – Availability checking
 - [x] HTTP-based availability checks
-- [x] Failure tracking
+- [x] Failure tracking and retries
 
 ### A4 – Lifecycle management
 - [x] NEW / ACTIVE / STALE / EXPIRED states
-- [x] Time-based and failure-based transitions
+- [x] Time-based transitions
+- [x] Failure-based expiration
 
 ### A5 – Read API
 - [x] GET /jobs endpoint
 - [x] Status filtering
 - [x] Visible jobs abstraction (new + active)
 
-### Next
-- A6: Advanced filtering (tech, role, company)
-- A7: Minimal frontend / JSON feed
-- A8: Storage upgrade (Postgres)
+### Runtime & Infrastructure
+- [x] Cloud Run runtime managed via Terraform
+- [x] Remote Terraform state in GCS with locking
+- [x] Cloud Scheduler triggering `/internal/tick`
+- [x] CI pipeline with tests, image build and deploy
 
+Status: **live**
 
-Status: live
+---
+
+## Next milestones
+
+### A6 – Advanced filtering
+- Technology tags
+- Role / category filtering
+- Company filtering
+
+### A7 – Distribution
+- Minimal frontend or JSON feed
+- Public API documentation
+
+### A8 – Storage upgrade
+- PostgreSQL backend
+- Basic migrations
+
+---
+
+## Future (design-level)
+
+- Company self-publishing workflow
+- AI-assisted metadata enrichment
+- Managed deployment options
