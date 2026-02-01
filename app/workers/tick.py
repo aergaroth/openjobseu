@@ -8,11 +8,10 @@ from storage.sqlite import (
     get_jobs_for_verification,
     update_job_availability,
 )
-
 from app.workers.availability import (
     check_job_availability,
 )
-
+from app.workers.lifecycle import apply_lifecycle_rules
 
 
 logger = logging.getLogger("openjobseu.tick")
@@ -137,5 +136,44 @@ def run_rss_tick():
     except Exception as exc:
         actions.append("availability_check_failed")
         logger.error("availability check failed", exc_info=exc)
+
+    # Lifecycle rules (A4)
+    try:
+        now = datetime.now(timezone.utc)
+
+        lifecycle_stats = {
+            "stale": 0,
+            "expired": 0,
+        }
+
+        jobs_for_lifecycle = get_jobs_for_verification(limit=50)
+
+        for job in jobs_for_lifecycle:
+            new_status = apply_lifecycle_rules(job, now)
+
+            if new_status:
+                update_job_availability(
+                    job_id=job["job_id"],
+                    status=new_status,
+                    verified_at=now.isoformat(),
+                    failure=False,
+                )
+                lifecycle_stats[new_status] += 1
+
+        if lifecycle_stats["stale"] or lifecycle_stats["expired"]:
+            actions.append(
+                f"lifecycle:stale={lifecycle_stats['stale']},expired={lifecycle_stats['expired']}"
+            )
+
+        logger.info(
+            "lifecycle rules applied",
+            extra=lifecycle_stats,
+        )
+
+    except Exception as exc:
+        actions.append("lifecycle_failed")
+        logger.error("lifecycle processing failed", exc_info=exc)
+
+
 
     return result
