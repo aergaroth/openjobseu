@@ -121,3 +121,40 @@ def update_job_availability(
 
     conn.commit()
     conn.close()
+
+
+def get_jobs(
+    status: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[dict]:
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+
+    query = """
+        SELECT
+            job_id,
+            source,
+            source_url,
+            title,
+            company_name,
+            status,
+            first_seen_at,
+            last_seen_at
+        FROM jobs
+    """
+    params = []
+
+    if status == "visible":
+        query += " WHERE status IN ('new', 'active')"
+    elif status:
+        query += " WHERE status = ?"
+        params.append(status)
+
+    query += " ORDER BY first_seen_at DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+
+    return [dict(row) for row in rows]

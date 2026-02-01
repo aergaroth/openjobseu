@@ -5,14 +5,15 @@ import logging
 from app.internal import router as internal_router
 from app.logging import configure_logging
 
+from app.api.jobs import router as jobs_router
+
 configure_logging()
-
 logging.basicConfig(level=logging.INFO)
-
 
 app = FastAPI(title="OpenJobsEU Runtime", version="0.1.0")
 
 app.include_router(internal_router)
+app.include_router(jobs_router)
 
 
 @app.get("/health")
