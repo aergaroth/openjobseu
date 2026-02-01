@@ -12,16 +12,31 @@ class RssFeedAdapter:
         return feed.entries
 
     def normalize(self, entry: dict) -> dict:
+        raw_title = entry.get("title", "").strip()
+
+        company = entry.get("author") or "unknown"
+        title = raw_title
+
+        # Safe heuristic: extract company from "Company: Job Title"
+        if company == "unknown" and ":" in raw_title:
+            possible_company, possible_title = raw_title.split(":", 1)
+
+            # very defensive checks
+            if 2 <= len(possible_company) <= 80:
+                company = possible_company.strip()
+                title = possible_title.strip()
+
         return {
             "job_id": f"{self.source}:{entry.get('id', entry.get('link'))}",
             "source": self.source,
             "source_job_id": entry.get('id', entry.get('link')),
             "source_url": entry.get('link'),
-            "title": entry.get('title'),
-            "company_name": entry.get('author', 'unknown'),
+            "title": title,
+            "company_name": company,
             "description": entry.get('summary', ''),
             "remote": True,
             "remote_scope": "EU-wide",
             "status": "new",
             "first_seen_at": datetime.now(timezone.utc).isoformat(),
         }
+
