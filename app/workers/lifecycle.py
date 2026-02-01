@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 STALE_AFTER_DAYS = 7
 EXPIRE_AFTER_DAYS = 30
 MAX_FAILURES = 3
+NEW_AFTER_HOURS = 24
 
 
 def apply_lifecycle_rules(job: dict, now: datetime) -> str | None:
@@ -14,8 +15,21 @@ def apply_lifecycle_rules(job: dict, now: datetime) -> str | None:
         - None if no change
     """
     status = job.get("status")
-    last_verified = job.get("last_verified_at")
     failures = job.get("verification_failures", 0)
+
+
+    # Handling NEW jobs
+    if status == "new":
+        first_seen = job.get("first_seen_at")
+        if not first_seen:
+            return None
+
+        first_seen_dt = datetime.fromisoformat(first_seen)
+        if now - first_seen_dt > timedelta(hours=NEW_AFTER_HOURS):
+            return "active"
+
+        return None
+
 
     # Never touch already expired jobs
     if status == "expired":
@@ -25,6 +39,8 @@ def apply_lifecycle_rules(job: dict, now: datetime) -> str | None:
     if failures >= MAX_FAILURES:
         return "expired"
 
+
+    last_verified = job.get("last_verified_at")
     if not last_verified:
         return None
 

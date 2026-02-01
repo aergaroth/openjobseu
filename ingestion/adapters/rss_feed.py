@@ -22,6 +22,6 @@ class RssFeedAdapter:
             "description": entry.get('summary', ''),
             "remote": True,
             "remote_scope": "EU-wide",
-            "status": "active",
+            "status": "new",
             "first_seen_at": datetime.now(timezone.utc).isoformat(),
         }
