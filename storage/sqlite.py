@@ -125,6 +125,10 @@ def update_job_availability(
 
 def get_jobs(
     status: str | None = None,
+    company: str | None = None,
+    title: str | None = None,
+    source: str | None = None,
+    remote_scope: str | None = None,
     limit: int = 20,
     offset: int = 0,
 ) -> list[dict]:
@@ -143,13 +147,34 @@ def get_jobs(
             last_seen_at
         FROM jobs
     """
+
+    clauses = []
     params = []
 
     if status == "visible":
-        query += " WHERE status IN ('new', 'active')"
+        clauses.append("status IN ('new', 'active')")
     elif status:
-        query += " WHERE status = ?"
+        clauses.append("status = ?")
         params.append(status)
+
+    if company:
+        clauses.append("LOWER(company_name) LIKE ?")
+        params.append(f"%{company.lower()}%")
+
+    if title:
+        clauses.append("LOWER(title) LIKE ?")
+        params.append(f"%{title.lower()}%")
+
+    if source:
+        clauses.append("source = ?")
+        params.append(source)
+
+    if remote_scope:
+        clauses.append("remote_scope = ?")
+        params.append(remote_scope)
+
+    if clauses:
+        query += " WHERE " + " AND ".join(clauses)
 
     query += " ORDER BY first_seen_at DESC LIMIT ? OFFSET ?"
     params.extend([limit, offset])
