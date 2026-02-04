@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>OpenJobsEU – EU-wide Remote Jobs</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 2rem;
+      background: #fafafa;
+      color: #111;
+    }
+
+    h1 {
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      margin-top: 0;
+      color: #555;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1.5rem;
+      font-size: 0.95rem;
+    }
+
+    th, td {
+      padding: 0.6rem 0.7rem;
+      border-bottom: 1px solid #ddd;
+      vertical-align: top;
+    }
+
+    th {
+      text-align: left;
+      background: #f0f0f0;
+      font-weight: 600;
+    }
+
+    tr:hover {
+      background: #f7f7f7;
+    }
+
+    a {
+      color: #0066cc;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .meta {
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <h1>OpenJobsEU</h1>
+  <p>EU-wide, fully remote job offers</p>
+
+  <table id="jobs-table">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Company</th>
+        <th>Source</th>
+        <th>First seen</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div class="meta" id="meta"></div>
+
+  <script>
+    const FEED_URL = "/jobs/feed";
+
+    fetch(FEED_URL)
+      .then(r => r.json())
+      .then(data => {
+        const tbody = document.querySelector("#jobs-table tbody");
+
+        data.jobs.forEach(job => {
+          const tr = document.createElement("tr");
+
+          tr.innerHTML = `
+            <td><a href="${job.url}" target="_blank" rel="noopener">${job.title}</a></td>
+            <td>${job.company}</td>
+            <td>${job.source}</td>
+            <td>${new Date(job.first_seen_at).toLocaleDateString()}</td>
+          `;
+
+          tbody.appendChild(tr);
+        });
+
+        document.getElementById("meta").textContent =
+          `Updated ${new Date(data.meta.generated_at).toLocaleString()} · ${data.meta.count} jobs`;
+      })
+      .catch(err => {
+        document.getElementById("meta").textContent =
+          "Failed to load job feed.";
+        console.error(err);
+      });
+  </script>
+</body>
+</html>
