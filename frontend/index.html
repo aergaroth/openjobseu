@@ -137,40 +137,52 @@
     </footer>
   </div>
 
-  <script>
-    const FEED_URL =
-      "https://openjobseu-anobnjle6q-lz.a.run.app/jobs/feed";
+<script>
+  const FEED_URL =
+    "https://openjobseu-anobnjle6q-lz.a.run.app/jobs/feed";
 
-    fetch(FEED_URL)
-      .then((r) => r.json())
-      .then((data) => {
-        const tbody = document.querySelector("#jobs-table tbody");
+  fetch(FEED_URL)
+    .then((r) => {
+      if (!r.ok) {
+        throw new Error(`HTTP ${r.status}`);
+      }
+      return r.json();
+    })
+    .then((data) => {
+      const tbody = document.querySelector("#jobs-table tbody");
+      const items = data.items || [];
 
-        data.jobs.forEach((job) => {
-          const tr = document.createElement("tr");
-
-          tr.innerHTML = `
-            <td>
-              <a href="${job.url}" target="_blank" rel="noopener">
-                ${job.title}
-              </a>
-            </td>
-            <td>${job.company}</td>
-            <td>${job.source}</td>
-            <td>${new Date(job.first_seen_at).toLocaleDateString()}</td>
-          `;
-
-          tbody.appendChild(tr);
-        });
-
+      if (items.length === 0) {
         document.getElementById("meta").textContent =
-          \`Updated \${new Date(data.meta.generated_at).toLocaleString()} · \${data.meta.count} jobs\`;
-      })
-      .catch((err) => {
-        document.getElementById("meta").textContent =
-          "Job feed is temporarily unavailable.";
-        console.error(err);
+          "No jobs available at the moment.";
+        return;
+      }
+
+      items.forEach((job) => {
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+          <td>
+            <a href="${job.source_url}" target="_blank" rel="noopener">
+              ${job.title}
+            </a>
+          </td>
+          <td>${job.company_name}</td>
+          <td>${job.source}</td>
+          <td>${new Date(job.first_seen_at).toLocaleDateString()}</td>
+        `;
+
+        tbody.appendChild(tr);
       });
-  </script>
+
+      document.getElementById("meta").textContent =
+        `Loaded ${items.length} jobs`;
+    })
+    .catch((err) => {
+      document.getElementById("meta").textContent =
+        "Job feed is temporarily unavailable.";
+      console.error("Feed error:", err);
+    });
+</script>
 </body>
 </html>
