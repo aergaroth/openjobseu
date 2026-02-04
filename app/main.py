@@ -8,6 +8,7 @@ from app.logging import configure_logging
 from app.api.jobs import router as jobs_router
 
 from storage.sqlite import init_db
+from fastapi.middleware.cors import CORSMiddleware
 
 init_db()
 
@@ -27,9 +28,6 @@ app.add_middleware(
     allow_methods=["GET"],
     allow_headers=["*"],
 )
-from fastapi.middleware.cors import CORSMiddleware
-
-
 
 
 @app.get("/health")
