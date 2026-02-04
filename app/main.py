@@ -7,6 +7,11 @@ from app.logging import configure_logging
 
 from app.api.jobs import router as jobs_router
 
+from storage.sqlite import init_db
+
+init_db()
+
+
 configure_logging()
 logging.basicConfig(level=logging.INFO)
 
