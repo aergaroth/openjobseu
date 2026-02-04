@@ -1,8 +1,9 @@
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone
+import os
 
-DB_PATH = Path("data/openjobseu.db")
+DB_PATH = Path(os.getenv("OPENJOBSEU_DB_PATH", "data/openjobseu.db"))
 DB_PATH.parent.mkdir(exist_ok=True)
 
 
