@@ -1,14 +1,16 @@
+import os
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone
-import os
 
-DB_PATH = Path(os.getenv("OPENJOBSEU_DB_PATH", "data/openjobseu.db"))
-DB_PATH.parent.mkdir(exist_ok=True)
-
+def get_db_path() -> Path:
+    path = Path(os.getenv("OPENJOBSEU_DB_PATH", "data/openjobseu.db"))
+    path.parent.mkdir(exist_ok=True)
+    return path
 
 def get_conn():
-    return sqlite3.connect(DB_PATH)
+    return sqlite3.connect(get_db_path())
+
 
 def init_db():
     with get_conn() as conn:
