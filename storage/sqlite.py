@@ -142,6 +142,7 @@ def get_jobs(
             source_url,
             title,
             company_name,
+            remote_scope,
             status,
             first_seen_at,
             last_seen_at

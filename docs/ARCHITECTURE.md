@@ -129,6 +129,22 @@ Example:
 
 The API is stateless and designed to scale horizontally.
 
+### Public Job Feed
+
+In addition to the query-based API, OpenJobsEU exposes a public JSON feed:
+
+GET /jobs/feed
+
+The feed provides a stable, read-only view of all visible jobs (NEW and ACTIVE),
+intended for:
+- simple frontends
+- external aggregators
+- automated consumers
+
+The feed does not support filtering or pagination and is designed to be
+cache-friendly and contract-stable.
+
+
 ---
 
 ## Infrastructure
