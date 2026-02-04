@@ -79,8 +79,8 @@
   <div class="meta" id="meta"></div>
 
   <script>
-    const FEED_URL = "/jobs/feed";
-
+    const FEED_URL = "https://openjobseu-anobnjle6q-lz.a.run.app/jobs/feed";
+    
     fetch(FEED_URL)
       .then(r => r.json())
       .then(data => {
@@ -104,7 +104,7 @@
       })
       .catch(err => {
         document.getElementById("meta").textContent =
-          "Failed to load job feed.";
+          "Job feed is temporarily unavailable.";
         console.error(err);
       });
   </script>
