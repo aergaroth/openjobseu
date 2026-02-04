@@ -2,23 +2,42 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>OpenJobsEU – EU-wide Remote Jobs</title>
+  <title>OpenJobsEU</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <style>
     body {
-      font-family: system-ui, -apple-system, sans-serif;
-      margin: 2rem;
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        Roboto, Ubuntu, "Helvetica Neue", Arial, sans-serif;
       background: #fafafa;
       color: #111;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 2.5rem auto;
+      padding: 0 1rem;
     }
 
     h1 {
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.25rem;
+    }
+
+    h2 {
+      margin-top: 0;
     }
 
     p {
-      margin-top: 0;
       color: #555;
+      max-width: 720px;
+    }
+
+    hr {
+      margin: 3rem 0;
+      border: none;
+      border-top: 1px solid #ddd;
     }
 
     table {
@@ -28,14 +47,15 @@
       font-size: 0.95rem;
     }
 
-    th, td {
+    th,
+    td {
       padding: 0.6rem 0.7rem;
       border-bottom: 1px solid #ddd;
       vertical-align: top;
+      text-align: left;
     }
 
     th {
-      text-align: left;
       background: #f0f0f0;
       font-weight: 600;
     }
@@ -56,41 +76,85 @@
     .meta {
       margin-top: 1rem;
       font-size: 0.85rem;
-      color: #666;
+      color: #777;
+    }
+
+    footer {
+      margin-top: 3rem;
+      font-size: 0.85rem;
+      color: #777;
     }
   </style>
 </head>
+
 <body>
-  <h1>OpenJobsEU</h1>
-  <p>EU-wide, fully remote job offers</p>
+  <div class="container">
+    <!-- Intro / landing -->
+    <h1>OpenJobsEU</h1>
+    <p>
+      OpenJobsEU is an open-source, compliance-first project focused on aggregating
+      legally accessible, EU-wide remote job offers.
+    </p>
+    <p>
+      The project is backend-first and infrastructure-oriented. User-facing
+      features are intentionally minimal at this stage.
+    </p>
 
-  <table id="jobs-table">
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Company</th>
-        <th>Source</th>
-        <th>First seen</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+    <p>
+      <a href="https://github.com/aergaroth/openjobseu" target="_blank" rel="noopener">
+        View project on GitHub
+      </a>
+    </p>
 
-  <div class="meta" id="meta"></div>
+    <hr />
+
+    <!-- Feed preview -->
+    <section>
+      <h2>Public job feed (preview)</h2>
+      <p>
+        Below is a minimal, read-only preview of the public job feed.
+        It serves as a reference consumer of the API rather than a full job board.
+      </p>
+
+      <table id="jobs-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Company</th>
+            <th>Source</th>
+            <th>First seen</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <div class="meta" id="meta">Loading feed…</div>
+    </section>
+
+    <footer>
+      OpenJobsEU is an early-stage project. Stability and correctness take priority
+      over UI features.
+    </footer>
+  </div>
 
   <script>
-    const FEED_URL = "https://openjobseu-anobnjle6q-lz.a.run.app/jobs/feed";
-    
+    const FEED_URL =
+      "https://openjobseu-anobnjle6q-lz.a.run.app/jobs/feed";
+
     fetch(FEED_URL)
-      .then(r => r.json())
-      .then(data => {
+      .then((r) => r.json())
+      .then((data) => {
         const tbody = document.querySelector("#jobs-table tbody");
 
-        data.jobs.forEach(job => {
+        data.jobs.forEach((job) => {
           const tr = document.createElement("tr");
 
           tr.innerHTML = `
-            <td><a href="${job.url}" target="_blank" rel="noopener">${job.title}</a></td>
+            <td>
+              <a href="${job.url}" target="_blank" rel="noopener">
+                ${job.title}
+              </a>
+            </td>
             <td>${job.company}</td>
             <td>${job.source}</td>
             <td>${new Date(job.first_seen_at).toLocaleDateString()}</td>
@@ -100,9 +164,9 @@
         });
 
         document.getElementById("meta").textContent =
-          `Updated ${new Date(data.meta.generated_at).toLocaleString()} · ${data.meta.count} jobs`;
+          \`Updated \${new Date(data.meta.generated_at).toLocaleString()} · \${data.meta.count} jobs\`;
       })
-      .catch(err => {
+      .catch((err) => {
         document.getElementById("meta").textContent =
           "Job feed is temporarily unavailable.";
         console.error(err);
