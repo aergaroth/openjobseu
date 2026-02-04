@@ -47,11 +47,25 @@ It is not a demo or mock system — all components are designed to run in produc
 - [x] Status filtering
 - [x] Visible jobs abstraction (new + active)
 
+### A6 – Distribution & consumption
+- [x] Public JSON feed (`/jobs/feed`)
+- [x] Stable, cache-friendly feed contract
+- [x] Minimal static frontend consuming the feed
+- [x] Contract tests for public feed
+
 ### Runtime & Infrastructure
 - [x] Cloud Run runtime managed via Terraform
 - [x] Remote Terraform state in GCS with locking
 - [x] Cloud Scheduler triggering `/internal/tick`
 - [x] CI pipeline with tests, image build and deploy
+- [x] Deterministic runtime initialization (fresh DB support)
+
+### A7 – Distribution & consumption
+- [x] Public JSON feed (`/jobs/feed`)
+- [x] Stable, versioned feed contract
+- [x] Cache-friendly public endpoint
+- [x] Contract tests for feed
+- [x] Minimal reference frontend consuming the feed
 
 Status: **live**
 
@@ -59,23 +73,24 @@ Status: **live**
 
 ## Next milestones
 
-### A6 – Advanced filtering
-- Technology tags
-- Role / category filtering
-- Company filtering
-
-### A7 – Distribution
-- Minimal frontend or JSON feed
-- Public API documentation
+### A7.1 – Distribution polish (optional)
+- CORS hardening for public feed consumers
+- Optional reverse proxy under primary domain
+- Frontend UX polish (sorting, client-side filtering)
 
 ### A8 – Storage upgrade
 - PostgreSQL backend
 - Basic migrations
 
+### A9 – Observability & ops polish
+- Structured logging
+- Basic runtime metrics
+- Scheduler and tick failure alerting
+
 ---
 
 ## Future (design-level)
 
-- Company self-publishing workflow
-- AI-assisted metadata enrichment
+- Company self-publishing workflow (manual, compliance-first)
+- Metadata enrichment (heuristic-based, no AI by default)
 - Managed deployment options

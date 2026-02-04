@@ -2,7 +2,7 @@
 
 # OpenJobsEU
 
-Project website: https://openjobseu.org (work in progress)
+Project website: https://openjobseu.org (simple frontend consuming the public feed)
 
 OpenJobsEU is an open-source, compliance-first platform for aggregating remote job offers across the European Union.
 
@@ -13,6 +13,21 @@ The project is built as a **production-oriented backend system**, with a strong 
 ## Live runtime (Cloud Run)
 
 https://openjobseu-anobnjle6q-lz.a.run.app
+
+---
+
+## Public job feed
+
+OpenJobsEU exposes a stable, read-only JSON feed of visible job offers:
+
+https://openjobseu-anobnjle6q-lz.a.run.app/jobs/feed
+
+The feed contains EU-wide, fully remote roles only and is intended for:
+- simple frontends
+- external aggregators
+- automated consumers
+
+The contract is intentionally minimal and cache-friendly.
 
 ---
 
