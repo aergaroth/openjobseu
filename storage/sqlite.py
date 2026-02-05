@@ -34,34 +34,63 @@ def init_db():
         )
         """)
 
+
 def upsert_job(job: dict):
+    """
+    Idempotent upsert of a job record.
+
+    Ingestion is treated as the source of truth for all job metadata
+    (title, company, description, remote_scope, etc.).
+    On conflict, all ingestion fields are refreshed to allow
+    canonical model evolution over time.
+
+    Availability and lifecycle workers may later update status-related fields.
+    """
     now = datetime.now(timezone.utc).isoformat()
 
     with get_conn() as conn:
-        conn.execute("""
-        INSERT INTO jobs (
-          job_id, source, source_job_id, source_url,
-          title, company_name, description,
-          remote, remote_scope, status,
-          first_seen_at, last_seen_at
+        conn.execute(
+            """
+            INSERT INTO jobs (
+                job_id,
+                source,
+                source_job_id,
+                source_url,
+                title,
+                company_name,
+                description,
+                remote,
+                remote_scope,
+                status,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(job_id) DO UPDATE SET
+                source_url = excluded.source_url,
+                title = excluded.title,
+                company_name = excluded.company_name,
+                description = excluded.description,
+                remote = excluded.remote,
+                remote_scope = excluded.remote_scope,
+                status = excluded.status,
+                last_seen_at = excluded.last_seen_at
+            """,
+            (
+                job["job_id"],
+                job["source"],
+                job["source_job_id"],
+                job["source_url"],
+                job["title"],
+                job["company_name"],
+                job["description"],
+                int(job["remote"]),
+                job["remote_scope"],
+                job["status"],
+                now,
+                now,
+            ),
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(job_id) DO UPDATE SET
-          last_seen_at = excluded.last_seen_at
-        """, (
-            job["job_id"],
-            job["source"],
-            job["source_job_id"],
-            job["source_url"],
-            job["title"],
-            job["company_name"],
-            job["description"],
-            int(job["remote"]),
-            job["remote_scope"],
-            job["status"],
-            now,
-            now,
-        ))
 
 
 def get_jobs_for_verification(limit: int = 20) -> list[dict]:

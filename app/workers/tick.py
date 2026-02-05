@@ -1,7 +1,10 @@
 from datetime import datetime, timezone
 import logging
+
 from ingestion.loaders.local_json import load_local_jobs
 from ingestion.adapters.rss_feed import RssFeedAdapter
+from ingestion.adapters.remotive_api import RemotiveApiAdapter
+
 from storage.sqlite import init_db, upsert_job
 
 from storage.sqlite import (
@@ -63,6 +66,15 @@ def run_rss_tick():
         jobs = [adapter.normalize(e) for e in entries]
 
         for job in jobs:
+
+            logger.info(
+                "rss normalized job",
+                extra={
+                "job_id": job["job_id"],
+                "remote_scope": job.get("remote_scope"),
+                },
+            )
+
             upsert_job(job)
 
         actions.append(f"persisted:{len(jobs)}")
@@ -175,5 +187,54 @@ def run_rss_tick():
         logger.error("lifecycle processing failed", exc_info=exc)
 
 
+
+    return result
+
+
+def run_remotive_tick():
+    logger.info("remotive tick worker started")
+
+    init_db()
+    actions = []
+
+    try:
+        adapter = RemotiveApiAdapter()
+        entries = adapter.fetch()
+        jobs = [adapter.normalize(e) for e in entries]
+
+        for job in jobs:
+            upsert_job(job)
+
+        actions.append(f"remotive_ingested:{len(jobs)}")
+
+        logger.info(
+            "remotive ingestion completed",
+            extra={
+                "source": "remotive",
+                "ingested": len(jobs),
+            }
+        )
+
+        logger.info(
+            "jobs persisted",
+            extra={
+                "count": len(jobs),
+                "storage": "sqlite",
+            }
+        )
+
+    except Exception as exc:
+        actions.append("remotive_ingestion_failed")
+        logger.error("remotive ingestion failed", exc_info=exc)
+
+    result = {
+        "actions": actions,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+    logger.info(
+        "remotive tick finished",
+        extra=result,
+    )
 
     return result
