@@ -20,41 +20,57 @@ router = APIRouter(prefix="/internal", tags=["internal"])
 @router.post("/tick")
 def tick():
     ingestion_mode = os.getenv("INGESTION_MODE", "prod")
-    ingestion_sources = os.getenv("INGESTION_SOURCES", "rss").split(",")
 
-    actions = []
+    raw_sources = os.getenv("INGESTION_SOURCES")
+    if raw_sources:
+        ingestion_sources = [s.strip() for s in raw_sources.split(",")]
+    else:
+        ingestion_sources = list(INGESTION_HANDLERS.keys())
 
     logger.info(
         "tick dispatcher invoked",
-        extra={"mode": ingestion_mode, "sources": ingestion_sources},
+        extra={
+            "mode": ingestion_mode,
+            "sources": ingestion_sources,
+        },
     )
+
+    actions = []
 
     if ingestion_mode == "local":
         result = run_tick()
         actions.extend(result.get("actions", []))
-    else:
-        for source in ingestion_sources:
-            source = source.strip()
-            handler = INGESTION_HANDLERS.get(source)
+        return {
+            "status": "ok",
+            "mode": ingestion_mode,
+            "sources": ["local"],
+            "actions": actions,
+        }
 
-            if not handler:
-                logger.warning("unknown ingestion source", extra={"source": source})
-                continue
+    for source in ingestion_sources:
+        handler = INGESTION_HANDLERS.get(source)
 
-            logger.info("starting ingestion source", extra={"source": source})
+        if not handler:
+            logger.warning(
+                "unknown ingestion source",
+                extra={"source": source},
+            )
+            continue
 
-            try:
-                result = handler()
-                actions.extend(result.get("actions", []))
-            except Exception as exc:
-                actions.append(f"{source}_failed")
-                logger.error(
-                    "ingestion source failed",
-                    extra={"source": source},
-                    exc_info=exc,
-                )
+        logger.info(
+            "starting ingestion source",
+            extra={"source": source},
+        )
 
-        run_post_ingestion(actions)
+        try:
+            result = handler()
+            actions.extend(result.get("actions", []))
+        except Exception as exc:
+            logger.error(
+                "ingestion source failed",
+                extra={"source": source},
+                exc_info=exc,
+            )
 
     return {
         "status": "ok",
