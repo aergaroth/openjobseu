@@ -1,5 +1,6 @@
 import os
 from fastapi.testclient import TestClient
+from app.internal import INGESTION_HANDLERS
 
 from app.main import app
 
@@ -7,18 +8,23 @@ client = TestClient(app)
 
 
 def test_tick_runs_all_adapters_by_default(monkeypatch):
-    monkeypatch.delenv("INGESTION_SOURCES", raising=False)
+
     monkeypatch.setenv("INGESTION_MODE", "prod")
 
-    response = client.post("/internal/tick")
+    # źródłem prawdy jest aplikacja / source of truth is in app
+    monkeypatch.setenv(
+        "INGESTION_SOURCES",
+        ",".join(INGESTION_HANDLERS.keys()),
+    )
 
+    response = client.post("/internal/tick")
     assert response.status_code == 200
 
     data = response.json()
     sources = data["sources"]
 
-    # kolejność nieistotna
-    assert set(sources) == {"rss", "remotive"}
+    assert set(sources) == set(INGESTION_HANDLERS.keys())
+
 
 
 def test_tick_runs_only_selected_adapter(monkeypatch):

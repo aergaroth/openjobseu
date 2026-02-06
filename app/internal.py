@@ -5,13 +5,17 @@ from fastapi import APIRouter
 from app.workers.tick import run_tick
 from app.workers.ingestion.rss import run_rss_ingestion
 from app.workers.ingestion.remotive import run_remotive_ingestion
+from app.workers.ingestion.remoteok import run_remoteok_ingestion
+
 from app.workers.post_ingestion import run_post_ingestion
+
 
 logger = logging.getLogger("openjobseu.runtime")
 
 INGESTION_HANDLERS = {
     "rss": run_rss_ingestion,
     "remotive": run_remotive_ingestion,
+    "remoteok": run_remoteok_ingestion,
 }
 
 router = APIRouter(prefix="/internal", tags=["internal"])
