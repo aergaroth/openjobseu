@@ -10,12 +10,15 @@ from app.api.jobs import router as jobs_router
 from storage.sqlite import init_db
 from fastapi.middleware.cors import CORSMiddleware
 
-init_db()
-
-
 
 configure_logging()
+logging.getLogger(__name__).info("logging configured")
+
 logging.basicConfig(level=logging.INFO)
+
+
+init_db()
+
 
 app = FastAPI(title="OpenJobsEU Runtime", version="0.1.0")
 

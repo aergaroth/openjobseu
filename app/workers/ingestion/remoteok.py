@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from ingestion.adapters.remoteok_api import RemoteOkApiAdapter
 from app.workers.normalization.remoteok import normalize_remoteok_job
-from app.workers.ingestion.logging import log_ingestion
+from app.workers.ingestion.log_helpers import log_ingestion
 from storage.sqlite import init_db, upsert_job
 
 SOURCE = "remoteok"

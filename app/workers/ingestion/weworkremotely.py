@@ -4,7 +4,7 @@ from ingestion.adapters.weworkremotely_rss import WeWorkRemotelyRssAdapter
 from app.workers.normalization.weworkremotely import (
     normalize_weworkremotely_job,
 )
-from app.workers.ingestion.logging import log_ingestion
+from app.workers.ingestion.log_helpers import log_ingestion
 from storage.sqlite import init_db, upsert_job
 
 SOURCE = "weworkremotely"

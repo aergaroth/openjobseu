@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from ingestion.adapters.remotive_api import RemotiveApiAdapter
 from app.workers.normalization.remotive import normalize_remotive_job
-from app.workers.ingestion.logging import log_ingestion
+from app.workers.ingestion.log_helpers import log_ingestion
 from storage.sqlite import init_db, upsert_job
 
 SOURCE = "remotive"
