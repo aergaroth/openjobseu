@@ -1,22 +1,62 @@
 # Data Sources – OpenJobsEU
 
-OpenJobsEU integrates only **legally accessible job data sources**.
+OpenJobsEU integrates **only legally accessible, public job data sources**.
 
-All sources are accessed in a read-only manner and processed through dedicated ingestion adapters that normalize data into the canonical job model.
+All sources are accessed in a **read-only** manner and processed through dedicated
+ingestion adapters. Raw data is never exposed directly — every job offer must pass
+through explicit normalization and validation before being persisted.
 
 ---
 
 ## Current data sources
 
-### RSS feeds
+### WeWorkRemotely
 
-- **Type:** Public RSS feeds
-- **Example:** WeWorkRemotely (remote programming jobs)
-- **Purpose:** Primary production data source
+- **Type:** Public RSS feed
+- **Endpoint:** 
+  https://weworkremotely.com/categories/remote-programming-jobs.rss
 - **Access:** Public, unauthenticated
-- **Legal basis:** Publicly available job listings published by the source
+- **Legal basis:** Publicly published job listings
+- **Scope:** Fully remote roles (EU-wide by project policy)
 
-RSS ingestion is the default production ingestion mode.
+Notes:
+- RSS entries are fetched as-is
+- Normalization applies a conservative company-name heuristic
+- Jobs without required fields are skipped
+
+---
+
+### Remotive
+
+- **Type:** Public JSON API
+- **Endpoint:**
+  https://remotive.com/api/remote-jobs
+- **Access:** Public, unauthenticated
+- **Legal basis:** Public API explicitly intended for reuse
+- **Scope:** EU-wide and Worldwide roles only
+
+Notes:
+- Raw API payloads are fetched without modification
+- Normalization enforces OpenJobsEU policy:
+  - EU-wide or Worldwide only
+  - non-EU–restricted jobs are skipped
+- Location data is preserved as provided by the source
+
+---
+
+### RemoteOK
+
+- **Type:** Public JSON API
+- **Endpoint:**
+  https://remoteok.com/api
+- **Access:** Public, unauthenticated
+- **Legal basis:** Public API with explicit reuse allowance
+- **Scope:** Remote-first roles with EU / Worldwide filtering
+
+Notes:
+- The first API element (metadata/legal notice) is ignored
+- Remaining entries are treated as job offers
+- Normalization filters and validates jobs explicitly
 
 ---
 
@@ -25,31 +65,70 @@ RSS ingestion is the default production ingestion mode.
 ### Local JSON file
 
 - **Type:** Local JSON file
-- **Purpose:** Development and testing
+- **Purpose:** Development and testing only
 - **Access:** No network access required
 - **Legal basis:** Synthetic example data
 
-Local ingestion is intended strictly for development and debugging and is never used in production.
+Local ingestion is used exclusively when:
+
+```bash
+INGESTION_MODE=local
+```
+It is never enabled in production deployments.
+
+---
+
+### Source integration principles
+
+Each data source follows the same strict integration model:
+
+### Adapters (fetch-only)
+
+Adapters are responsible only for:
+
+- fetching raw source data
+- handling source-specific formats
+- returning unmodified payloads
+
+Adapters must not:
+
+- apply heuristics
+- perform normalization
+- persist data
+- modify lifecycle state
+
+---
+
+## Normalization
+
+Normalization is handled separately and is responsible for:
+
+- validating required fields
+- enforcing OpenJobsEU inclusion policy
+- mapping raw payloads to the canonical job model
+- rejecting non-compliant job offers
+
+Normalization logic is:
+- source-specific
+- deterministic
+- covered by automated tests
 
 ---
 
 ## Planned sources
 
-The following source types are considered for future stages:
+Future sources may include:
 
-- Additional public RSS or JSON feeds
-- Company-provided job feeds or submissions
-- Explicitly shared job datasets
+- additional public RSS feeds
+- public job APIs
+- company-provided feeds or submissions
 
-Each new source will be evaluated individually for legal accessibility and compliance before integration.
+Each new source will be evaluated individually for:
 
----
+- legal accessibility
+- reuse permissions
+- data stability
+- alignment with OpenJobsEU scope
 
-## Source integration principles
+No scraping of closed or protected platforms is planned or permitted.
 
-Each data source is integrated through a dedicated adapter that is responsible for:
-- fetching source data
-- handling source-specific formats
-- transforming data into the canonical job model
-
-Adapters do not perform availability checks or lifecycle transitions.

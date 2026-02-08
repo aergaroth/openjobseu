@@ -10,19 +10,19 @@ Each job progresses through a well-defined lifecycle driven by periodic verifica
 
 Jobs move through the following lifecycle states:
 
-- **NEW** 
+- **NEW**
   Freshly discovered job, within the first 24 hours after `first_seen_at`.
 
-- **ACTIVE**
+- **ACTIVE** 
   Verified and visible job.
 
-- **STALE** 
+- **STALE**
   Job that has not been successfully verified within its expected verification window.
 
 - **UNREACHABLE**
   Job whose source could not be reached during availability verification (temporary state).
 
-- **EXPIRED**
+- **EXPIRED** 
   Job confirmed unavailable or outdated after repeated failed verifications.
 
 From an API consumer perspective, **NEW and ACTIVE jobs are treated as visible**.
@@ -34,8 +34,8 @@ From an API consumer perspective, **NEW and ACTIVE jobs are treated as visible**
 The lifecycle supports the following transitions:
 
 new → active
-active → stale
-stale → active
+active → stale 
+stale → active 
 stale → expired
 active → unreachable
 unreachable → active
@@ -58,6 +58,22 @@ Lifecycle transitions are handled asynchronously by the availability worker and 
 
 ---
 
+## Source posting date (informational)
+
+Some data sources provide an original publication date for job offers (`posted_at`).
+
+Notes:
+- `posted_at` is **not** used directly to drive lifecycle transitions
+- lifecycle state is determined by `first_seen_at` and verification results
+- `posted_at` may be used in the future to:
+  - improve ingestion filtering
+  - avoid re-ingesting very old offers
+  - support audit and analytical use cases
+
+This separation ensures consistent behavior across sources with varying data quality.
+
+---
+
 ## Scheduling model
 
 Lifecycle updates are executed as part of a periodic **tick-based worker**, triggered by the scheduler.
@@ -66,4 +82,3 @@ This design ensures:
 - predictable system behavior
 - separation of ingestion and verification concerns
 - resilience to transient source failures
-

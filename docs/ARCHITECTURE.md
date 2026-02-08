@@ -2,15 +2,16 @@
 
 ## Overview
 
-OpenJobsEU is an open-source, compliance-first platform for aggregating legally accessible remote job offers within the European Union.
+OpenJobsEU is an open-source, compliance-first platform for aggregating **legally accessible, EU-wide remote job offers**.
 
-The system is designed as a backend-oriented platform with a strong emphasis on:
-- clear separation of concerns
-- data freshness and lifecycle management
+The system is designed as a **backend-first ingestion platform**, with strong emphasis on:
+- clear separation of responsibilities
+- correctness and data freshness
+- explicit lifecycle management
 - infrastructure automation
 - operational transparency
 
-User-facing features are intentionally minimal at this stage.
+User-facing features are intentionally minimal and treated as **secondary consumers** of the data.
 
 ---
 
@@ -18,166 +19,202 @@ User-facing features are intentionally minimal at this stage.
 
 ![Architecture diagram](./architecture.png)
 
-The system operates as a periodic worker pipeline:
+At runtime, OpenJobsEU operates as a **tick-based ingestion system**:
 
-ingestion → persistence → availability → lifecycle → read API
+**dispatcher → ingestion → normalization → persistence → availability → lifecycle → read API**
 
-Availability checks and lifecycle transitions run asynchronously and do not block ingestion or API requests.
+The system is intentionally **pull-based and stateless** between ticks.
 
----
-
-## Core Components
-
-### Ingestion Adapters
-
-Each external job source is integrated through a dedicated ingestion adapter responsible for:
-- fetching job data
-- handling source-specific formats
-- transforming raw data into the canonical job model
-
-Adapters are isolated to ensure that failures in one source do not affect the rest of the system.
+Availability checks and lifecycle transitions are executed **after ingestion** and do not block data fetching.
 
 ---
 
-### Ingestion Mode
+## Tick Dispatcher
 
-OpenJobsEU supports multiple ingestion modes:
+The entry point for all background work is:
 
-- `rss` (default) – real job ingestion via RSS feeds
-- `local` – development-only ingestion from a local JSON file
-
-The mode is controlled via the `INGESTION_MODE` environment variable.
-
-Example (development fallback):
-
-```bash
-INGESTION_MODE=local
+```
+POST /internal/tick
 ```
 
-Local ingestion is intended strictly for testing and debugging and is not used in production.
+The dispatcher:
+- reads active ingestion sources from environment configuration
+- invokes each source independently
+- aggregates ingestion results
+- triggers post-ingestion processing
+
+This design ensures:
+- isolation between sources
+- predictable execution order
+- safe extension with new adapters
+
+---
+
+## Ingestion Sources
+
+Each external job source is integrated as a **fetch-only adapter**, responsible solely for:
+- retrieving raw data
+- handling source-specific formats
+- returning unmodified payloads
+
+Adapters **do not**:
+- apply heuristics
+- perform normalization
+- persist data
+- modify lifecycle state
+
+Currently implemented sources include:
+- WeWorkRemotely (RSS)
+- Remotive (public API)
+- RemoteOK (public API)
 
 ---
 
 ## Normalization Layer
 
-All incoming job data is normalized into a single canonical model to ensure:
+Normalization is handled by **source-specific normalizers**, executed immediately after fetching.
 
-- consistent querying
-- predictable filtering
-- source-agnostic processing
+Responsibilities:
+- validate required fields
+- enforce OpenJobsEU inclusion rules (EU-wide, remote-only)
+- map raw payloads to the canonical job model
+- reject jobs that do not meet project criteria
 
-The normalization layer enforces required fields and produces a uniform representation regardless of source.
+Normalization is:
+- explicit
+- deterministic
+- fully test-covered
+
+This layer is the **policy boundary** of the system.
 
 ---
 
 ## Job Store
 
-The job store acts as the system’s single source of truth and is responsible for:
+The job store is the system’s single source of truth.
 
-- persisting normalized job data
-- tracking job lifecycle state
-- storing timestamps related to ingestion and verification
+Responsibilities:
+- persist normalized job records
+- ensure idempotent upserts
+- track lifecycle and verification timestamps
 
-The current implementation uses SQLite and is designed to be replaceable with a relational database in later stages.
+Current backend:
+- SQLite (sufficient for early-stage and development)
+
+The storage layer is designed to be **replaceable** without changes to ingestion or normalization logic.
 
 ---
 
 ## Availability Checker
 
-Job availability is verified asynchronously by a background worker that:
+After ingestion, a background worker:
+- periodically verifies job URLs via HTTP
+- interprets response codes and network failures
+- updates availability-related fields
 
-- periodically checks original job URLs
-- interprets HTTP response codes
-- updates job status accordingly
+The checker prioritizes:
+- correctness over volume
+- freshness over completeness
 
-This mechanism prioritizes data freshness over raw job volume.
+Availability results directly influence lifecycle transitions.
 
 ---
 
 ## Job Lifecycle
 
-Jobs move through a defined lifecycle:
+Each job progresses through a defined lifecycle:
 
-- NEW – recently discovered jobs (first 24h)
-- ACTIVE – verified and visible jobs
-- STALE – jobs not verified within a defined time window
-- EXPIRED – jobs confirmed unavailable or outdated
+- **NEW** – freshly discovered job
+- **ACTIVE** – verified and visible
+- **STALE** – not verified within the expected window
+- **EXPIRED** – confirmed unavailable or outdated
 
-From an API consumer perspective, NEW and ACTIVE jobs are treated as visible.
+From an API consumer perspective:
+- **NEW** and **ACTIVE** jobs are considered *visible*
+
+Lifecycle transitions are deterministic and rule-based.
 
 ---
 
 ## Read API
 
-The Read API exposes job data in a read-only manner.
+The Read API exposes job data in a **read-only, consumer-safe** manner.
 
-Currently supported endpoints:
+### Query API
 
-### List jobs
-``` GET /jobs```
-
+```
+GET /jobs
+```
 
 Query parameters:
-
-- ```status```: visible | new | active | stale | expired
-- ```limit```: default 20
-- ```offset```: default 0
+- `status`: visible | new | active | stale | expired
+- `limit`: default 20
+- `offset`: default 0
 
 Example:
+```
+GET /jobs?status=visible
+```
 
-```GET /jobs?status=visible```
-
-The API is stateless and designed to scale horizontally.
+---
 
 ### Public Job Feed
 
-In addition to the query-based API, OpenJobsEU exposes a public JSON feed:
+In addition to the query API, OpenJobsEU exposes a **stable public JSON feed**:
 
+```
 GET /jobs/feed
+```
 
-The feed provides a stable, read-only view of all visible jobs (NEW and ACTIVE),
-intended for:
+The feed:
+- returns all visible jobs (NEW + ACTIVE)
+- does not support filtering or pagination
+- is cache-friendly and contract-stable
+
+It is intended for:
 - simple frontends
 - external aggregators
 - automated consumers
-
-The feed does not support filtering or pagination and is designed to be
-cache-friendly and contract-stable.
-
 
 ---
 
 ## Infrastructure
 
-OpenJobsEU infrastructure follows cloud-native practices:
-- containerized services
+OpenJobsEU follows cloud-native infrastructure principles:
+- containerized runtime
 - Infrastructure as Code (Terraform)
-- automated CI/CD pipelines
-- environment-based configuration
+- CI pipelines with automated tests
+- environment-driven configuration
 
-The system is currently deployed on Google Cloud Run, with provider portability in mind.
+Current deployment target:
+- Google Cloud Run
+
+The system is designed to remain **cloud-provider portable**.
 
 ---
 
 ## Observability
 
-Basic observability is provided via:
-- structured application logs
-- health check endpoints
-- Cloud Run and Cloud Scheduler execution logs
+Observability is provided via:
+- structured ingestion logs
+- unified ingestion event logging
+- health and readiness endpoints
+- Cloud Run and Scheduler execution logs
 
-More advanced metrics and alerting are planned for later stages.
+Metrics and alerting are intentionally deferred until ingestion behavior stabilizes.
 
 ---
 
 ## Compliance and Legal Boundaries
 
 OpenJobsEU explicitly avoids:
-- scraping closed or protected job platforms
-- automating interactions with third-party systems
-- storing or redistributing proprietary content
+- scraping closed or protected platforms
+- bypassing access controls
+- automating third-party interactions
+- redistributing proprietary content
 
-All data processing is limited to legally accessible sources or explicit submissions.
+All data originates from:
+- legally accessible public sources
+- explicit, source-provided APIs
 
----
-
+Compliance is treated as a **first-class architectural constraint**.

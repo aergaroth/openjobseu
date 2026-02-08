@@ -21,12 +21,14 @@ It is not a demo or mock system — all components are designed to run in produc
 
 ---
 
-## MVP v1 — DONE ✅
+## MVP v1 — DONE
 
 ### A1 – Ingestion
 - [x] Canonical job data model
 - [x] Local JSON ingestion (dev)
 - [x] RSS ingestion (WeWorkRemotely)
+- [x] Public API ingestion (Remotive, RemoteOK)
+- [x] Source-specific normalization with tests
 
 ### A2 – Persistence
 - [x] SQLite storage
@@ -38,7 +40,7 @@ It is not a demo or mock system — all components are designed to run in produc
 - [x] Failure tracking and retries
 
 ### A4 – Lifecycle management
-- [x] NEW / ACTIVE / STALE / EXPIRED states
+- [x] NEW / ACTIVE / STALE / EXPIRED / UNREACHABLE states
 - [x] Time-based transitions
 - [x] Failure-based expiration
 
@@ -50,8 +52,8 @@ It is not a demo or mock system — all components are designed to run in produc
 ### A6 – Distribution & consumption
 - [x] Public JSON feed (`/jobs/feed`)
 - [x] Stable, cache-friendly feed contract
-- [x] Minimal static frontend consuming the feed
 - [x] Contract tests for public feed
+- [x] Minimal static reference frontend
 
 ### Runtime & Infrastructure
 - [x] Cloud Run runtime managed via Terraform
@@ -60,32 +62,26 @@ It is not a demo or mock system — all components are designed to run in produc
 - [x] CI pipeline with tests, image build and deploy
 - [x] Deterministic runtime initialization (fresh DB support)
 
-### A7 – Distribution & consumption
-- [x] Public JSON feed (`/jobs/feed`)
-- [x] Stable, versioned feed contract
-- [x] Cache-friendly public endpoint
-- [x] Contract tests for feed
-- [x] Minimal reference frontend consuming the feed
-
 Status: **live**
 
 ---
 
 ## Next milestones
 
-### A7.1 – Distribution polish (optional)
+### A6.1 – Distribution polish (optional)
 - CORS hardening for public feed consumers
 - Optional reverse proxy under primary domain
 - Frontend UX polish (sorting, client-side filtering)
 
-### A8 – Storage upgrade
-- PostgreSQL backend
-- Basic migrations
-
-### A9 – Observability & ops polish
+### A7 – Observability & ops polish
 - Structured logging
-- Basic runtime metrics
+- Runtime metrics (tick duration, ingestion counts)
 - Scheduler and tick failure alerting
+
+### A8 – Storage upgrade
+- Higher-level database engine backend
+- Explicit schema and migrations
+- Indexing aligned with read and lifecycle patterns
 
 ---
 
