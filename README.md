@@ -2,11 +2,18 @@
 
 # OpenJobsEU
 
-Project website: https://openjobseu.org (simple frontend consuming the public feed)
+Project website: https://openjobseu.org
+(Simple static frontend consuming the public job feed)
 
-OpenJobsEU is an open-source, compliance-first platform for aggregating remote job offers across the European Union.
+OpenJobsEU is an open-source, compliance-first platform for aggregating **EU-wide, fully remote job offers**.
 
-The project is built as a **production-oriented backend system**, with a strong focus on DevOps, cloud infrastructure, and data lifecycle management — not as a consumer-facing job board.
+The project is built as a **backend-first, production-oriented system**, with a strong focus on:
+- clean domain modeling
+- ingestion correctness
+- data lifecycle management
+- real cloud deployment
+
+It is **not** a consumer-facing job board.
 
 ---
 
@@ -22,63 +29,91 @@ OpenJobsEU exposes a stable, read-only JSON feed of visible job offers:
 
 https://openjobseu-anobnjle6q-lz.a.run.app/jobs/feed
 
-The feed contains EU-wide, fully remote roles only and is intended for:
-- simple frontends
+The feed contains **EU-wide, fully remote roles only** and is intended for:
+- minimal frontends
 - external aggregators
 - automated consumers
 
-The contract is intentionally minimal and cache-friendly.
+The contract is intentionally **minimal, cache-friendly, and read-only**.
+
+---
+
+## High-level architecture
+
+At runtime, OpenJobsEU operates as a **tick-based ingestion system**:
+
+1. **Cloud Scheduler** triggers `/internal/tick`
+2. A **dispatcher** determines active ingestion sources
+3. Each source runs through:
+   - fetch-only adapter (external API / RSS)
+   - source-specific normalization
+   - idempotent persistence
+4. Post-ingestion workers handle:
+   - availability checks
+   - lifecycle transitions
+
+The system is designed so that **adding a new data source does not affect existing ones**.
 
 ---
 
 ## Goals
-- Aggregate only legally accessible job data
-- Focus exclusively on remote roles within the EU
+- Aggregate only **legally accessible** job data
+- Focus exclusively on **EU-wide remote roles**
 - Verify job availability and data freshness over time
-- Provide a transparent alternative to closed job platforms
+- Provide a transparent, inspectable alternative to closed job platforms
 
 ---
 
-## Non-Goals
-- Scraping of commercial or closed job boards
-- User profiling, tracking, or advertising
-- Automated posting to third-party platforms
+## Explicit non-goals
+- Scraping closed or protected job boards
+- User accounts, profiles, or tracking
+- Advertising, ranking, or recommendation systems
+- Acting as a full-featured job board
 
 ---
 
 ## Core features
-- Source-specific ingestion adapters (RSS, extensible)
+- Multiple ingestion sources with a unified dispatcher
+- Fetch-only adapters and explicit normalization layer
 - Canonical job data model
-- Persistent storage and idempotent upserts
-- Background availability verification
-- Job lifecycle management (NEW -> ACTIVE -> STALE -> EXPIRED)
-- Read-only Jobs API with filtering
+- Idempotent storage and lifecycle tracking
+- Availability verification via HTTP checks
+- Read-only Jobs API and public feed
+- Structured ingestion logging
 - Infrastructure as Code (Terraform)
-- CI/CD pipelines and basic observability
+- CI pipeline with automated tests
 
 ---
 
 ## Current status
 
-OpenJobsEU is a working, early-stage system running in real cloud infrastructure.
+OpenJobsEU is a **working early-stage system**, running in real cloud infrastructure.
 
-Implemented features:
-- RSS ingestion (WeWorkRemotely as initial source)
-- Persistent storage (SQLite)
-- HTTP-based job availability checks
-- Time- and failure-based lifecycle management
-- Read-only Jobs API
-- Automated scheduler (Cloud Run)
+### Implemented ingestion sources
+- **WeWorkRemotely** (RSS)
+- **Remotive** (public API)
+- **RemoteOK** (public API)
 
-The system operates as a **tick-based worker**, executed periodically via Cloud Scheduler.
+### Implemented runtime components
+- Tick dispatcher with pluggable sources
+- Source-specific normalization
+- SQLite persistence (dev / early prod)
+- Availability checking
+- Lifecycle management (NEW → ACTIVE → STALE → EXPIRED)
+- Public `/jobs/feed` endpoint
+- Cloud Run + Cloud Scheduler runtime
+- CI with validation and normalization tests
+
+The system is intentionally conservative and correctness-oriented.
 
 ---
 
 ## Documentation
-- docs/ARCHITECTURE.md
-- docs/DATA_SOURCES.md
-- docs/COMPLIANCE.md
-- docs/ROADMAP.md
+- `docs/ARCHITECTURE.md` – system design and ingestion flow
+- `docs/DATA_SOURCES.md` – details of supported sources
+- `docs/CANONICAL_MODEL.md` – canonical job schema
+- `docs/COMPLIANCE.md` – data access and legal considerations
+- `docs/ROADMAP.md` – planned evolution
 
 ---
 
