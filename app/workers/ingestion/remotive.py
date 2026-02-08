@@ -18,7 +18,6 @@ def run_remotive_ingestion() -> dict:
     try:
         adapter = RemotiveApiAdapter()
 
-        log_ingestion(source=SOURCE, phase="fetch")
         entries = adapter.fetch()
         log_ingestion(
             source=SOURCE,

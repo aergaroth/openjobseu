@@ -21,7 +21,6 @@ def run_weworkremotely_ingestion() -> dict:
     try:
         adapter = WeWorkRemotelyRssAdapter(RSS_URL)
 
-        log_ingestion(source=SOURCE, phase="fetch")
         entries = adapter.fetch()
         log_ingestion(
             source=SOURCE,

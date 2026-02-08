@@ -12,14 +12,10 @@ def run_remoteok_ingestion() -> dict:
     log_ingestion(source=SOURCE, phase="start")
 
     init_db()
-    actions = []
     persisted = 0
 
     try:
         adapter = RemoteOkApiAdapter()
-
-        log_ingestion(source=SOURCE, phase="fetch")
-
         entries = adapter.fetch()
 
         log_ingestion(
@@ -36,25 +32,21 @@ def run_remoteok_ingestion() -> dict:
             upsert_job(job)
             persisted += 1
 
-        actions.append(f"{SOURCE}_ingested:{persisted}")
-
         log_ingestion(
             source=SOURCE,
             phase="end",
             persisted=persisted,
         )
 
-    except Exception as exc:
-        actions.append(f"{SOURCE}_failed")
+        return {
+            "actions": [f"{SOURCE}_ingested:{persisted}"],
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
 
+    except Exception as exc:
         log_ingestion(
             source=SOURCE,
             phase="error",
             error=str(exc),
         )
         raise
-
-    return {
-        "actions": actions,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }

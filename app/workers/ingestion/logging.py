@@ -1,6 +1,6 @@
 import logging
 
-logger = logging.getLogger("openjobseu")
+logger = logging.getLogger("openjobseu.ingestion")
 
 
 def log_ingestion(
@@ -20,7 +20,7 @@ def log_ingestion(
     """
 
     logger.info(
-        "ingestion event",
+        "ingestion",
         extra={
             "component": "ingestion",
             "source": source,
