@@ -5,7 +5,7 @@ from typing import List, Dict
 logger = logging.getLogger("openjobseu.ingestion.remoteok")
 
 
-class RemoteOKApiAdapter:
+class RemoteOkApiAdapter:
     """
     Fetch-only adapter for RemoteOK public API.
 
