@@ -1,24 +1,32 @@
 from datetime import datetime, timezone
-import logging
 
-from ingestion.adapters.remoteok_api import RemoteOKApiAdapter
+from ingestion.adapters.remoteok_api import RemoteOkApiAdapter
 from app.workers.normalization.remoteok import normalize_remoteok_job
+from app.workers.ingestion.logging import log_ingestion
 from storage.sqlite import init_db, upsert_job
 
-logger = logging.getLogger("openjobseu.ingestion.remoteok")
+SOURCE = "remoteok"
 
 
 def run_remoteok_ingestion() -> dict:
-    logger.info("remoteok ingestion started")
+    log_ingestion(source=SOURCE, phase="start")
 
     init_db()
     actions = []
-
     persisted = 0
 
     try:
-        adapter = RemoteOKApiAdapter()
+        adapter = RemoteOkApiAdapter()
+
+        log_ingestion(source=SOURCE, phase="fetch")
+
         entries = adapter.fetch()
+
+        log_ingestion(
+            source=SOURCE,
+            phase="fetch",
+            raw_count=len(entries),
+        )
 
         for raw in entries:
             job = normalize_remoteok_job(raw)
@@ -28,16 +36,23 @@ def run_remoteok_ingestion() -> dict:
             upsert_job(job)
             persisted += 1
 
-        actions.append(f"remoteok_ingested:{persisted}")
+        actions.append(f"{SOURCE}_ingested:{persisted}")
 
-        logger.info(
-            "remoteok ingestion completed",
-            extra={"persisted": persisted},
+        log_ingestion(
+            source=SOURCE,
+            phase="end",
+            persisted=persisted,
         )
 
     except Exception as exc:
-        actions.append("remoteok_ingestion_failed")
-        logger.error("remoteok ingestion failed", exc_info=exc)
+        actions.append(f"{SOURCE}_failed")
+
+        log_ingestion(
+            source=SOURCE,
+            phase="error",
+            error=str(exc),
+        )
+        raise
 
     return {
         "actions": actions,

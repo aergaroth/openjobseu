@@ -1,19 +1,18 @@
 from datetime import datetime, timezone
-import logging
 
 from ingestion.adapters.weworkremotely_rss import WeWorkRemotelyRssAdapter
 from app.workers.normalization.weworkremotely import (
     normalize_weworkremotely_job,
 )
+from app.workers.ingestion.logging import log_ingestion
 from storage.sqlite import init_db, upsert_job
 
-logger = logging.getLogger("openjobseu.ingestion.weworkremotely")
-
+SOURCE = "weworkremotely"
 RSS_URL = "https://weworkremotely.com/categories/remote-programming-jobs.rss"
 
 
 def run_weworkremotely_ingestion() -> dict:
-    logger.info("weworkremotely ingestion started")
+    log_ingestion(source=SOURCE, phase="start")
 
     init_db()
     actions = []
@@ -21,7 +20,14 @@ def run_weworkremotely_ingestion() -> dict:
 
     try:
         adapter = WeWorkRemotelyRssAdapter(RSS_URL)
+
+        log_ingestion(source=SOURCE, phase="fetch")
         entries = adapter.fetch()
+        log_ingestion(
+            source=SOURCE,
+            phase="fetch",
+            raw_count=len(entries),
+        )
 
         for raw in entries:
             job = normalize_weworkremotely_job(raw)
@@ -31,19 +37,23 @@ def run_weworkremotely_ingestion() -> dict:
             upsert_job(job)
             persisted += 1
 
-        actions.append(f"weworkremotely_ingested:{persisted}")
+        actions.append(f"{SOURCE}_ingested:{persisted}")
 
-        logger.info(
-            "weworkremotely ingestion completed",
-            extra={
-                "source": "weworkremotely",
-                "persisted": persisted,
-            },
+        log_ingestion(
+            source=SOURCE,
+            phase="end",
+            persisted=persisted,
         )
 
     except Exception as exc:
-        actions.append("weworkremotely_ingestion_failed")
-        logger.error("weworkremotely ingestion failed", exc_info=exc)
+        actions.append(f"{SOURCE}_failed")
+
+        log_ingestion(
+            source=SOURCE,
+            phase="error",
+            error=str(exc),
+        )
+        raise
 
     return {
         "actions": actions,
