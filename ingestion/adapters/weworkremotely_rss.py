@@ -1,8 +1,8 @@
 import feedparser
 from datetime import datetime, timezone
 
-class RssFeedAdapter:
-    source = "rss"
+class WeWorkRemotelyRssAdapter:
+    source = "weworkremotely"
 
     def __init__(self, feed_url: str):
         self.feed_url = feed_url
