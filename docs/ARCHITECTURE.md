@@ -2,16 +2,15 @@
 
 ## Overview
 
-OpenJobsEU is an open-source, compliance-first platform for aggregating **legally accessible, EU-wide remote job offers**.
+OpenJobsEU is an open-source, compliance-first platform for aggregating legally accessible remote job offers within the European Union.
 
-The system is designed as a **backend-first ingestion platform**, with strong emphasis on:
-- clear separation of responsibilities
-- correctness and data freshness
-- explicit lifecycle management
-- infrastructure automation
+The system is designed as a backend-oriented, production-grade pipeline with a strong emphasis on:
+- clear separation of concerns
+- data freshness and lifecycle correctness
 - operational transparency
+- cloud-native deployment
 
-User-facing features are intentionally minimal and treated as **secondary consumers** of the data.
+User-facing functionality is intentionally minimal and strictly read-only.
 
 ---
 
@@ -19,202 +18,133 @@ User-facing features are intentionally minimal and treated as **secondary consum
 
 ![Architecture diagram](./architecture.png)
 
-At runtime, OpenJobsEU operates as a **tick-based ingestion system**:
 
-**dispatcher → ingestion → normalization → persistence → availability → lifecycle → read API**
+The system operates as a periodic **tick-based pipeline**:
 
-The system is intentionally **pull-based and stateless** between ticks.
+External Sources → Ingestion → Normalization → Storage → Availability & Lifecycle → Read API → Consumers
 
-Availability checks and lifecycle transitions are executed **after ingestion** and do not block data fetching.
-
----
-
-## Tick Dispatcher
-
-The entry point for all background work is:
-
-```
-POST /internal/tick
-```
-
-The dispatcher:
-- reads active ingestion sources from environment configuration
-- invokes each source independently
-- aggregates ingestion results
-- triggers post-ingestion processing
-
-This design ensures:
-- isolation between sources
-- predictable execution order
-- safe extension with new adapters
+This model ensures predictable behavior, resilience to partial failures, and clear operational boundaries.
 
 ---
 
-## Ingestion Sources
+## Core Components
 
-Each external job source is integrated as a **fetch-only adapter**, responsible solely for:
-- retrieving raw data
+### External Job Sources
+
+Legally accessible, public job data sources such as:
+- public RSS feeds
+- public JSON APIs
+
+No scraping, authentication bypassing, or automated interactions are performed.
+
+---
+
+### Ingestion Adapters
+
+Each source is integrated via a dedicated ingestion adapter responsible for:
+- fetching raw job data
 - handling source-specific formats
-- returning unmodified payloads
+- emitting raw job entries
 
-Adapters **do not**:
-- apply heuristics
-- perform normalization
-- persist data
-- modify lifecycle state
-
-Currently implemented sources include:
-- WeWorkRemotely (RSS)
-- Remotive (public API)
-- RemoteOK (public API)
+Adapters are isolated so failures in one source do not affect others.
 
 ---
 
-## Normalization Layer
+### Normalization Layer
 
-Normalization is handled by **source-specific normalizers**, executed immediately after fetching.
+The normalization layer converts raw job entries into a single **canonical job model**.
 
 Responsibilities:
-- validate required fields
-- enforce OpenJobsEU inclusion rules (EU-wide, remote-only)
-- map raw payloads to the canonical job model
-- reject jobs that do not meet project criteria
+- enforce required fields
+- apply source-specific heuristics safely
+- reject non-compliant or out-of-scope jobs
+- produce source-agnostic job records
 
-Normalization is:
-- explicit
-- deterministic
-- fully test-covered
-
-This layer is the **policy boundary** of the system.
+Normalization is the primary policy boundary of the system.
 
 ---
 
-## Job Store
+### Job Store
 
 The job store is the system’s single source of truth.
 
 Responsibilities:
-- persist normalized job records
-- ensure idempotent upserts
-- track lifecycle and verification timestamps
+- persist normalized job data
+- track lifecycle-related timestamps
+- support idempotent upserts
 
-Current backend:
-- SQLite (sufficient for early-stage and development)
-
-The storage layer is designed to be **replaceable** without changes to ingestion or normalization logic.
+The current implementation uses SQLite, with the design allowing replacement by a higher-level database engine in the future.
 
 ---
 
-## Availability Checker
+### Availability & Lifecycle
 
-After ingestion, a background worker:
-- periodically verifies job URLs via HTTP
-- interprets response codes and network failures
-- updates availability-related fields
+Background workers handle:
+- periodic availability verification of job URLs
+- lifecycle transitions (NEW → ACTIVE → STALE → EXPIRED / UNREACHABLE)
 
-The checker prioritizes:
-- correctness over volume
-- freshness over completeness
-
-Availability results directly influence lifecycle transitions.
+These processes are asynchronous and do not block ingestion or API access.
 
 ---
 
-## Job Lifecycle
+### Read API
 
-Each job progresses through a defined lifecycle:
+The Read API exposes job data in a strictly read-only manner.
 
-- **NEW** – freshly discovered job
-- **ACTIVE** – verified and visible
-- **STALE** – not verified within the expected window
-- **EXPIRED** – confirmed unavailable or outdated
+Key properties:
+- stateless
+- cache-friendly
+- contract-stable
 
-From an API consumer perspective:
-- **NEW** and **ACTIVE** jobs are considered *visible*
+Endpoints:
+- GET /jobs
+- GET /jobs/feed
 
-Lifecycle transitions are deterministic and rule-based.
-
----
-
-## Read API
-
-The Read API exposes job data in a **read-only, consumer-safe** manner.
-
-### Query API
-
-```
-GET /jobs
-```
-
-Query parameters:
-- `status`: visible | new | active | stale | expired
-- `limit`: default 20
-- `offset`: default 0
-
-Example:
-```
-GET /jobs?status=visible
-```
+Only visible jobs (NEW and ACTIVE) are exposed to consumers.
 
 ---
 
-### Public Job Feed
+### Frontend & Consumers
 
-In addition to the query API, OpenJobsEU exposes a **stable public JSON feed**:
-
-```
-GET /jobs/feed
-```
-
-The feed:
-- returns all visible jobs (NEW + ACTIVE)
-- does not support filtering or pagination
-- is cache-friendly and contract-stable
-
-It is intended for:
-- simple frontends
+Consumers include:
+- a minimal reference frontend
 - external aggregators
-- automated consumers
+- automated systems
+
+All consumers interact exclusively via the Read API or public feed.
 
 ---
 
-## Infrastructure
+## Execution Model
 
-OpenJobsEU follows cloud-native infrastructure principles:
-- containerized runtime
-- Infrastructure as Code (Terraform)
-- CI pipelines with automated tests
-- environment-driven configuration
+The entire system is executed via a periodic **scheduler-triggered tick**:
 
-Current deployment target:
-- Google Cloud Run
+1. Ingestion phase
+2. Post-ingestion processing
+3. Availability checks
+4. Lifecycle transitions
 
-The system is designed to remain **cloud-provider portable**.
+This design avoids long-running workers and ensures deterministic execution.
 
 ---
 
 ## Observability
 
 Observability is provided via:
-- structured ingestion logs
-- unified ingestion event logging
+- structured application logs
+- explicit ingestion phase logging
 - health and readiness endpoints
-- Cloud Run and Scheduler execution logs
 
-Metrics and alerting are intentionally deferred until ingestion behavior stabilizes.
+More advanced metrics and alerting are planned.
 
 ---
 
-## Compliance and Legal Boundaries
+## Compliance Boundaries
 
 OpenJobsEU explicitly avoids:
-- scraping closed or protected platforms
-- bypassing access controls
-- automating third-party interactions
-- redistributing proprietary content
+- scraping closed platforms
+- user tracking or profiling
+- automated redistribution to third parties
 
-All data originates from:
-- legally accessible public sources
-- explicit, source-provided APIs
+All processing is limited to legally accessible data sources.
 
-Compliance is treated as a **first-class architectural constraint**.
