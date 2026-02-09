@@ -9,13 +9,15 @@ from app.workers.ingestion.weworkremotely import run_weworkremotely_ingestion
 from app.workers.ingestion.remotive import run_remotive_ingestion
 from app.workers.ingestion.remoteok import run_remoteok_ingestion
 
+from app.workers.ingestion.registry import (
+    INGESTION_HANDLERS,
+    get_available_ingestion_sources,
+)
+
+
+
 logger = logging.getLogger("openjobseu.runtime")
 
-INGESTION_HANDLERS = {
-    "weworkremotely": run_weworkremotely_ingestion,
-    "remotive": run_remotive_ingestion,
-    "remoteok": run_remoteok_ingestion,
-}
 
 router = APIRouter(prefix="/internal", tags=["internal"])
 

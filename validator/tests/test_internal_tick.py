@@ -1,6 +1,6 @@
 import os
 from fastapi.testclient import TestClient
-from app.internal import get_available_ingestion_sources
+from app.workers.ingestion.registry import get_available_ingestion_sources
 
 from app.main import app
 

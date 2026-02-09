@@ -1,4 +1,9 @@
 from datetime import datetime, timedelta, timezone
+from storage.sqlite import get_jobs_for_verification, update_job_availability
+import logging
+
+
+logger = logging.getLogger("openjobseu.lifecycle")
 
 STALE_AFTER_DAYS = 7
 EXPIRE_AFTER_DAYS = 30
@@ -54,3 +59,41 @@ def apply_lifecycle_rules(job: dict, now: datetime) -> str | None:
             return "stale"
 
     return None
+
+
+def run_lifecycle_rules() -> None:
+    """
+    Apply lifecycle rules to all eligible jobs.
+    """
+    now = datetime.now(timezone.utc)
+
+    jobs = get_jobs_for_lifecycle(limit=50)
+
+    for job in jobs:
+        new_status = apply_lifecycle_rules(job, now)
+
+        if new_status:
+            update_job_availability(
+                job_id=job["job_id"],
+                status=new_status,
+                verified_at=now.isoformat(),
+                failure=False,
+            )
+
+
+
+def run_lifecycle_pipeline() -> None:
+    jobs = get_jobs_for_verification(limit=50)
+    now = datetime.now(timezone.utc)
+
+    for job in jobs:
+        new_status = apply_lifecycle_rules(job, now)
+        if new_status:
+            update_job_availability(
+                job_id=job["job_id"],
+                status=new_status,
+                verified_at=now.isoformat(),
+                failure=False,
+            )
+
+    logger.info("lifecycle pipeline completed")

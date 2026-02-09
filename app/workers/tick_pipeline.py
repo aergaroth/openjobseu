@@ -2,8 +2,8 @@ import logging
 from typing import Iterable, Dict, Callable, List
 
 from app.workers.post_ingestion import run_post_ingestion
-from app.workers.availability import run_availability_checks
-from app.workers.lifecycle import run_lifecycle_rules
+from app.workers.availability import run_availability_pipeline
+from app.workers.lifecycle import run_lifecycle_pipeline
 
 logger = logging.getLogger("openjobseu.pipeline")
 
@@ -45,10 +45,10 @@ def run_tick_pipeline(
     run_post_ingestion(actions)
 
     # --- Availability ---
-    run_availability_checks()
+    run_availability_pipeline()
 
     # --- Lifecycle ---
-    run_lifecycle_rules()
+    run_lifecycle_pipeline()
 
     logger.info(
         "tick pipeline finished",

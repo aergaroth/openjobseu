@@ -3,6 +3,8 @@ import logging
 import requests
 
 logger = logging.getLogger("openjobseu.worker.availability")
+from storage.sqlite import get_jobs_for_verification, update_job_availability
+
 
 DEFAULT_TIMEOUT = 5
 
@@ -70,3 +72,35 @@ def run_availability_checks(jobs: list[dict]) -> dict:
 
     logger.info("availability checks completed", extra=summary)
     return summary
+
+
+
+from storage.sqlite import (
+    get_jobs_for_verification,
+    update_job_availability,
+)
+
+
+def run_availability_pipeline() -> None:
+    """
+    Pipeline-level availability stage.
+    Fetches jobs, checks availability and persists results.
+    """
+
+    jobs = get_jobs_for_verification(limit=20)
+    now = datetime.now(timezone.utc).isoformat()
+
+    for job in jobs:
+        status = check_job_availability(job)
+
+        update_job_availability(
+            job_id=job["job_id"],
+            status=status,
+            verified_at=now,
+            failure=(status == "unreachable"),
+        )
+
+    logger.info(
+        "availability pipeline completed",
+        extra={"checked": len(jobs)},
+    )
