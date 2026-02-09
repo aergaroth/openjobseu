@@ -22,7 +22,7 @@ def run_tick():
         actions.append("local_ingestion_failed")
         logger.error("local ingestion failed", exc_info=exc)
 
-    run_post_ingestion(actions)
+    run_post_ingestion()
 
     return {
         "actions": actions,
