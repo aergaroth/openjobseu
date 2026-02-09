@@ -42,7 +42,7 @@ def run_tick_pipeline(
             logger.exception("ingestion source failed", extra={"source": source})
 
     # --- Post-ingestion ---
-    run_post_ingestion(actions)
+    run_post_ingestion()
 
     # --- Availability ---
     run_availability_pipeline()
