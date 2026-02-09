@@ -21,9 +21,12 @@ User-facing functionality is intentionally minimal and strictly read-only.
 
 The system operates as a periodic **tick-based pipeline**:
 
-External Sources → Ingestion → Normalization → Storage → Availability & Lifecycle → Read API → Consumers
+External Sources -> Ingestion -> Normalization -> Storage -> Availability & Lifecycle -> Read API -> Consumers
 
 This model ensures predictable behavior, resilience to partial failures, and clear operational boundaries.
+
+> In production (Cloud Run), OpenJobsEU runs in prod mode by default.
+> Development-only local ingestion requires explicitly setting ```INGESTION_MODE=local```
 
 ---
 
@@ -147,4 +150,6 @@ OpenJobsEU explicitly avoids:
 - automated redistribution to third parties
 
 All processing is limited to legally accessible data sources.
+
+
 
