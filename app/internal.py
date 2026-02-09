@@ -20,6 +20,9 @@ INGESTION_HANDLERS = {
 
 router = APIRouter(prefix="/internal", tags=["internal"])
 
+def get_available_ingestion_sources() -> list[str]:
+    return list(INGESTION_HANDLERS.keys())
+
 
 @router.post("/tick")
 def tick():
