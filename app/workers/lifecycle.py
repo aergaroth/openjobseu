@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from storage.sqlite import get_jobs_for_verification, update_job_availability
+from storage.sqlite import get_jobs_for_verification, update_job_availability, init_db
 import logging
 
 
@@ -63,26 +63,15 @@ def apply_lifecycle_rules(job: dict, now: datetime) -> str | None:
 
 def run_lifecycle_rules() -> None:
     """
+    Backward-compatible wrapper.
     Apply lifecycle rules to all eligible jobs.
     """
-    now = datetime.now(timezone.utc)
-
-    jobs = get_jobs_for_lifecycle(limit=50)
-
-    for job in jobs:
-        new_status = apply_lifecycle_rules(job, now)
-
-        if new_status:
-            update_job_availability(
-                job_id=job["job_id"],
-                status=new_status,
-                verified_at=now.isoformat(),
-                failure=False,
-            )
+    run_lifecycle_pipeline()
 
 
 
 def run_lifecycle_pipeline() -> None:
+    init_db()
     jobs = get_jobs_for_verification(limit=50)
     now = datetime.now(timezone.utc)
 

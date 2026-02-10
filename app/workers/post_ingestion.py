@@ -2,8 +2,9 @@
 
 import logging
 
-from app.workers.availability import run_availability_checks
-from app.workers.lifecycle import run_lifecycle_rules
+from app.workers.availability import run_availability_pipeline
+from app.workers.lifecycle import run_lifecycle_pipeline
+from storage.sqlite import init_db
 
 logger = logging.getLogger("openjobseu.post_ingestion")
 
@@ -24,15 +25,18 @@ def run_post_ingestion() -> None:
 
     logger.info("post-ingestion started")
 
+    # Ensure DB schema exists even if ingestion phase had no valid sources.
+    init_db()
+
     # --- Availability ---
     try:
-        run_availability_checks()
+        run_availability_pipeline()
     except Exception:
         logger.exception("availability step failed")
 
     # --- Lifecycle ---
     try:
-        run_lifecycle_rules()
+        run_lifecycle_pipeline()
     except Exception:
         logger.exception("lifecycle step failed")
 

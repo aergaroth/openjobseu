@@ -2,8 +2,6 @@ import logging
 from typing import Iterable, Dict, Callable, List
 
 from app.workers.post_ingestion import run_post_ingestion
-from app.workers.availability import run_availability_pipeline
-from app.workers.lifecycle import run_lifecycle_pipeline
 
 logger = logging.getLogger("openjobseu.pipeline")
 
@@ -15,7 +13,7 @@ def run_tick_pipeline(
 ) -> dict:
     """
     Execute full tick pipeline:
-    ingestion → post_ingestion → availability → lifecycle
+    ingestion → post_ingestion
     """
 
     actions: List[str] = []
@@ -41,14 +39,8 @@ def run_tick_pipeline(
         except Exception:
             logger.exception("ingestion source failed", extra={"source": source})
 
-    # --- Post-ingestion ---
+    # --- Post-ingestion (availability + lifecycle) ---
     run_post_ingestion()
-
-    # --- Availability ---
-    run_availability_pipeline()
-
-    # --- Lifecycle ---
-    run_lifecycle_pipeline()
 
     logger.info(
         "tick pipeline finished",
