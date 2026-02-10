@@ -2,6 +2,12 @@ from datetime import datetime, timezone
 import logging
 from typing import Dict, Optional
 
+from app.workers.normalization.common import (
+    normalize_source_datetime,
+    sanitize_location,
+    sanitize_url,
+)
+
 logger = logging.getLogger("openjobseu.normalization.remoteok")
 
 
@@ -20,7 +26,7 @@ def normalize_remoteok_job(raw: Dict) -> Optional[Dict]:
         job_id = raw.get("id")
         title = raw.get("position")
         company = raw.get("company")
-        url = raw.get("url") or raw.get("apply_url")
+        url = sanitize_url(raw.get("url") or raw.get("apply_url"))
 
         if not job_id or not title or not company or not url:
             logger.warning(
@@ -31,18 +37,14 @@ def normalize_remoteok_job(raw: Dict) -> Optional[Dict]:
 
         # Posted date handling
         # RemoteOK provides both ISO date and epoch
-        posted_at = None
-        if raw.get("date"):
-            posted_at = raw["date"]
-        elif raw.get("epoch"):
-            posted_at = datetime.fromtimestamp(
-                raw["epoch"], tz=timezone.utc
-            ).isoformat()
-        else:
+        posted_at = normalize_source_datetime(raw.get("date"))
+        if not posted_at:
+            posted_at = normalize_source_datetime(raw.get("epoch"))
+        if not posted_at:
             posted_at = datetime.now(timezone.utc).isoformat()
 
         # Location / scope
-        location = raw.get("location", "").lower()
+        location = (sanitize_location(raw.get("location")) or "").lower()
 
         # Conservative EU detection
         eu_markers = [

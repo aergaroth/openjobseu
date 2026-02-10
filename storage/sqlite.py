@@ -47,6 +47,7 @@ def upsert_job(job: dict):
     Availability and lifecycle workers may later update status-related fields.
     """
     now = datetime.now(timezone.utc).isoformat()
+    first_seen_at = job.get("first_seen_at") or now
 
     with get_conn() as conn:
         conn.execute(
@@ -74,6 +75,10 @@ def upsert_job(job: dict):
                 remote = excluded.remote,
                 remote_scope = excluded.remote_scope,
                 status = excluded.status,
+                first_seen_at = CASE
+                    WHEN excluded.first_seen_at < jobs.first_seen_at THEN excluded.first_seen_at
+                    ELSE jobs.first_seen_at
+                END,
                 last_seen_at = excluded.last_seen_at
             """,
             (
@@ -87,7 +92,7 @@ def upsert_job(job: dict):
                 int(job["remote"]),
                 job["remote_scope"],
                 job["status"],
-                now,
+                first_seen_at,
                 now,
             ),
         )

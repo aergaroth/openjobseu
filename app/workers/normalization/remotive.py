@@ -1,6 +1,12 @@
 from datetime import datetime, timezone
 from typing import Optional, Dict
 
+from app.workers.normalization.common import (
+    normalize_source_datetime,
+    sanitize_location,
+    sanitize_url,
+)
+
 
 def normalize_remotive_job(raw: Dict) -> Optional[Dict]:
     """
@@ -16,8 +22,8 @@ def normalize_remotive_job(raw: Dict) -> Optional[Dict]:
     title = raw.get("title")
     company = raw.get("company_name")
     description = raw.get("description")
-    url = raw.get("url")
-    location = raw.get("candidate_required_location")
+    url = sanitize_url(raw.get("url"))
+    location = sanitize_location(raw.get("candidate_required_location"))
 
     if not all([job_id, title, company, description, url, location]):
         return None
@@ -29,6 +35,8 @@ def normalize_remotive_job(raw: Dict) -> Optional[Dict]:
         return None
 
     now = datetime.now(timezone.utc).isoformat()
+    publication_date = normalize_source_datetime(raw.get("publication_date"))
+    first_seen_at = publication_date if publication_date else now
 
     return {
         "job_id": f"remotive:{job_id}",
@@ -41,6 +49,6 @@ def normalize_remotive_job(raw: Dict) -> Optional[Dict]:
         "remote": True,
         "remote_scope": location,
         "status": "new",
-        "first_seen_at": now,
+        "first_seen_at": first_seen_at,
         "last_seen_at": now,
     }

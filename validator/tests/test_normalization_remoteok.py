@@ -70,3 +70,21 @@ def test_remoteok_uses_epoch_when_date_missing():
 
     assert job is not None
     assert job["first_seen_at"].endswith("+00:00")
+
+
+def test_remoteok_normalization_cleans_url_and_location():
+    raw = {
+        "id": 1002,
+        "position": "Backend Engineer",
+        "company": "Acme",
+        "description": "Role",
+        "location": "   Europe   ",
+        "url": " https://remoteok.com/remote-jobs/1002?utm_medium=email&ref=home#apply ",
+        "date": "2026-02-06T10:00:00+00:00",
+    }
+
+    job = normalize_remoteok_job(raw)
+
+    assert job is not None
+    assert job["source_url"] == "https://remoteok.com/remote-jobs/1002?ref=home"
+    assert job["remote_scope"] == "EU-wide"

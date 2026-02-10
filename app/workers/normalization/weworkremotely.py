@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 from typing import Dict, Optional
 import logging
 
+from app.workers.normalization.common import normalize_source_datetime, sanitize_url
+
 logger = logging.getLogger("openjobseu.normalization.weworkremotely")
 
 
@@ -18,7 +20,7 @@ def normalize_weworkremotely_job(raw: Dict) -> Optional[Dict]:
 
     try:
         raw_title = (raw.get("title") or "").strip()
-        link = raw.get("link")
+        link = sanitize_url(raw.get("link"))
         source_job_id = raw.get("id") or link
 
         if not raw_title or not link or not source_job_id:
@@ -40,8 +42,13 @@ def normalize_weworkremotely_job(raw: Dict) -> Optional[Dict]:
                 company = possible_company.strip()
                 title = possible_title.strip()
 
-        # --- first_seen_at ---
-        first_seen_at = datetime.now(timezone.utc).isoformat()
+        first_seen_at = (
+            normalize_source_datetime(raw.get("published"))
+            or normalize_source_datetime(raw.get("updated"))
+            or normalize_source_datetime(raw.get("published_parsed"))
+            or normalize_source_datetime(raw.get("updated_parsed"))
+            or datetime.now(timezone.utc).isoformat()
+        )
 
         normalized = {
             "job_id": f"weworkremotely:{source_job_id}",

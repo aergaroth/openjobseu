@@ -23,6 +23,7 @@ def test_remotive_normalization_happy_path():
     assert job["remote_scope"] == "Europe"
     assert job["status"] == "new"
     assert job["source_url"] == raw["url"]
+    assert job["first_seen_at"] == raw["publication_date"]
 
 
 def test_remotive_normalization_skips_non_eu_jobs():
@@ -54,6 +55,7 @@ def test_remotive_normalization_handles_worldwide_as_valid():
 
     assert job is not None
     assert job["remote_scope"] == "Worldwide"
+    assert job["first_seen_at"].endswith("+00:00")
 
 
 def test_remotive_normalization_skips_missing_required_fields():
@@ -82,3 +84,20 @@ def test_remotive_job_id_is_stable_string():
 
     assert job["job_id"] == "remotive:999"
     assert isinstance(job["job_id"], str)
+
+
+def test_remotive_normalization_cleans_url_and_location():
+    raw = {
+        "id": 1001,
+        "title": "Engineer",
+        "company_name": "Acme",
+        "description": "Role",
+        "url": " https://remotive.com/remote-jobs/1001?utm_source=rss&ref=abc#top ",
+        "candidate_required_location": "  Europe   only  ",
+    }
+
+    job = normalize_remotive_job(raw)
+
+    assert job is not None
+    assert job["source_url"] == "https://remotive.com/remote-jobs/1001?ref=abc"
+    assert job["remote_scope"] == "Europe only"

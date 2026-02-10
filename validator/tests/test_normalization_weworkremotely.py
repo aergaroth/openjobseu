@@ -68,3 +68,31 @@ def test_weworkremotely_company_heuristic_is_safe():
     assert job["company_name"] == "unknown"
     assert job["title"] == "X: Y: Z Engineer"
 
+
+def test_weworkremotely_uses_source_published_date_when_present():
+    raw = {
+        "title": "Acme Corp: Senior Backend Engineer",
+        "link": "https://weworkremotely.com/remote-jobs/321",
+        "id": "wwr-321",
+        "summary": "Great role",
+        "published": "Thu, 06 Feb 2026 14:30:00 +0000",
+    }
+
+    job = normalize_weworkremotely_job(raw)
+
+    assert job is not None
+    assert job["first_seen_at"] == "2026-02-06T14:30:00+00:00"
+
+
+def test_weworkremotely_normalization_cleans_url():
+    raw = {
+        "title": "Acme Corp: Senior Backend Engineer",
+        "link": " https://weworkremotely.com/remote-jobs/654?utm_campaign=rss&src=feed#content ",
+        "id": "wwr-654",
+        "summary": "Great role",
+    }
+
+    job = normalize_weworkremotely_job(raw)
+
+    assert job is not None
+    assert job["source_url"] == "https://weworkremotely.com/remote-jobs/654?src=feed"
