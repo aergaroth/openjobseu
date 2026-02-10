@@ -8,7 +8,6 @@ from app.workers.ingestion.log_helpers import log_ingestion
 from storage.sqlite import init_db, upsert_job
 
 SOURCE = "weworkremotely"
-RSS_URL = "https://weworkremotely.com/categories/remote-programming-jobs.rss"
 
 
 def run_weworkremotely_ingestion() -> dict:
@@ -19,7 +18,7 @@ def run_weworkremotely_ingestion() -> dict:
     persisted = 0
 
     try:
-        adapter = WeWorkRemotelyRssAdapter(RSS_URL)
+        adapter = WeWorkRemotelyRssAdapter()
 
         entries = adapter.fetch()
         log_ingestion(

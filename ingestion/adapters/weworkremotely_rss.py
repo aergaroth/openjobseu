@@ -2,10 +2,8 @@ import feedparser
 
 class WeWorkRemotelyRssAdapter:
     source = "weworkremotely"
-
-    def __init__(self, feed_url: str):
-        self.feed_url = feed_url
+    FEED_URL = "https://weworkremotely.com/categories/remote-programming-jobs.rss"
 
     def fetch(self) -> list[dict]:
-        feed = feedparser.parse(self.feed_url)
+        feed = feedparser.parse(self.FEED_URL)
         return feed.entries
