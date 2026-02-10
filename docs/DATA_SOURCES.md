@@ -22,6 +22,8 @@ through explicit normalization and validation before being persisted.
 Notes:
 - RSS entries are fetched as-is
 - Normalization applies a conservative company-name heuristic
+- Normalization uses source publication date when available (`published` / `updated`)
+- Source URL is sanitized before persistence
 - Jobs without required fields are skipped
 
 ---
@@ -40,7 +42,8 @@ Notes:
 - Normalization enforces OpenJobsEU policy:
   - EU-wide or Worldwide only
   - non-EU–restricted jobs are skipped
-- Location data is preserved as provided by the source
+- `publication_date` is used as `first_seen_at` when available
+- URL and location fields are sanitized during normalization
 
 ---
 
@@ -57,6 +60,8 @@ Notes:
 - The first API element (metadata/legal notice) is ignored
 - Remaining entries are treated as job offers
 - Normalization filters and validates jobs explicitly
+- Source date (`date` / `epoch`) is used for `first_seen_at` when available
+- Source URL is sanitized before persistence
 
 ---
 
@@ -131,4 +136,3 @@ Each new source will be evaluated individually for:
 - alignment with OpenJobsEU scope
 
 No scraping of closed or protected platforms is planned or permitted.
-

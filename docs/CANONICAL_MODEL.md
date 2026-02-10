@@ -63,7 +63,9 @@ From an API consumer perspective, **NEW and ACTIVE jobs are treated as visible**
 
 ## Persistence notes
 
-- `first_seen_at` is set only once, on initial ingestion
+- `first_seen_at` prefers source publication timestamp when available
+- if source publication timestamp is missing, `first_seen_at` falls back to ingestion time
+- on repeated upserts of the same `job_id`, the earliest `first_seen_at` is preserved
 - `last_seen_at` is updated on each successful ingestion of the same job
 - `last_verified_at` is updated only by the availability checker
 - ingestion and normalization do not modify lifecycle state beyond initial creation
@@ -126,6 +128,7 @@ Normalization is responsible for:
 - validating required fields
 - enforcing OpenJobsEU inclusion policy
 - mapping raw payloads to the canonical job model
+- sanitizing source URL and location fields
 - rejecting non-compliant job offers
 
 Normalization is source-specific, deterministic, and covered by automated tests.
