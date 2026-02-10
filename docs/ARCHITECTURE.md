@@ -140,6 +140,19 @@ Observability is provided via:
 
 More advanced metrics and alerting are planned.
 
+As part of operational verification, a lightweight DB smoke check script
+is executed after each deployment.
+
+The smoke check validates:
+- application health endpoint
+- successful tick execution
+- database accessibility and integrity
+- job_id uniqueness
+- basic feed consistency
+
+Any failure blocks the deployment and requires investigation.
+
+
 ---
 
 ## Compliance Boundaries

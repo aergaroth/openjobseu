@@ -61,6 +61,7 @@ It is not a demo or mock system — all components are designed to run in produc
 - [x] Cloud Scheduler triggering `/internal/tick`
 - [x] CI pipeline with tests, image build and deploy
 - [x] Deterministic runtime initialization (fresh DB support)
+- [x] Post-deploy DB smoke check for runtime and data integrity verification
 
 Status: **live**
 
