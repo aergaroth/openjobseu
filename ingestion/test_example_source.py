@@ -1,4 +1,5 @@
 from ingestion.adapters.example_source import ExampleSourceAdapter
+from app.workers.normalization.example_source import normalize_example_source_job
 
 
 REQUIRED_FIELDS = [
@@ -14,9 +15,10 @@ REQUIRED_FIELDS = [
 ]
 
 
-def test_adapter_produces_canonical_jobs():
+def test_example_source_produces_canonical_jobs():
     adapter = ExampleSourceAdapter()
-    jobs = adapter.run()
+    raw_jobs = adapter.fetch()
+    jobs = [normalize_example_source_job(job) for job in raw_jobs]
 
     assert isinstance(jobs, list)
     assert len(jobs) > 0
@@ -26,5 +28,5 @@ def test_adapter_produces_canonical_jobs():
             assert field in job
 
 def get_jobs():
-    return ExampleSourceAdapter().run()
-
+    adapter = ExampleSourceAdapter()
+    return [normalize_example_source_job(job) for job in adapter.fetch()]
