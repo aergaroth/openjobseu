@@ -14,8 +14,6 @@ from fastapi.middleware.cors import CORSMiddleware
 configure_logging()
 logging.getLogger(__name__).info("logging configured")
 
-logging.basicConfig(level=logging.INFO)
-
 
 init_db()
 

@@ -28,6 +28,9 @@ This model ensures predictable behavior, resilience to partial failures, and cle
 > In production (Cloud Run), OpenJobsEU runs in prod mode by default.
 > Development-only local ingestion requires explicitly setting ```INGESTION_MODE=local```
 
+> Logging format is determined by runtime mode. Local development uses text logs, while containerized deployments emit 
+> structured JSON logs.
+
 ---
 
 ## Core Components
