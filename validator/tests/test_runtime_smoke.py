@@ -28,3 +28,5 @@ def test_internal_tick_smoke():
     data = resp.json()
     assert data["status"] == "ok"
     assert "actions" in data
+    assert "metrics" in data
+    assert "tick_duration_ms" in data["metrics"]

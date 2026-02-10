@@ -139,6 +139,7 @@ This design avoids long-running workers and ensures deterministic execution.
 Observability is provided via:
 - structured application logs
 - explicit ingestion phase logging
+- runtime tick metrics (duration and per-source ingestion counts)
 - health and readiness endpoints
 
 More advanced metrics and alerting are planned.
@@ -166,5 +167,4 @@ OpenJobsEU explicitly avoids:
 - automated redistribution to third parties
 
 All processing is limited to legally accessible data sources.
-
 

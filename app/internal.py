@@ -46,7 +46,7 @@ def tick():
             "status": "ok",
             "mode": "local",
             "sources": ["local"],
-            "actions": result.get("actions", []),
+            **result,
         }
 
     result = run_tick_pipeline(

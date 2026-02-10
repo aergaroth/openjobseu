@@ -77,7 +77,7 @@ Status: **live**
 
 ### A7 – Observability & ops polish
 - [x] Structured logging
-- [ ] Runtime metrics (tick duration, ingestion counts)
+- [x] Runtime metrics (tick duration, ingestion counts)
 - [ ] Scheduler and tick failure alerting
 
 ### A8 – Storage upgrade

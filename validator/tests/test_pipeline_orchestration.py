@@ -40,3 +40,48 @@ def test_tick_pipeline_runs_post_ingestion_once(monkeypatch):
 
     assert post_calls["count"] == 1
     assert result["actions"] == ["remotive_ingested:1"]
+    assert "metrics" in result
+    assert "tick_duration_ms" in result["metrics"]
+    assert result["metrics"]["ingestion"]["sources_total"] == 1
+    assert "remotive" in result["metrics"]["ingestion"]["per_source"]
+
+
+def test_tick_pipeline_aggregates_per_source_metrics(monkeypatch):
+    def ok_handler():
+        return {
+            "actions": ["remotive_ingested:3"],
+            "metrics": {
+                "source": "remotive",
+                "status": "ok",
+                "raw_count": 10,
+                "persisted_count": 3,
+                "skipped_count": 7,
+                "duration_ms": 25,
+            },
+        }
+
+    def failed_handler():
+        raise RuntimeError("source down")
+
+    monkeypatch.setattr(tick_pipeline, "run_post_ingestion", lambda: None)
+
+    result = tick_pipeline.run_tick_pipeline(
+        ingestion_sources=["remotive", "remoteok", "unknown"],
+        ingestion_handlers={
+            "remotive": ok_handler,
+            "remoteok": failed_handler,
+        },
+    )
+
+    ingestion_metrics = result["metrics"]["ingestion"]
+
+    assert ingestion_metrics["sources_total"] == 3
+    assert ingestion_metrics["sources_ok"] == 1
+    assert ingestion_metrics["sources_failed"] == 1
+    assert ingestion_metrics["sources_unknown"] == 1
+    assert ingestion_metrics["raw_count"] == 10
+    assert ingestion_metrics["persisted_count"] == 3
+    assert ingestion_metrics["skipped_count"] == 7
+    assert ingestion_metrics["per_source"]["remotive"]["status"] == "ok"
+    assert ingestion_metrics["per_source"]["remoteok"]["status"] == "failed"
+    assert ingestion_metrics["per_source"]["unknown"]["status"] == "unknown"

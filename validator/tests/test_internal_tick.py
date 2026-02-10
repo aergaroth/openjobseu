@@ -24,6 +24,7 @@ def test_tick_runs_all_adapters_by_default(monkeypatch):
     sources = data["sources"]
 
     assert set(sources) == set(get_available_ingestion_sources())
+    assert "metrics" in data
 
 
 
@@ -37,6 +38,7 @@ def test_tick_runs_only_selected_adapter(monkeypatch):
 
     data = response.json()
     assert data["sources"] == ["remotive"]
+    assert "metrics" in data
 
 
 def test_tick_local_mode(monkeypatch):
@@ -51,6 +53,7 @@ def test_tick_local_mode(monkeypatch):
 
     assert data["mode"] == "local"
     assert data["sources"] == ["local"] or "local_ingested" in " ".join(data["actions"])
+    assert "metrics" in data
 
 
 def test_tick_ignores_unknown_source(monkeypatch):
@@ -63,4 +66,4 @@ def test_tick_ignores_unknown_source(monkeypatch):
 
     data = response.json()
     assert "weworkremotely" in data["sources"]
-
+    assert "metrics" in data
