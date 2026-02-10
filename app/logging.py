@@ -20,6 +20,7 @@ class SafeExtraFormatter(logging.Formatter):
             "exc_text", "stack_info", "lineno", "funcName",
             "created", "msecs", "relativeCreated",
             "thread", "threadName", "processName", "process",
+            "taskName",
         }
 
         extras = {
