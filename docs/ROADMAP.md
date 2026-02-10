@@ -62,6 +62,7 @@ It is not a demo or mock system — all components are designed to run in produc
 - [x] CI pipeline with tests, image build and deploy
 - [x] Deterministic runtime initialization (fresh DB support)
 - [x] Post-deploy DB smoke check for runtime and data integrity verification
+- [x] Runtime-aware structured logging (JSON in container, text locally)
 
 Status: **live**
 
@@ -75,9 +76,9 @@ Status: **live**
 - Frontend UX polish (sorting, client-side filtering)
 
 ### A7 – Observability & ops polish
-- Structured logging
-- Runtime metrics (tick duration, ingestion counts)
-- Scheduler and tick failure alerting
+- [x] Structured logging
+- [ ] Runtime metrics (tick duration, ingestion counts)
+- [ ] Scheduler and tick failure alerting
 
 ### A8 – Storage upgrade
 - Higher-level database engine backend
@@ -89,5 +90,5 @@ Status: **live**
 ## Future (design-level)
 
 - Company self-publishing workflow (manual, compliance-first)
-- Metadata enrichment (heuristic-based, no AI by default)
+- Metadata enrichment (source-provided fields such as posted_at; heuristic-based, no AI by default)
 - Managed deployment options
