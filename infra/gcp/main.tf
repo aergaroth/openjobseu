@@ -13,7 +13,7 @@ resource "google_cloud_run_v2_service" "this" {
 
       env {
         name  = "INGESTION_MODE"
-        value = "rss"
+        value = "prod"
       }
       ports {
         container_port = 8000
