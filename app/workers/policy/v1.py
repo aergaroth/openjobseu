@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Optional, Tuple
 
 
 NON_REMOTE_KEYWORDS = [
@@ -31,7 +31,7 @@ def contains_any(text: str, keywords: list[str]) -> bool:
     return any(k in text for k in keywords)
 
 
-def evaluate_policy(job: Dict) -> bool:
+def evaluate_policy(job: Dict) -> Tuple[bool, Optional[str]]:
     """
     Policy v1:
     - Reject non-remote roles
@@ -45,10 +45,10 @@ def evaluate_policy(job: Dict) -> bool:
 
     # Remote purity check
     if contains_any(full_text, NON_REMOTE_KEYWORDS):
-        return False
+        return False, "non_remote"
 
     # Geo restriction check
     if contains_any(full_text, GEO_RESTRICT_KEYWORDS):
-        return False
+        return False, "geo_restriction"
 
-    return True
+    return True, None

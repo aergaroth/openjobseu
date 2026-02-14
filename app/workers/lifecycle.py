@@ -1,9 +1,5 @@
 from datetime import datetime, timedelta, timezone
 from storage.sqlite import get_jobs_for_verification, update_job_availability, init_db
-import logging
-
-
-logger = logging.getLogger("openjobseu.lifecycle")
 
 STALE_AFTER_DAYS = 7
 EXPIRE_AFTER_DAYS = 30
@@ -84,5 +80,3 @@ def run_lifecycle_pipeline() -> None:
                 verified_at=now.isoformat(),
                 failure=False,
             )
-
-    logger.info("lifecycle pipeline completed")

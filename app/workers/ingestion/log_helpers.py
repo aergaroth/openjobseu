@@ -13,18 +13,20 @@ def log_ingestion(
     Unified ingestion logger.
 
     phase examples:
-    - start
     - fetch
-    - end
+    - ingestion_summary
     - error
     """
 
-    logger.info(
-        "ingestion",
-        extra={
-            "component": "ingestion",
-            "source": source,
-            "phase": phase,
-            **extra_fields,
-        },
-    )
+    payload = {
+        "component": "ingestion",
+        "source": source,
+        "phase": phase,
+        **extra_fields,
+    }
+
+    if phase == "fetch":
+        logger.debug("ingestion", extra=payload)
+        return
+
+    logger.info("ingestion", extra=payload)

@@ -43,11 +43,6 @@ def run_tick_pipeline(
         "skipped_count": 0,
     }
 
-    logger.info(
-        "tick pipeline started",
-        extra={"sources": requested_sources},
-    )
-
     # --- Ingestion phase ---
     for source in requested_sources:
         handler = ingestion_handlers.get(source)
@@ -64,8 +59,6 @@ def run_tick_pipeline(
                 "duration_ms": int((perf_counter() - source_started_perf) * 1000),
             }
             continue
-
-        logger.info("starting ingestion source", extra={"source": source})
 
         try:
             result = handler()
@@ -132,13 +125,13 @@ def run_tick_pipeline(
     }
 
     logger.info(
-        "tick pipeline finished",
+        "tick",
         extra={
-            "actions": actions,
-            "tick_duration_ms": tick_duration_ms,
+            "component": "pipeline",
+            "phase": "tick_finished",
+            "total_duration_ms": tick_duration_ms,
             "sources_ok": totals["sources_ok"],
             "sources_failed": totals["sources_failed"],
-            "sources_unknown": totals["sources_unknown"],
             "persisted_count": totals["persisted_count"],
         },
     )

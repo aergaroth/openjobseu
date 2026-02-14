@@ -32,11 +32,14 @@ def tick():
     else:
         ingestion_sources = list(INGESTION_HANDLERS.keys())
 
+    tick_sources = ["local"] if ingestion_mode == "local" else ingestion_sources
     logger.info(
-        "tick dispatcher invoked",
+        "tick",
         extra={
+            "component": "runtime",
+            "phase": "tick_start",
             "mode": ingestion_mode,
-            "sources": ingestion_sources,
+            "sources": tick_sources,
         },
     )
 

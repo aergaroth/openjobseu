@@ -73,7 +73,7 @@ def run_availability_checks(jobs: list[dict]) -> dict:
     logger.info("availability checks completed", extra=summary)
     return summary
 
-def run_availability_pipeline() -> None:
+def run_availability_pipeline() -> dict:
     """
     Pipeline-level availability stage.
     Fetches jobs, checks availability and persists results.
@@ -83,8 +83,17 @@ def run_availability_pipeline() -> None:
     jobs = get_jobs_for_verification(limit=20)
     now = datetime.now(timezone.utc).isoformat()
 
+    summary = {
+        "checked": 0,
+        "active": 0,
+        "expired": 0,
+        "unreachable": 0,
+    }
+
     for job in jobs:
         status = check_job_availability(job)
+        summary["checked"] += 1
+        summary[status] += 1
 
         update_job_availability(
             job_id=job["job_id"],
@@ -93,7 +102,4 @@ def run_availability_pipeline() -> None:
             failure=(status == "unreachable"),
         )
 
-    logger.info(
-        "availability pipeline completed",
-        extra={"checked": len(jobs)},
-    )
+    return summary

@@ -59,6 +59,63 @@ def test_ingestion_skips_policy_rejected_jobs(
     result = getattr(module, runner_name)()
 
     assert persisted == []
+    assert result["metrics"]["fetched_count"] == 1
+    assert result["metrics"]["normalized_count"] == 1
+    assert result["metrics"]["accepted_count"] == 0
+    assert result["metrics"]["rejected_policy_count"] == 1
     assert result["metrics"]["raw_count"] == 1
     assert result["metrics"]["persisted_count"] == 0
     assert result["metrics"]["skipped_count"] == 1
+
+
+def test_ingestion_emits_single_summary_log(monkeypatch):
+    class FakeAdapter:
+        def fetch(self):
+            return [{"id": "raw-1"}, {"id": "raw-2"}, {"id": "raw-3"}]
+
+    normalized_jobs = {
+        "raw-1": None,
+        "raw-2": {
+            "job_id": "remoteok:2",
+            "title": "Senior PM",
+            "description": "Remote but must be based in the US",
+        },
+        "raw-3": {
+            "job_id": "remoteok:3",
+            "title": "Backend Engineer",
+            "description": "Fully remote role in Europe",
+        },
+    }
+
+    log_calls = []
+    persisted = []
+
+    monkeypatch.setattr(remoteok, "init_db", lambda: None)
+    monkeypatch.setattr(remoteok, "RemoteOkApiAdapter", FakeAdapter)
+    monkeypatch.setattr(
+        remoteok,
+        "normalize_remoteok_job",
+        lambda raw: normalized_jobs[raw["id"]],
+    )
+    monkeypatch.setattr(remoteok, "upsert_job", lambda job: persisted.append(job))
+    monkeypatch.setattr(remoteok, "log_ingestion", lambda **kwargs: log_calls.append(kwargs))
+
+    result = remoteok.run_remoteok_ingestion()
+
+    assert not any(call.get("phase") == "start" for call in log_calls)
+    summary_calls = [call for call in log_calls if call.get("phase") == "ingestion_summary"]
+    assert len(summary_calls) == 1
+
+    summary = summary_calls[0]
+    assert summary["source"] == "remoteok"
+    assert summary["fetched"] == 3
+    assert summary["normalized"] == 2
+    assert summary["accepted"] == 1
+    assert summary["rejected_policy"] == 1
+    assert summary["duration_ms"] >= 0
+
+    assert len(persisted) == 1
+    assert result["metrics"]["fetched_count"] == 3
+    assert result["metrics"]["normalized_count"] == 2
+    assert result["metrics"]["accepted_count"] == 1
+    assert result["metrics"]["rejected_policy_count"] == 1

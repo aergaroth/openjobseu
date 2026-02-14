@@ -30,4 +30,22 @@ def test_policy_rejects_us_only():
         "description": "100% remote but must be based in the US",
     }
 
-    assert evaluate_policy(job) is False
+    assert evaluate_policy(job) == (False, "geo_restriction")
+
+
+def test_policy_rejects_non_remote():
+    job = {
+        "title": "Senior PM (hybrid)",
+        "description": "Great role",
+    }
+
+    assert evaluate_policy(job) == (False, "non_remote")
+
+
+def test_policy_accepts_clean_remote_role():
+    job = {
+        "title": "Senior Backend Engineer",
+        "description": "Fully remote role across Europe",
+    }
+
+    assert evaluate_policy(job) == (True, None)

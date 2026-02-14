@@ -22,6 +22,36 @@ def test_post_ingestion_runs_steps_in_order(monkeypatch):
     assert calls == ["init_db", "availability", "lifecycle"]
 
 
+def test_post_ingestion_logs_single_summary(monkeypatch):
+    info_calls = []
+
+    monkeypatch.setattr(post_ingestion, "init_db", lambda: None)
+    monkeypatch.setattr(
+        post_ingestion,
+        "run_availability_pipeline",
+        lambda: {"checked": 5, "expired": 2, "unreachable": 1},
+    )
+    monkeypatch.setattr(post_ingestion, "run_lifecycle_pipeline", lambda: None)
+    monkeypatch.setattr(
+        post_ingestion.logger,
+        "info",
+        lambda message, extra=None: info_calls.append(
+            {"message": message, "extra": extra or {}}
+        ),
+    )
+
+    post_ingestion.run_post_ingestion()
+
+    assert len(info_calls) == 1
+    summary = info_calls[0]
+    assert summary["message"] == "post_ingestion"
+    assert summary["extra"]["phase"] == "post_ingestion_summary"
+    assert summary["extra"]["availability_checked"] == 5
+    assert summary["extra"]["expired"] == 2
+    assert summary["extra"]["unreachable"] == 1
+    assert summary["extra"]["duration_ms"] >= 0
+
+
 def test_tick_pipeline_runs_post_ingestion_once(monkeypatch):
     post_calls = {"count": 0}
 
@@ -85,3 +115,51 @@ def test_tick_pipeline_aggregates_per_source_metrics(monkeypatch):
     assert ingestion_metrics["per_source"]["remotive"]["status"] == "ok"
     assert ingestion_metrics["per_source"]["remoteok"]["status"] == "failed"
     assert ingestion_metrics["per_source"]["unknown"]["status"] == "unknown"
+
+
+def test_tick_pipeline_logs_standardized_finish(monkeypatch):
+    info_calls = []
+
+    monkeypatch.setattr(
+        tick_pipeline.logger,
+        "info",
+        lambda message, extra=None: info_calls.append(
+            {"message": message, "extra": extra or {}}
+        ),
+    )
+    monkeypatch.setattr(tick_pipeline, "run_post_ingestion", lambda: None)
+
+    def ok_handler():
+        return {
+            "actions": ["remotive_ingested:1"],
+            "metrics": {
+                "source": "remotive",
+                "status": "ok",
+                "raw_count": 2,
+                "persisted_count": 1,
+                "skipped_count": 1,
+                "duration_ms": 5,
+            },
+        }
+
+    tick_pipeline.run_tick_pipeline(
+        ingestion_sources=["remotive"],
+        ingestion_handlers={"remotive": ok_handler},
+    )
+
+    assert not any(call["message"] == "tick pipeline started" for call in info_calls)
+    assert not any(call["message"] == "starting ingestion source" for call in info_calls)
+
+    finish_calls = [
+        call
+        for call in info_calls
+        if call["extra"].get("phase") == "tick_finished"
+    ]
+    assert len(finish_calls) == 1
+
+    finish_log = finish_calls[0]
+    assert finish_log["message"] == "tick"
+    assert finish_log["extra"]["total_duration_ms"] >= 0
+    assert finish_log["extra"]["sources_ok"] == 1
+    assert finish_log["extra"]["sources_failed"] == 0
+    assert finish_log["extra"]["persisted_count"] == 1
