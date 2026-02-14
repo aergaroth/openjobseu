@@ -51,7 +51,7 @@ def run_post_ingestion() -> None:
 
     duration_ms = int((perf_counter() - started) * 1000)
     logger.info(
-        "post_ingestion",
+        "post_ingestion_summary",
         extra={
             "component": "post_ingestion",
             "phase": "post_ingestion_summary",

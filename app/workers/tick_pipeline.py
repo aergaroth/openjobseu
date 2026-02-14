@@ -148,7 +148,7 @@ def run_tick_pipeline(
     }
 
     logger.info(
-        "tick",
+        "tick_finished",
         extra={
             "component": "pipeline",
             "phase": "tick_finished",

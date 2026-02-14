@@ -44,7 +44,7 @@ def test_post_ingestion_logs_single_summary(monkeypatch):
 
     assert len(info_calls) == 1
     summary = info_calls[0]
-    assert summary["message"] == "post_ingestion"
+    assert summary["message"] == "post_ingestion_summary"
     assert summary["extra"]["phase"] == "post_ingestion_summary"
     assert summary["extra"]["availability_checked"] == 5
     assert summary["extra"]["expired"] == 2
@@ -178,7 +178,7 @@ def test_tick_pipeline_logs_standardized_finish(monkeypatch):
     assert len(finish_calls) == 1
 
     finish_log = finish_calls[0]
-    assert finish_log["message"] == "tick"
+    assert finish_log["message"] == "tick_finished"
     assert finish_log["extra"]["total_duration_ms"] >= 0
     assert finish_log["extra"]["sources_ok"] == 1
     assert finish_log["extra"]["sources_failed"] == 0

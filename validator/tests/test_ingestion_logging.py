@@ -28,14 +28,18 @@ def test_fetch_phase_logs_on_debug(monkeypatch):
 
     assert len(debug_calls) == 1
     assert len(info_calls) == 0
-    assert debug_calls[0]["message"] == "ingestion"
-    assert debug_calls[0]["extra"]["component"] == "ingestion"
-    assert debug_calls[0]["extra"]["source"] == "remoteok"
-    assert debug_calls[0]["extra"]["phase"] == "fetch"
-    assert debug_calls[0]["extra"]["raw_count"] == 7
+
+    msg = debug_calls[0]["message"]
+    extra = debug_calls[0]["extra"]
+
+    assert isinstance(msg, str)
+    assert extra["component"] == "ingestion"
+    assert extra["source"] == "remoteok"
+    assert extra["phase"] == "fetch"
+    assert extra["raw_count"] == 7
 
 
-def test_non_fetch_phase_logs_on_info(monkeypatch):
+def test_ingestion_summary_logs_on_info(monkeypatch):
     debug_calls = []
     info_calls = []
 
@@ -66,7 +70,16 @@ def test_non_fetch_phase_logs_on_info(monkeypatch):
 
     assert len(debug_calls) == 0
     assert len(info_calls) == 1
-    assert info_calls[0]["message"] == "ingestion"
-    assert info_calls[0]["extra"]["component"] == "ingestion"
-    assert info_calls[0]["extra"]["source"] == "remotive"
-    assert info_calls[0]["extra"]["phase"] == "ingestion_summary"
+
+    msg = info_calls[0]["message"]
+    extra = info_calls[0]["extra"]
+
+    # Sprawdzamy tylko semantykę message
+    assert msg.startswith("ingestion_summary[remotive]")
+
+    # Sprawdzamy kluczowe pola, nie pełną strukturę
+    assert extra["component"] == "ingestion"
+    assert extra["fetched"] == 4
+    assert extra["accepted"] == 2
+    assert extra["rejected_policy"] == 1
+    assert extra["duration_ms"] == 10

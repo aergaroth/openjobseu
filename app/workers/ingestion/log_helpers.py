@@ -29,4 +29,4 @@ def log_ingestion(
         logger.debug("ingestion", extra=payload)
         return
 
-    logger.info("ingestion", extra=payload)
+    logger.info(f"ingestion_summary[{source}]", extra=payload)
