@@ -6,6 +6,7 @@ from app.workers.normalization.weworkremotely import (
     normalize_weworkremotely_job,
 )
 from app.workers.ingestion.log_helpers import log_ingestion
+from app.workers.policy.enforcement import apply_policy_v1
 from storage.sqlite import init_db, upsert_job
 
 SOURCE = "weworkremotely"
@@ -34,6 +35,7 @@ def run_weworkremotely_ingestion() -> dict:
 
         for raw in entries:
             job = normalize_weworkremotely_job(raw)
+            job = apply_policy_v1(job, source=SOURCE)
             if not job:
                 skipped += 1
                 continue

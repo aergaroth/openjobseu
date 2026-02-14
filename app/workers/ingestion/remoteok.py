@@ -4,6 +4,7 @@ from time import perf_counter
 from ingestion.adapters.remoteok_api import RemoteOkApiAdapter
 from app.workers.normalization.remoteok import normalize_remoteok_job
 from app.workers.ingestion.log_helpers import log_ingestion
+from app.workers.policy.enforcement import apply_policy_v1
 from storage.sqlite import init_db, upsert_job
 
 SOURCE = "remoteok"
@@ -31,6 +32,7 @@ def run_remoteok_ingestion() -> dict:
 
         for raw in entries:
             job = normalize_remoteok_job(raw)
+            job = apply_policy_v1(job, source=SOURCE)
             if not job:
                 skipped += 1
                 continue

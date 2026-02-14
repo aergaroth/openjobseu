@@ -8,6 +8,9 @@ from app.workers.normalization.common import (
     sanitize_url,
 )
 
+from app.workers.normalization.cleaning import clean_description
+
+
 logger = logging.getLogger("openjobseu.normalization.remoteok")
 
 
@@ -59,6 +62,13 @@ def normalize_remoteok_job(raw: Dict) -> Optional[Dict]:
             # Not confidently EU → still remote, but marked explicitly
             remote_scope = "worldwide"
 
+
+        raw_description = raw.get("description", "") or ""
+        cleaned_description = clean_description(
+            raw_description,
+            source="remoteok",
+        )
+
         normalized = {
             "job_id": f"remoteok:{job_id}",
             "source": "remoteok",
@@ -66,7 +76,7 @@ def normalize_remoteok_job(raw: Dict) -> Optional[Dict]:
             "source_url": url,
             "title": title.strip(),
             "company_name": company.strip(),
-            "description": raw.get("description", "").strip(),
+            "description": cleaned_description,
             "remote": True,
             "remote_scope": remote_scope,
             "status": "new",
