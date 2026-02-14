@@ -6,6 +6,10 @@ from app.main import app
 client = TestClient(app)
 
 
+def _is_text_response(response) -> bool:
+    return response.headers.get("content-type", "").startswith("text/plain")
+
+
 def test_health_endpoint():
     resp = client.get("/health")
     assert resp.status_code == 200
@@ -25,8 +29,13 @@ def test_internal_tick_smoke():
     resp = client.post("/internal/tick")
     assert resp.status_code == 200
 
-    data = resp.json()
-    assert data["status"] == "ok"
-    assert "actions" in data
-    assert "metrics" in data
-    assert "tick_duration_ms" in data["metrics"]
+    if _is_text_response(resp):
+        body = resp.text
+        assert "Tick finished" in body
+        assert "TOTALS" in body
+    else:
+        data = resp.json()
+        assert data["status"] == "ok"
+        assert "actions" in data
+        assert "metrics" in data
+        assert "tick_duration_ms" in data["metrics"]

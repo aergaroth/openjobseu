@@ -74,6 +74,10 @@ def test_tick_pipeline_runs_post_ingestion_once(monkeypatch):
     assert "tick_duration_ms" in result["metrics"]
     assert result["metrics"]["ingestion"]["sources_total"] == 1
     assert "remotive" in result["metrics"]["ingestion"]["per_source"]
+    assert (
+        result["metrics"]["ingestion"]["per_source"]["remotive"]["policy"]["rejected_total"]
+        == 0
+    )
 
 
 def test_tick_pipeline_aggregates_per_source_metrics(monkeypatch):
@@ -86,6 +90,11 @@ def test_tick_pipeline_aggregates_per_source_metrics(monkeypatch):
                 "raw_count": 10,
                 "persisted_count": 3,
                 "skipped_count": 7,
+                "policy_rejected_total": 2,
+                "policy_rejected_by_reason": {
+                    "non_remote": 1,
+                    "geo_restriction": 1,
+                },
                 "duration_ms": 25,
             },
         }
@@ -113,8 +122,19 @@ def test_tick_pipeline_aggregates_per_source_metrics(monkeypatch):
     assert ingestion_metrics["persisted_count"] == 3
     assert ingestion_metrics["skipped_count"] == 7
     assert ingestion_metrics["per_source"]["remotive"]["status"] == "ok"
+    assert ingestion_metrics["per_source"]["remotive"]["policy"]["rejected_total"] == 2
+    assert (
+        ingestion_metrics["per_source"]["remotive"]["policy"]["by_reason"]["non_remote"]
+        == 1
+    )
+    assert (
+        ingestion_metrics["per_source"]["remotive"]["policy"]["by_reason"]["geo_restriction"]
+        == 1
+    )
     assert ingestion_metrics["per_source"]["remoteok"]["status"] == "failed"
+    assert ingestion_metrics["per_source"]["remoteok"]["policy"]["rejected_total"] == 0
     assert ingestion_metrics["per_source"]["unknown"]["status"] == "unknown"
+    assert ingestion_metrics["per_source"]["unknown"]["policy"]["rejected_total"] == 0
 
 
 def test_tick_pipeline_logs_standardized_finish(monkeypatch):

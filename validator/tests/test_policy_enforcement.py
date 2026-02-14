@@ -16,7 +16,17 @@ def test_apply_policy_v1_rejects_job():
         "description": "100% remote but must be based in the US",
     }
 
-    assert apply_policy_v1(job, source="remoteok") is None
+    assert apply_policy_v1(job, source="remoteok") == (None, "geo_restriction")
+
+
+def test_apply_policy_v1_accepts_job():
+    job = {
+        "job_id": "remoteok:2",
+        "title": "Backend Engineer",
+        "description": "Fully remote role in Europe",
+    }
+
+    assert apply_policy_v1(job, source="remoteok") == (job, None)
 
 
 @pytest.mark.parametrize(
@@ -63,6 +73,9 @@ def test_ingestion_skips_policy_rejected_jobs(
     assert result["metrics"]["normalized_count"] == 1
     assert result["metrics"]["accepted_count"] == 0
     assert result["metrics"]["rejected_policy_count"] == 1
+    assert result["metrics"]["policy_rejected_total"] == 1
+    assert result["metrics"]["policy_rejected_by_reason"]["non_remote"] == 0
+    assert result["metrics"]["policy_rejected_by_reason"]["geo_restriction"] == 1
     assert result["metrics"]["raw_count"] == 1
     assert result["metrics"]["persisted_count"] == 0
     assert result["metrics"]["skipped_count"] == 1
@@ -112,6 +125,8 @@ def test_ingestion_emits_single_summary_log(monkeypatch):
     assert summary["normalized"] == 2
     assert summary["accepted"] == 1
     assert summary["rejected_policy"] == 1
+    assert summary["rejected_non_remote"] == 0
+    assert summary["rejected_geo_restriction"] == 1
     assert summary["duration_ms"] >= 0
 
     assert len(persisted) == 1
@@ -119,3 +134,6 @@ def test_ingestion_emits_single_summary_log(monkeypatch):
     assert result["metrics"]["normalized_count"] == 2
     assert result["metrics"]["accepted_count"] == 1
     assert result["metrics"]["rejected_policy_count"] == 1
+    assert result["metrics"]["policy_rejected_total"] == 1
+    assert result["metrics"]["policy_rejected_by_reason"]["non_remote"] == 0
+    assert result["metrics"]["policy_rejected_by_reason"]["geo_restriction"] == 1

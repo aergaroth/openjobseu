@@ -2,6 +2,8 @@ import os
 import logging
 from fastapi import APIRouter
 
+import json
+
 from app.workers.tick import run_tick
 from app.workers.tick_pipeline import run_tick_pipeline
 
@@ -14,7 +16,10 @@ from app.workers.ingestion.registry import (
     get_available_ingestion_sources,
 )
 
+from fastapi import Response
+from app.logging import should_use_text_logs
 
+from app.utils.tick_formatting import format_tick_summary
 
 logger = logging.getLogger("openjobseu.runtime")
 
@@ -57,9 +62,18 @@ def tick():
         ingestion_handlers=INGESTION_HANDLERS,
     )
 
-    return {
+    payload = {
         "status": "ok",
         "mode": ingestion_mode,
         "sources": ingestion_sources,
         **result,
     }
+
+    if should_use_text_logs():
+        return Response(
+            content=format_tick_summary(payload),
+            media_type="text/plain",
+        )
+
+    return payload
+

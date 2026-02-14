@@ -18,6 +18,10 @@ def run_remotive_ingestion() -> dict:
     normalized_count = 0
     accepted_count = 0
     rejected_policy_count = 0
+    rejected_by_reason = {
+        "non_remote": 0,
+        "geo_restriction": 0,
+    }
     skipped = 0
 
     try:
@@ -38,9 +42,11 @@ def run_remotive_ingestion() -> dict:
                 continue
             normalized_count += 1
 
-            job = apply_policy_v1(normalized_job, source=SOURCE)
+            job, reason = apply_policy_v1(normalized_job, source=SOURCE)
             if not job:
                 rejected_policy_count += 1
+                if reason in rejected_by_reason:
+                    rejected_by_reason[reason] += 1
                 skipped += 1
                 continue
 
@@ -57,6 +63,8 @@ def run_remotive_ingestion() -> dict:
             normalized=normalized_count,
             accepted=accepted_count,
             rejected_policy=rejected_policy_count,
+            rejected_non_remote=rejected_by_reason["non_remote"],
+            rejected_geo_restriction=rejected_by_reason["geo_restriction"],
             duration_ms=duration_ms,
         )
 
@@ -72,6 +80,8 @@ def run_remotive_ingestion() -> dict:
             skipped=skipped,
             normalized=normalized_count,
             rejected_policy=rejected_policy_count,
+            rejected_non_remote=rejected_by_reason["non_remote"],
+            rejected_geo_restriction=rejected_by_reason["geo_restriction"],
             duration_ms=duration_ms,
             error=str(exc),
         )
@@ -86,6 +96,8 @@ def run_remotive_ingestion() -> dict:
             "normalized_count": normalized_count,
             "accepted_count": accepted_count,
             "rejected_policy_count": rejected_policy_count,
+            "policy_rejected_total": rejected_policy_count,
+            "policy_rejected_by_reason": rejected_by_reason.copy(),
             "raw_count": fetched_count,
             "persisted_count": accepted_count,
             "skipped_count": skipped,

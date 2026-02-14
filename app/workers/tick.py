@@ -59,6 +59,13 @@ def run_tick():
                         "raw_count": raw_count,
                         "persisted_count": 0,
                         "skipped_count": 0,
+                        "policy": {
+                            "rejected_total": 0,
+                            "by_reason": {
+                                "non_remote": 0,
+                                "geo_restriction": 0,
+                            },
+                        },
                         "duration_ms": source_duration_ms,
                     }
                 },

@@ -17,6 +17,26 @@ def _int_metric(value, default: int = 0) -> int:
         return default
 
 
+def _policy_metrics(source_metrics: dict | None = None) -> dict:
+    source_metrics = source_metrics or {}
+    by_reason = source_metrics.get("policy_rejected_by_reason") or {}
+    non_remote = _int_metric(by_reason.get("non_remote", 0))
+    geo_restriction = _int_metric(by_reason.get("geo_restriction", 0))
+    rejected_total = _int_metric(
+        source_metrics.get(
+            "policy_rejected_total",
+            source_metrics.get("rejected_policy_count", non_remote + geo_restriction),
+        )
+    )
+    return {
+        "rejected_total": rejected_total,
+        "by_reason": {
+            "non_remote": non_remote,
+            "geo_restriction": geo_restriction,
+        },
+    }
+
+
 def run_tick_pipeline(
     *,
     ingestion_sources: Iterable[str],
@@ -56,6 +76,7 @@ def run_tick_pipeline(
                 "raw_count": 0,
                 "persisted_count": 0,
                 "skipped_count": 0,
+                "policy": _policy_metrics(),
                 "duration_ms": int((perf_counter() - source_started_perf) * 1000),
             }
             continue
@@ -81,6 +102,7 @@ def run_tick_pipeline(
                 "raw_count": raw_count,
                 "persisted_count": persisted_count,
                 "skipped_count": skipped_count,
+                "policy": _policy_metrics(source_metrics),
                 "duration_ms": duration_ms,
             }
 
@@ -99,6 +121,7 @@ def run_tick_pipeline(
                 "raw_count": 0,
                 "persisted_count": 0,
                 "skipped_count": 0,
+                "policy": _policy_metrics(),
                 "duration_ms": int((perf_counter() - source_started_perf) * 1000),
             }
 

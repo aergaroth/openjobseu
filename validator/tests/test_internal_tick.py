@@ -7,6 +7,10 @@ from app.main import app
 client = TestClient(app)
 
 
+def _is_text_response(response) -> bool:
+    return response.headers.get("content-type", "").startswith("text/plain")
+
+
 def test_tick_runs_all_adapters_by_default(monkeypatch):
 
     monkeypatch.setenv("INGESTION_MODE", "prod")
@@ -20,11 +24,17 @@ def test_tick_runs_all_adapters_by_default(monkeypatch):
     response = client.post("/internal/tick")
     assert response.status_code == 200
 
-    data = response.json()
-    sources = data["sources"]
+    if _is_text_response(response):
+        body = response.text
+        assert "Tick finished (prod)" in body
+        for source in get_available_ingestion_sources():
+            assert source in body
+    else:
+        data = response.json()
+        sources = data["sources"]
 
-    assert set(sources) == set(get_available_ingestion_sources())
-    assert "metrics" in data
+        assert set(sources) == set(get_available_ingestion_sources())
+        assert "metrics" in data
 
 
 
@@ -36,9 +46,14 @@ def test_tick_runs_only_selected_adapter(monkeypatch):
 
     assert response.status_code == 200
 
-    data = response.json()
-    assert data["sources"] == ["remotive"]
-    assert "metrics" in data
+    if _is_text_response(response):
+        body = response.text
+        assert "Tick finished (prod)" in body
+        assert "remotive" in body
+    else:
+        data = response.json()
+        assert data["sources"] == ["remotive"]
+        assert "metrics" in data
 
 
 def test_tick_local_mode(monkeypatch):
@@ -64,6 +79,11 @@ def test_tick_ignores_unknown_source(monkeypatch):
 
     assert response.status_code == 200
 
-    data = response.json()
-    assert "weworkremotely" in data["sources"]
-    assert "metrics" in data
+    if _is_text_response(response):
+        body = response.text
+        assert "Tick finished (prod)" in body
+        assert "weworkremotely" in body
+    else:
+        data = response.json()
+        assert "weworkremotely" in data["sources"]
+        assert "metrics" in data
