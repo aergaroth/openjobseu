@@ -68,19 +68,26 @@ Status: **live**
 
 ---
 
-## Next milestones
+## Post-MVP evolution
 
-### A6.1 – Distribution polish (optional)
-- CORS hardening for public feed consumers
-- Optional reverse proxy under primary domain
-- Frontend UX polish (sorting, client-side filtering)
+### A7 – Content quality & policy layer (v1) — DONE
+- [x] Source-aware HTML cleaning layer
+- [x] Spam marker removal (RemoteOK-specific artifacts)
+- [x] Remote purity policy (hard non-remote signals)
+- [x] Geo restriction filter (US-only / NA-only hard reject)
+- [x] Global policy enforcement across all ingestion sources
+- [x] Cleaning and policy test coverage
+- [x] Audit scripts for source quality analysis (geo + remote purity)
 
-### A7 – Observability & ops polish
+### A8 – Observability & ops polish
 - [x] Structured logging
 - [x] Runtime metrics (tick duration, ingestion counts)
+- [ ] Tick summary metrics (per source: fetched / accepted / rejected)
+- [ ] Policy rejection metrics and reason tracking
+- [ ] Rejection audit log (policy v1)
 - [ ] Scheduler and tick failure alerting
 
-### A8 – Storage upgrade
+### A9 – Storage upgrade
 - Higher-level database engine backend
 - Explicit schema and migrations
 - Indexing aligned with read and lifecycle patterns
@@ -92,3 +99,8 @@ Status: **live**
 - Company self-publishing workflow (manual, compliance-first)
 - Metadata enrichment (source-provided fields such as posted_at; heuristic-based, no AI by default)
 - Managed deployment options
+- Policy v2:
+  - EU explicit logic (EU + EOG + UK)
+  - Soft-flag mode instead of hard reject
+  - Policy reason codes instead of boolean decision
+  - Drift detection per source (quality regression monitoring)
