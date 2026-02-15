@@ -6,6 +6,7 @@ import pytest
 sys.modules.setdefault("feedparser", SimpleNamespace(parse=lambda *_args, **_kwargs: None))
 
 from app.workers.ingestion import remoteok, remotive, weworkremotely
+from app.workers.policy import enforcement
 from app.workers.policy.enforcement import apply_policy_v1
 
 
@@ -27,6 +28,51 @@ def test_apply_policy_v1_accepts_job():
     }
 
     assert apply_policy_v1(job, source="remoteok") == (job, None)
+
+
+def test_apply_policy_v1_logs_policy_audit_on_reject(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(
+        enforcement.audit_logger,
+        "info",
+        lambda message, extra=None: calls.append({"message": message, "extra": extra or {}}),
+    )
+
+    job = {
+        "job_id": "remoteok:1",
+        "title": "Senior PM",
+        "description": "100% remote but must be based in the US",
+    }
+
+    assert apply_policy_v1(job, source="remoteok") == (None, "geo_restriction")
+    assert len(calls) == 1
+    assert calls[0]["message"] == "policy_reject[remoteok]"
+    assert calls[0]["extra"] == {
+        "component": "policy",
+        "job_id": "remoteok:1",
+        "reason": "geo_restriction",
+        "policy_version": "v1",
+    }
+
+
+def test_apply_policy_v1_does_not_log_policy_audit_on_accept(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(
+        enforcement.audit_logger,
+        "info",
+        lambda message, extra=None: calls.append({"message": message, "extra": extra or {}}),
+    )
+
+    job = {
+        "job_id": "remoteok:2",
+        "title": "Backend Engineer",
+        "description": "Fully remote role in Europe",
+    }
+
+    assert apply_policy_v1(job, source="remoteok") == (job, None)
+    assert calls == []
 
 
 @pytest.mark.parametrize(
