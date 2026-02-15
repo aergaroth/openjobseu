@@ -39,7 +39,7 @@ def tick():
 
     tick_sources = ["local"] if ingestion_mode == "local" else ingestion_sources
     logger.info(
-        "tick",
+        "tick_start",
         extra={
             "component": "runtime",
             "phase": "tick_start",

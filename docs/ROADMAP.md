@@ -82,10 +82,11 @@ Status: **live**
 ### A8 – Observability & ops polish
 - [x] Structured logging
 - [x] Runtime metrics (tick duration, ingestion counts)
-- [ ] Tick summary metrics (per source: fetched / accepted / rejected)
-- [ ] Policy rejection metrics and reason tracking
-- [ ] Rejection audit log (policy v1)
+- [x] Tick summary metrics (per source: fetched / accepted / rejected)
+- [x] Policy rejection metrics and reason tracking
+- [ ] Rejection audit log (policy v1, persistent file-based)
 - [ ] Scheduler and tick failure alerting
+
 
 ### A9 – Storage upgrade
 - Higher-level database engine backend
