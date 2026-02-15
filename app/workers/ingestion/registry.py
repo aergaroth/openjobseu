@@ -1,11 +1,11 @@
 from typing import Dict, Callable
 
-from ingestion.adapters.greenhouse_api import GREENHOUSE_BOARDS
+#from ingestion.adapters.greenhouse_api import GREENHOUSE_BOARDS
 
 from app.workers.ingestion.weworkremotely import run_weworkremotely_ingestion
 from app.workers.ingestion.remotive import run_remotive_ingestion
 from app.workers.ingestion.remoteok import run_remoteok_ingestion
-from app.workers.ingestion.greenhouse import run_greenhouse_ingestion
+#from app.workers.ingestion.greenhouse import run_greenhouse_ingestion
 
 INGESTION_HANDLERS: Dict[str, Callable[[], dict]] = {
     "weworkremotely": run_weworkremotely_ingestion,
