@@ -7,12 +7,12 @@ NON_REMOTE_KEYWORDS = [
     "in office",
     "in-office",
     "hybrid",
-    "relocation required",
-    "must be located in",
+    "relocation required"
 ]
 
 GEO_RESTRICT_KEYWORDS = [
     "us only",
+    "usa only",
     "united states only",
     "us citizens",
     "us work authorization",
