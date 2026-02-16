@@ -18,6 +18,9 @@ def test_apply_policy_v1_rejects_job():
     }
 
     assert apply_policy_v1(job, source="remoteok") == (None, "geo_restriction")
+    assert job["_compliance"]["policy_version"] == "v1"
+    assert job["_compliance"]["policy_reason"] == "geo_restriction"
+    assert job["_compliance"]["remote_model"] == "remote_but_geo_restricted"
 
 
 def test_apply_policy_v1_accepts_job():
@@ -28,6 +31,32 @@ def test_apply_policy_v1_accepts_job():
     }
 
     assert apply_policy_v1(job, source="remoteok") == (job, None)
+    assert job["_compliance"]["policy_version"] == "v1"
+    assert job["_compliance"]["policy_reason"] is None
+    assert job["_compliance"]["remote_model"] == "remote_only"
+
+
+def test_apply_policy_v1_calls_classifier_safely_when_fields_missing(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(
+        enforcement,
+        "classify_remote_model",
+        lambda title, description: calls.append((title, description))
+        or {"remote_model": "unknown"},
+    )
+
+    job = {
+        "job_id": "remoteok:3",
+    }
+
+    assert apply_policy_v1(job, source="remoteok") == (job, None)
+    assert calls == [("", "")]
+    assert job["_compliance"] == {
+        "policy_version": "v1",
+        "policy_reason": None,
+        "remote_model": "unknown",
+    }
 
 
 def test_apply_policy_v1_logs_policy_audit_on_reject(monkeypatch):

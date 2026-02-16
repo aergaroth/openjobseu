@@ -65,6 +65,12 @@ def test_ingestion_summary_logs_on_info(monkeypatch):
         normalized=3,
         accepted=2,
         rejected_policy=1,
+        remote_model_counts={
+            "remote_only": 2,
+            "remote_but_geo_restricted": 1,
+            "non_remote": 3,
+            "unknown": 4,
+        },
         duration_ms=10,
     )
 
@@ -82,4 +88,8 @@ def test_ingestion_summary_logs_on_info(monkeypatch):
     assert extra["fetched"] == 4
     assert extra["accepted"] == 2
     assert extra["rejected_policy"] == 1
+    assert extra["remote_only"] == 2
+    assert extra["remote_non_remote"] == 3
+    assert extra["remote_geo_restricted"] == 1
+    assert extra["remote_unknown"] == 4
     assert extra["duration_ms"] == 10

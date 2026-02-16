@@ -25,6 +25,19 @@ def log_ingestion(
         **extra_fields,
     }
 
+    if phase == "ingestion_summary":
+        remote_model_counts = extra_fields.get("remote_model_counts") or {}
+        payload.update(
+            {
+                "remote_only": remote_model_counts.get("remote_only", 0),
+                "remote_non_remote": remote_model_counts.get("non_remote", 0),
+                "remote_geo_restricted": remote_model_counts.get(
+                    "remote_but_geo_restricted", 0
+                ),
+                "remote_unknown": remote_model_counts.get("unknown", 0),
+            }
+        )
+
     if phase == "fetch":
         logger.debug("ingestion", extra=payload)
         return

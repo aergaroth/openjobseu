@@ -19,6 +19,17 @@ def test_local_tick_returns_runtime_metrics(monkeypatch):
     assert result["metrics"]["ingestion"]["raw_count"] == 3
     assert result["metrics"]["ingestion"]["per_source"]["local"]["status"] == "ok"
     assert (
+        "remote_model_counts"
+        in result["metrics"]["ingestion"]["per_source"]["local"]
+    )
+    rm = result["metrics"]["ingestion"]["per_source"]["local"]["remote_model_counts"]
+    assert set(rm.keys()) == {
+        "remote_only",
+        "remote_but_geo_restricted",
+        "non_remote",
+        "unknown",
+    }
+    assert (
         result["metrics"]["ingestion"]["per_source"]["local"]["policy"]["rejected_total"]
         == 0
     )
@@ -36,6 +47,17 @@ def test_local_tick_reports_failed_ingestion_metrics(monkeypatch):
     assert result["actions"] == ["local_ingestion_failed"]
     assert result["metrics"]["ingestion"]["sources_failed"] == 1
     assert result["metrics"]["ingestion"]["per_source"]["local"]["status"] == "failed"
+    assert (
+        "remote_model_counts"
+        in result["metrics"]["ingestion"]["per_source"]["local"]
+    )
+    rm = result["metrics"]["ingestion"]["per_source"]["local"]["remote_model_counts"]
+    assert set(rm.keys()) == {
+        "remote_only",
+        "remote_but_geo_restricted",
+        "non_remote",
+        "unknown",
+    }
     assert (
         result["metrics"]["ingestion"]["per_source"]["local"]["policy"]["rejected_total"]
         == 0

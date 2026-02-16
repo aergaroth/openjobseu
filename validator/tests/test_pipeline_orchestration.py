@@ -78,6 +78,15 @@ def test_tick_pipeline_runs_post_ingestion_once(monkeypatch):
         result["metrics"]["ingestion"]["per_source"]["remotive"]["policy"]["rejected_total"]
         == 0
     )
+    assert (
+        result["metrics"]["ingestion"]["per_source"]["remotive"]["remote_model_counts"]
+        == {
+            "remote_only": 0,
+            "remote_but_geo_restricted": 0,
+            "non_remote": 0,
+            "unknown": 0,
+        }
+    )
 
 
 def test_tick_pipeline_aggregates_per_source_metrics(monkeypatch):
@@ -94,6 +103,12 @@ def test_tick_pipeline_aggregates_per_source_metrics(monkeypatch):
                 "policy_rejected_by_reason": {
                     "non_remote": 1,
                     "geo_restriction": 1,
+                },
+                "remote_model_counts": {
+                    "remote_only": 2,
+                    "remote_but_geo_restricted": 1,
+                    "non_remote": 3,
+                    "unknown": 4,
                 },
                 "duration_ms": 25,
             },
@@ -131,10 +146,28 @@ def test_tick_pipeline_aggregates_per_source_metrics(monkeypatch):
         ingestion_metrics["per_source"]["remotive"]["policy"]["by_reason"]["geo_restriction"]
         == 1
     )
+    assert ingestion_metrics["per_source"]["remotive"]["remote_model_counts"] == {
+        "remote_only": 2,
+        "remote_but_geo_restricted": 1,
+        "non_remote": 3,
+        "unknown": 4,
+    }
     assert ingestion_metrics["per_source"]["remoteok"]["status"] == "failed"
     assert ingestion_metrics["per_source"]["remoteok"]["policy"]["rejected_total"] == 0
+    assert ingestion_metrics["per_source"]["remoteok"]["remote_model_counts"] == {
+        "remote_only": 0,
+        "remote_but_geo_restricted": 0,
+        "non_remote": 0,
+        "unknown": 0,
+    }
     assert ingestion_metrics["per_source"]["unknown"]["status"] == "unknown"
     assert ingestion_metrics["per_source"]["unknown"]["policy"]["rejected_total"] == 0
+    assert ingestion_metrics["per_source"]["unknown"]["remote_model_counts"] == {
+        "remote_only": 0,
+        "remote_but_geo_restricted": 0,
+        "non_remote": 0,
+        "unknown": 0,
+    }
 
 
 def test_tick_pipeline_logs_standardized_finish(monkeypatch):

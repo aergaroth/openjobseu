@@ -37,6 +37,19 @@ def _policy_metrics(source_metrics: dict | None = None) -> dict:
     }
 
 
+def _remote_model_metrics(source_metrics: dict | None = None) -> dict:
+    source_metrics = source_metrics or {}
+    remote_model_counts = source_metrics.get("remote_model_counts") or {}
+    return {
+        "remote_only": _int_metric(remote_model_counts.get("remote_only", 0)),
+        "remote_but_geo_restricted": _int_metric(
+            remote_model_counts.get("remote_but_geo_restricted", 0)
+        ),
+        "non_remote": _int_metric(remote_model_counts.get("non_remote", 0)),
+        "unknown": _int_metric(remote_model_counts.get("unknown", 0)),
+    }
+
+
 def run_tick_pipeline(
     *,
     ingestion_sources: Iterable[str],
@@ -77,6 +90,7 @@ def run_tick_pipeline(
                 "persisted_count": 0,
                 "skipped_count": 0,
                 "policy": _policy_metrics(),
+                "remote_model_counts": _remote_model_metrics(),
                 "duration_ms": int((perf_counter() - source_started_perf) * 1000),
             }
             continue
@@ -103,6 +117,7 @@ def run_tick_pipeline(
                 "persisted_count": persisted_count,
                 "skipped_count": skipped_count,
                 "policy": _policy_metrics(source_metrics),
+                "remote_model_counts": _remote_model_metrics(source_metrics),
                 "duration_ms": duration_ms,
             }
 
@@ -122,6 +137,7 @@ def run_tick_pipeline(
                 "persisted_count": 0,
                 "skipped_count": 0,
                 "policy": _policy_metrics(),
+                "remote_model_counts": _remote_model_metrics(),
                 "duration_ms": int((perf_counter() - source_started_perf) * 1000),
             }
 

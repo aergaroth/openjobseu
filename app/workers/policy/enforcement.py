@@ -2,6 +2,7 @@ import logging
 from typing import Dict, Optional, Tuple
 
 from app.workers.policy.v1 import evaluate_policy
+from app.workers.policy.v2.remote_classifier import classify_remote_model
 
 audit_logger = logging.getLogger("openjobseu.policy.audit")
 
@@ -12,14 +13,30 @@ def apply_policy_v1(job: Optional[Dict], *, source: str) -> Tuple[Optional[Dict]
 
     This runs after normalization and before persistence.
     """
-    if not job:
+    if job is None:
         return None, None
 
     # Kept for API compatibility with ingestion callers.
     _ = source
 
-    accepted, reason = evaluate_policy(job)
-    if not accepted:
+    decision, reason = evaluate_policy(job)
+
+    try:
+        classification = classify_remote_model(
+            str(job.get("title") or ""),
+            str(job.get("description") or ""),
+        )
+        remote_model = classification.get("remote_model")
+    except Exception:
+        remote_model = "unknown"
+
+    job["_compliance"] = {
+        "policy_version": "v1",
+        "policy_reason": reason,
+        "remote_model": remote_model,
+    }
+
+    if not decision:
         audit_logger.info(
             f"policy_reject[{source}]",
             extra={

@@ -66,6 +66,12 @@ def run_tick():
                                 "geo_restriction": 0,
                             },
                         },
+                        "remote_model_counts": {
+                            "remote_only": 0,
+                            "remote_but_geo_restricted": 0,
+                            "non_remote": 0,
+                            "unknown": 0,
+                        },
                         "duration_ms": source_duration_ms,
                     }
                 },
