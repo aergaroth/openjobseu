@@ -9,7 +9,7 @@ REQUIRED_FIELDS = [
     "source_url",
     "title",
     "company_name",
-    "remote",
+    "remote_source_flag",
     "status",
     "created_at",
 ]
