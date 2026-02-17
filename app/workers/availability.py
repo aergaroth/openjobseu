@@ -78,7 +78,7 @@ def run_availability_pipeline() -> dict:
     Pipeline-level availability stage.
     Fetches jobs, checks availability and persists results.
     """
-    init_db()
+    # init_db()  # initialized at app startup in app/main.py
 
     jobs = get_jobs_for_verification(limit=20)
     now = datetime.now(timezone.utc).isoformat()

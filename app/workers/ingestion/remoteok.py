@@ -11,7 +11,7 @@ SOURCE = "remoteok"
 
 
 def run_remoteok_ingestion() -> dict:
-    init_db()
+    # init_db()  # initialized at app startup in app/main.py
     started = perf_counter()
     fetched_count = 0
     normalized_count = 0

@@ -7,7 +7,7 @@
         "name": "ExampleTech"
       },
       "location": "Remote",
-      "remote": true,
+      "remote_source_flag": true,
       "remote_scope": "EU",
       "employment_type": "full-time",
       "description": "We are looking for a DevOps Engineer to work on cloud infrastructure and CI/CD pipelines.",
@@ -22,7 +22,7 @@
         "name": "RemoteOps EU"
       },
       "location": "Remote",
-      "remote": true,
+      "remote_source_flag": true,
       "remote_scope": "Selected EU countries",
       "employment_type": "contract",
       "description": "Platform engineering role focused on reliability and automation.",

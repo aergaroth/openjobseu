@@ -19,7 +19,7 @@ def test_weworkremotely_normalization_happy_path():
     assert job["source_job_id"] == "wwr-123"
     assert job["title"] == "Senior Backend Engineer"
     assert job["company_name"] == "Acme Corp"
-    assert job["remote"] is True
+    assert job["remote_source_flag"] is True
     assert job["remote_scope"] == "EU-wide"
     assert job["status"] == "new"
     assert job["source_url"] == raw["link"]

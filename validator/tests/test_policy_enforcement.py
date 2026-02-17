@@ -136,7 +136,7 @@ def test_ingestion_skips_policy_rejected_jobs(
 
     persisted = []
 
-    monkeypatch.setattr(module, "init_db", lambda: None)
+    # monkeypatch.setattr(module, "init_db", lambda: None)
     monkeypatch.setattr(module, adapter_attr, FakeAdapter)
     monkeypatch.setattr(module, normalize_attr, lambda _: rejected_job)
     monkeypatch.setattr(module, "upsert_job", lambda job: persisted.append(job))
@@ -178,7 +178,7 @@ def test_ingestion_emits_single_summary_log(monkeypatch):
     log_calls = []
     persisted = []
 
-    monkeypatch.setattr(remoteok, "init_db", lambda: None)
+    # monkeypatch.setattr(remoteok, "init_db", lambda: None)
     monkeypatch.setattr(remoteok, "RemoteOkApiAdapter", FakeAdapter)
     monkeypatch.setattr(
         remoteok,

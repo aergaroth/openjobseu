@@ -11,7 +11,7 @@ SOURCE = "remotive"
 
 
 def run_remotive_ingestion() -> dict:
-    init_db()
+    # init_db()  # initialized at app startup in app/main.py
     started = perf_counter()
     actions = []
     fetched_count = 0

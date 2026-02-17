@@ -20,7 +20,7 @@ def test_remoteok_normalization_happy_path():
     assert job["source_job_id"] == "123"
     assert job["title"] == "Senior Backend Engineer"
     assert job["company_name"] == "Acme Corp"
-    assert job["remote"] is True
+    assert job["remote_source_flag"] is True
     assert job["remote_scope"] == "EU-wide"
     assert job["status"] == "new"
     assert job["first_seen_at"] == "2026-02-05T14:00:02+00:00"

@@ -23,17 +23,28 @@ def init_db():
 	      title TEXT,
 	      company_name TEXT,
 	      description TEXT,
-	      remote INTEGER,
+	      remote_source_flag INTEGER,
 	      remote_scope TEXT,
 	      status TEXT,
 	      first_seen_at TEXT,
 	      last_seen_at TEXT,
 	      last_verified_at TEXT,
 	      verification_failures INTEGER DEFAULT 0,
-	      updated_at TEXT
+	      updated_at TEXT,
+          remote_class TEXT DEFAULT NULL,
+          geo_class TEXT DEFAULT NULL,
+          
+          policy_v1_decision TEXT DEFAULT NULL,
+          policy_v1_reason TEXT DEFAULT NULL,
+
+          policy_v2_decision TEXT DEFAULT NULL,
+          policy_v2_reason TEXT DEFAULT NULL,
+
+          compliance_status TEXT DEFAULT NULL,
+          compliance_score INTEGER DEFAULT NULL
+         
         )
         """)
-
 
 def upsert_job(job: dict):
     """
@@ -60,7 +71,7 @@ def upsert_job(job: dict):
                 title,
                 company_name,
                 description,
-                remote,
+                remote_source_flag,
                 remote_scope,
                 status,
                 first_seen_at,
@@ -72,7 +83,7 @@ def upsert_job(job: dict):
                 title = excluded.title,
                 company_name = excluded.company_name,
                 description = excluded.description,
-                remote = excluded.remote,
+                remote_source_flag = excluded.remote_source_flag,
                 remote_scope = excluded.remote_scope,
                 status = excluded.status,
                 first_seen_at = CASE
@@ -89,7 +100,7 @@ def upsert_job(job: dict):
                 job["title"],
                 job["company_name"],
                 job["description"],
-                int(job["remote"]),
+                int(job["remote_source_flag"]),
                 job["remote_scope"],
                 job["status"],
                 first_seen_at,

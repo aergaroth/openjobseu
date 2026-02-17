@@ -77,7 +77,7 @@ def normalize_remoteok_job(raw: Dict) -> Optional[Dict]:
             "title": title.strip(),
             "company_name": company.strip(),
             "description": cleaned_description,
-            "remote": True,
+            "remote_source_flag": True,
             "remote_scope": remote_scope,
             "status": "new",
             "first_seen_at": posted_at,

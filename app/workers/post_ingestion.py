@@ -31,8 +31,7 @@ def run_post_ingestion() -> None:
         "unreachable": 0,
     }
 
-    # Ensure DB schema exists even if ingestion phase had no valid sources.
-    init_db()
+    # init_db()  # initialized at app startup in app/main.py
 
     # --- Availability ---
     try:

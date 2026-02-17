@@ -67,7 +67,7 @@ def run_lifecycle_rules() -> None:
 
 
 def run_lifecycle_pipeline() -> None:
-    init_db()
+    # init_db()  # initialized at app startup in app/main.py
     jobs = get_jobs_for_verification(limit=50)
     now = datetime.now(timezone.utc)
 

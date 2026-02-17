@@ -46,7 +46,7 @@ def normalize_remotive_job(raw: Dict) -> Optional[Dict]:
         "title": title.strip(),
         "company_name": company.strip(),
         "description": description.strip(),
-        "remote": True,
+        "remote_source_flag": True,
         "remote_scope": location,
         "status": "new",
         "first_seen_at": first_seen_at,

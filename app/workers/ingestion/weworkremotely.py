@@ -13,7 +13,7 @@ SOURCE = "weworkremotely"
 
 
 def run_weworkremotely_ingestion() -> dict:
-    init_db()
+    # init_db()  # initialized at app startup in app/main.py
     started = perf_counter()
     actions = []
     fetched_count = 0

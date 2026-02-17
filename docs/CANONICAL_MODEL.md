@@ -26,7 +26,7 @@ storage, and querying across different sources.
 
 ## Location & Scope (implemented)
 
-- **remote**: boolean (must be `true` for inclusion)
+- **remote_source_flag**: boolean source-level remote indicator (must be `true` for inclusion)
 - **remote_scope**: source-provided scope, preserved verbatim 
   Examples:
   - `EU-wide`

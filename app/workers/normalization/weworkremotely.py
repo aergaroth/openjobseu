@@ -58,7 +58,7 @@ def normalize_weworkremotely_job(raw: Dict) -> Optional[Dict]:
             "title": title,
             "company_name": company,
             "description": raw.get("summary", "") or "",
-            "remote": True,
+            "remote_source_flag": True,
             "remote_scope": "EU-wide",
             "status": "new",
             "first_seen_at": first_seen_at,

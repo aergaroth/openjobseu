@@ -10,7 +10,7 @@ def _make_job(job_id: str, first_seen_at: str) -> dict:
         "title": "Backend Engineer",
         "company_name": "Acme",
         "description": "Role description",
-        "remote": True,
+        "remote_source_flag": True,
         "remote_scope": "Europe",
         "status": "new",
         "first_seen_at": first_seen_at,

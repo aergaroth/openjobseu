@@ -5,7 +5,7 @@ from app.workers import tick_pipeline
 def test_post_ingestion_runs_steps_in_order(monkeypatch):
     calls: list[str] = []
 
-    monkeypatch.setattr(post_ingestion, "init_db", lambda: calls.append("init_db"))
+    # monkeypatch.setattr(post_ingestion, "init_db", lambda: calls.append("init_db"))
     monkeypatch.setattr(
         post_ingestion,
         "run_availability_pipeline",
@@ -19,13 +19,14 @@ def test_post_ingestion_runs_steps_in_order(monkeypatch):
 
     post_ingestion.run_post_ingestion()
 
-    assert calls == ["init_db", "availability", "lifecycle"]
+    # assert calls == ["init_db", "availability", "lifecycle"]
+    assert calls == ["availability", "lifecycle"]
 
 
 def test_post_ingestion_logs_single_summary(monkeypatch):
     info_calls = []
 
-    monkeypatch.setattr(post_ingestion, "init_db", lambda: None)
+    # monkeypatch.setattr(post_ingestion, "init_db", lambda: None)
     monkeypatch.setattr(
         post_ingestion,
         "run_availability_pipeline",

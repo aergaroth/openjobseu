@@ -20,7 +20,7 @@ def normalize_example_source_job(raw: Dict) -> Dict:
         "description": raw.get("description"),
         "employment_type": raw.get("employment_type"),
         "seniority": "unspecified",
-        "remote": True,
+        "remote_source_flag": True,
         "remote_scope": raw.get("remote_scope"),
         "country_restrictions": None,
         "tech_tags": raw.get("technologies", []),
