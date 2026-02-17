@@ -53,6 +53,12 @@ def run_tick():
                 "raw_count": raw_count,
                 "persisted_count": 0,
                 "skipped_count": 0,
+                "remote_model_totals": {
+                    "remote_only": 0,
+                    "remote_but_geo_restricted": 0,
+                    "non_remote": 0,
+                    "unknown": 0,
+                },
                 "per_source": {
                     "local": {
                         "status": source_status,
@@ -65,6 +71,12 @@ def run_tick():
                                 "non_remote": 0,
                                 "geo_restriction": 0,
                             },
+                        },
+                        "remote_model": {
+                            "remote_only": 0,
+                            "remote_but_geo_restricted": 0,
+                            "non_remote": 0,
+                            "unknown": 0,
                         },
                         "remote_model_counts": {
                             "remote_only": 0,

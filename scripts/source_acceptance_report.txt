@@ -1,0 +1,18 @@
+OPENJOBSEU SOURCE ACCEPTANCE REPORT
+date: 2026-02-16
+rule: ACCEPTED if remote_pct > 30 (remote_eu_uk excludes onsite/hybrid and negative-remote signals)
+
+ACCEPTED
+- himalayas_rss | rss | https://himalayas.app/jobs/rss | remote_eu_uk=35/100 (35.0%) | onsite_hits=15
+- jobicy_api | api | https://jobicy.com/api/v2/remote-jobs | remote_eu_uk=50/100 (50.0%) | onsite_hits=23
+- jobicy_rss | rss | https://jobicy.com/?feed=job_feed | remote_eu_uk=18/50 (36.0%) | onsite_hits=0
+- wwr_product_rss | rss | https://weworkremotely.com/categories/remote-product-jobs.rss | remote_eu_uk=9/23 (39.1%) | onsite_hits=3
+
+REJECTED
+- arbeitnow_api | api | https://arbeitnow.com/api/job-board-api | remote_eu_uk=22/100 (22.0%) | onsite_hits=30
+- devitjobs_uk_xml | rss | https://devitjobs.uk/job_feed.xml | remote_eu_uk=74/300 (24.7%) | onsite_hits=118
+- remoteok_rss_all | rss | https://remoteok.com/remote-jobs.rss | remote_eu_uk=28/100 (28.0%) | onsite_hits=9
+- themuse_api | api | https://www.themuse.com/api/public/jobs?page=1 | remote_eu_uk=1/20 (5.0%) | onsite_hits=7
+- wwr_design_rss | rss | https://weworkremotely.com/categories/remote-design-jobs.rss | remote_eu_uk=9/31 (29.0%) | onsite_hits=8
+- wwr_sales_marketing_rss | rss | https://weworkremotely.com/categories/remote-sales-and-marketing-jobs.rss | remote_eu_uk=18/62 (29.0%) | onsite_hits=4
+- wwr_support_rss | rss | https://weworkremotely.com/categories/remote-customer-support-jobs.rss | remote_eu_uk=10/34 (29.4%) | onsite_hits=8

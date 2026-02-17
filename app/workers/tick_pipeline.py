@@ -7,6 +7,13 @@ from app.workers.post_ingestion import run_post_ingestion
 
 logger = logging.getLogger("openjobseu.pipeline")
 
+REMOTE_MODEL_KEYS = (
+    "remote_only",
+    "remote_but_geo_restricted",
+    "non_remote",
+    "unknown",
+)
+
 
 def _int_metric(value, default: int = 0) -> int:
     try:
@@ -40,14 +47,7 @@ def _policy_metrics(source_metrics: dict | None = None) -> dict:
 def _remote_model_metrics(source_metrics: dict | None = None) -> dict:
     source_metrics = source_metrics or {}
     remote_model_counts = source_metrics.get("remote_model_counts") or {}
-    return {
-        "remote_only": _int_metric(remote_model_counts.get("remote_only", 0)),
-        "remote_but_geo_restricted": _int_metric(
-            remote_model_counts.get("remote_but_geo_restricted", 0)
-        ),
-        "non_remote": _int_metric(remote_model_counts.get("non_remote", 0)),
-        "unknown": _int_metric(remote_model_counts.get("unknown", 0)),
-    }
+    return {key: _int_metric(remote_model_counts.get(key, 0)) for key in REMOTE_MODEL_KEYS}
 
 
 def run_tick_pipeline(
@@ -75,6 +75,7 @@ def run_tick_pipeline(
         "persisted_count": 0,
         "skipped_count": 0,
     }
+    remote_model_totals = {key: 0 for key in REMOTE_MODEL_KEYS}
 
     # --- Ingestion phase ---
     for source in requested_sources:
@@ -84,15 +85,19 @@ def run_tick_pipeline(
         if not handler:
             logger.warning("unknown ingestion source", extra={"source": source})
             totals["sources_unknown"] += 1
+            source_remote_model = _remote_model_metrics()
             per_source[source] = {
                 "status": "unknown",
                 "raw_count": 0,
                 "persisted_count": 0,
                 "skipped_count": 0,
                 "policy": _policy_metrics(),
-                "remote_model_counts": _remote_model_metrics(),
+                "remote_model": source_remote_model,
+                "remote_model_counts": source_remote_model.copy(),
                 "duration_ms": int((perf_counter() - source_started_perf) * 1000),
             }
+            for key in REMOTE_MODEL_KEYS:
+                remote_model_totals[key] += source_remote_model[key]
             continue
 
         try:
@@ -111,13 +116,15 @@ def run_tick_pipeline(
             )
 
             source_status = source_metrics.get("status", "ok")
+            source_remote_model = _remote_model_metrics(source_metrics)
             per_source[source] = {
                 "status": source_status,
                 "raw_count": raw_count,
                 "persisted_count": persisted_count,
                 "skipped_count": skipped_count,
                 "policy": _policy_metrics(source_metrics),
-                "remote_model_counts": _remote_model_metrics(source_metrics),
+                "remote_model": source_remote_model,
+                "remote_model_counts": source_remote_model.copy(),
                 "duration_ms": duration_ms,
             }
 
@@ -128,18 +135,24 @@ def run_tick_pipeline(
             totals["raw_count"] += raw_count
             totals["persisted_count"] += persisted_count
             totals["skipped_count"] += skipped_count
+            for key in REMOTE_MODEL_KEYS:
+                remote_model_totals[key] += source_remote_model[key]
         except Exception:
             logger.exception("ingestion source failed", extra={"source": source})
             totals["sources_failed"] += 1
+            source_remote_model = _remote_model_metrics()
             per_source[source] = {
                 "status": "failed",
                 "raw_count": 0,
                 "persisted_count": 0,
                 "skipped_count": 0,
                 "policy": _policy_metrics(),
-                "remote_model_counts": _remote_model_metrics(),
+                "remote_model": source_remote_model,
+                "remote_model_counts": source_remote_model.copy(),
                 "duration_ms": int((perf_counter() - source_started_perf) * 1000),
             }
+            for key in REMOTE_MODEL_KEYS:
+                remote_model_totals[key] += source_remote_model[key]
 
     # --- Post-ingestion (availability + lifecycle) ---
     run_post_ingestion()
@@ -159,6 +172,7 @@ def run_tick_pipeline(
             "raw_count": totals["raw_count"],
             "persisted_count": totals["persisted_count"],
             "skipped_count": totals["skipped_count"],
+            "remote_model_totals": remote_model_totals,
             "per_source": per_source,
         },
     }

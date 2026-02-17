@@ -15,8 +15,11 @@ def format_tick_summary(payload: dict) -> str:
         f"{'REJ':>6}"
         f"{'NR':>6}"
         f"{'GEO':>6}"
+        f"{'RO':>6}"
+        f"{'RG':>6}"
+        f"{'UNK':>6}"
         f"{'REJ%':>7}"
-        f"{'TIME(ms)':>10}"
+        f"{'TIME':>10}"
     )
 
     lines.append(header)
@@ -31,6 +34,10 @@ def format_tick_summary(payload: dict) -> str:
         rejected = policy.get("rejected_total", 0)
         non_remote = reasons.get("non_remote", 0)
         geo_restriction = reasons.get("geo_restriction", 0)
+        remote_model = data.get("remote_model") or data.get("remote_model_counts") or {}
+        remote_only = remote_model.get("remote_only", 0)
+        remote_geo_restricted = remote_model.get("remote_but_geo_restricted", 0)
+        remote_unknown = remote_model.get("unknown", 0)
         duration = data.get("duration_ms", 0)
 
         rej_percent = (rejected / raw * 100) if raw else 0.0
@@ -42,6 +49,9 @@ def format_tick_summary(payload: dict) -> str:
             f"{rejected:>6}"
             f"{non_remote:>6}"
             f"{geo_restriction:>6}"
+            f"{remote_only:>6}"
+            f"{remote_geo_restricted:>6}"
+            f"{remote_unknown:>6}"
             f"{rej_percent:>7.1f}"
             f"{duration:>10}"
         )

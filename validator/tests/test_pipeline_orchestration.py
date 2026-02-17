@@ -78,6 +78,15 @@ def test_tick_pipeline_runs_post_ingestion_once(monkeypatch):
         result["metrics"]["ingestion"]["per_source"]["remotive"]["policy"]["rejected_total"]
         == 0
     )
+    remote_model = result["metrics"]["ingestion"]["per_source"]["remotive"]["remote_model"]
+    assert set(remote_model.keys()) == {
+        "remote_only",
+        "remote_but_geo_restricted",
+        "non_remote",
+        "unknown",
+    }
+    for key in remote_model:
+        assert isinstance(remote_model[key], int)
     assert (
         result["metrics"]["ingestion"]["per_source"]["remotive"]["remote_model_counts"]
         == {
@@ -136,6 +145,14 @@ def test_tick_pipeline_aggregates_per_source_metrics(monkeypatch):
     assert ingestion_metrics["raw_count"] == 10
     assert ingestion_metrics["persisted_count"] == 3
     assert ingestion_metrics["skipped_count"] == 7
+    assert set(ingestion_metrics["remote_model_totals"].keys()) == {
+        "remote_only",
+        "remote_but_geo_restricted",
+        "non_remote",
+        "unknown",
+    }
+    for key in ingestion_metrics["remote_model_totals"]:
+        assert isinstance(ingestion_metrics["remote_model_totals"][key], int)
     assert ingestion_metrics["per_source"]["remotive"]["status"] == "ok"
     assert ingestion_metrics["per_source"]["remotive"]["policy"]["rejected_total"] == 2
     assert (
@@ -146,6 +163,16 @@ def test_tick_pipeline_aggregates_per_source_metrics(monkeypatch):
         ingestion_metrics["per_source"]["remotive"]["policy"]["by_reason"]["geo_restriction"]
         == 1
     )
+    assert set(ingestion_metrics["per_source"]["remotive"]["remote_model"].keys()) == {
+        "remote_only",
+        "remote_but_geo_restricted",
+        "non_remote",
+        "unknown",
+    }
+    for key in ingestion_metrics["per_source"]["remotive"]["remote_model"]:
+        assert isinstance(
+            ingestion_metrics["per_source"]["remotive"]["remote_model"][key], int
+        )
     assert ingestion_metrics["per_source"]["remotive"]["remote_model_counts"] == {
         "remote_only": 2,
         "remote_but_geo_restricted": 1,
@@ -154,6 +181,16 @@ def test_tick_pipeline_aggregates_per_source_metrics(monkeypatch):
     }
     assert ingestion_metrics["per_source"]["remoteok"]["status"] == "failed"
     assert ingestion_metrics["per_source"]["remoteok"]["policy"]["rejected_total"] == 0
+    assert set(ingestion_metrics["per_source"]["remoteok"]["remote_model"].keys()) == {
+        "remote_only",
+        "remote_but_geo_restricted",
+        "non_remote",
+        "unknown",
+    }
+    for key in ingestion_metrics["per_source"]["remoteok"]["remote_model"]:
+        assert isinstance(
+            ingestion_metrics["per_source"]["remoteok"]["remote_model"][key], int
+        )
     assert ingestion_metrics["per_source"]["remoteok"]["remote_model_counts"] == {
         "remote_only": 0,
         "remote_but_geo_restricted": 0,
@@ -162,6 +199,16 @@ def test_tick_pipeline_aggregates_per_source_metrics(monkeypatch):
     }
     assert ingestion_metrics["per_source"]["unknown"]["status"] == "unknown"
     assert ingestion_metrics["per_source"]["unknown"]["policy"]["rejected_total"] == 0
+    assert set(ingestion_metrics["per_source"]["unknown"]["remote_model"].keys()) == {
+        "remote_only",
+        "remote_but_geo_restricted",
+        "non_remote",
+        "unknown",
+    }
+    for key in ingestion_metrics["per_source"]["unknown"]["remote_model"]:
+        assert isinstance(
+            ingestion_metrics["per_source"]["unknown"]["remote_model"][key], int
+        )
     assert ingestion_metrics["per_source"]["unknown"]["remote_model_counts"] == {
         "remote_only": 0,
         "remote_but_geo_restricted": 0,
