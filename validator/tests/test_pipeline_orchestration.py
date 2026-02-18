@@ -55,13 +55,23 @@ def test_post_ingestion_logs_single_summary(monkeypatch):
 
 def test_tick_pipeline_runs_post_ingestion_once(monkeypatch):
     post_calls = {"count": 0}
+    compliance_calls = {"count": 0}
 
     def handler():
         return {"actions": ["remotive_ingested:1"]}
 
+    def fake_compliance_resolution():
+        compliance_calls["count"] += 1
+        return {"checked": 0, "updated": 0, "duration_ms": 0}
+
     def fake_post_ingestion():
         post_calls["count"] += 1
 
+    monkeypatch.setattr(
+        tick_pipeline,
+        "run_compliance_resolution",
+        fake_compliance_resolution,
+    )
     monkeypatch.setattr(tick_pipeline, "run_post_ingestion", fake_post_ingestion)
 
     result = tick_pipeline.run_tick_pipeline(
@@ -69,6 +79,7 @@ def test_tick_pipeline_runs_post_ingestion_once(monkeypatch):
         ingestion_handlers={"remotive": handler},
     )
 
+    assert compliance_calls["count"] == 1
     assert post_calls["count"] == 1
     assert result["actions"] == ["remotive_ingested:1"]
     assert "metrics" in result
@@ -127,6 +138,11 @@ def test_tick_pipeline_aggregates_per_source_metrics(monkeypatch):
     def failed_handler():
         raise RuntimeError("source down")
 
+    monkeypatch.setattr(
+        tick_pipeline,
+        "run_compliance_resolution",
+        lambda: {"checked": 0, "updated": 0, "duration_ms": 0},
+    )
     monkeypatch.setattr(tick_pipeline, "run_post_ingestion", lambda: None)
 
     result = tick_pipeline.run_tick_pipeline(
@@ -227,6 +243,11 @@ def test_tick_pipeline_logs_standardized_finish(monkeypatch):
         lambda message, extra=None: info_calls.append(
             {"message": message, "extra": extra or {}}
         ),
+    )
+    monkeypatch.setattr(
+        tick_pipeline,
+        "run_compliance_resolution",
+        lambda: {"checked": 0, "updated": 0, "duration_ms": 0},
     )
     monkeypatch.setattr(tick_pipeline, "run_post_ingestion", lambda: None)
 

@@ -171,6 +171,55 @@ def update_job_availability(
     conn.close()
 
 
+def get_jobs_for_compliance_resolution(limit: int = 500) -> list[dict]:
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+
+    rows = conn.execute(
+        """
+        SELECT
+            job_id,
+            remote_class,
+            geo_class
+        FROM jobs
+        ORDER BY COALESCE(last_seen_at, '1970-01-01') DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def update_job_compliance_resolution(
+    job_id: str,
+    compliance_status: str,
+    compliance_score: int,
+):
+    now = datetime.now(timezone.utc).isoformat()
+
+    conn = get_conn()
+    conn.execute(
+        """
+        UPDATE jobs
+        SET
+            compliance_status = ?,
+            compliance_score = ?,
+            updated_at = ?
+        WHERE job_id = ?
+        """,
+        (
+            compliance_status,
+            compliance_score,
+            now,
+            job_id,
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+
 def get_jobs(
     status: str | None = None,
     company: str | None = None,

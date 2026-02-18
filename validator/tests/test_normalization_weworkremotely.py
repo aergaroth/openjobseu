@@ -69,6 +69,21 @@ def test_weworkremotely_company_heuristic_is_safe():
     assert job["title"] == "X: Y: Z Engineer"
 
 
+def test_weworkremotely_company_heuristic_ignores_url_like_prefix():
+    raw = {
+        "title": "https://weworkremotely.com/remote-jobs/acme-backend-engineer: Backend Engineer",
+        "link": "https://weworkremotely.com/remote-jobs/acme-backend-engineer",
+        "id": "wwr-999",
+        "summary": "Role",
+    }
+
+    job = normalize_weworkremotely_job(raw)
+
+    assert job is not None
+    assert job["company_name"] == "unknown"
+    assert job["title"] == raw["title"]
+
+
 def test_weworkremotely_uses_source_published_date_when_present():
     raw = {
         "title": "Acme Corp: Senior Backend Engineer",
@@ -96,3 +111,18 @@ def test_weworkremotely_normalization_cleans_url():
 
     assert job is not None
     assert job["source_url"] == "https://weworkremotely.com/remote-jobs/654?src=feed"
+
+
+def test_weworkremotely_uses_slug_when_raw_id_is_url():
+    raw = {
+        "title": "Acme Corp: Senior Backend Engineer",
+        "link": "https://weworkremotely.com/remote-jobs/acme-backend-engineer",
+        "id": "https://weworkremotely.com/remote-jobs/acme-backend-engineer",
+        "summary": "Great role",
+    }
+
+    job = normalize_weworkremotely_job(raw)
+
+    assert job is not None
+    assert job["source_job_id"] == "acme-backend-engineer"
+    assert job["job_id"] == "weworkremotely:acme-backend-engineer"

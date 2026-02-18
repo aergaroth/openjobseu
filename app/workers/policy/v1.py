@@ -1,4 +1,7 @@
+import logging
 from typing import Dict, Optional, Tuple
+
+from app.workers.policy.v2.remote_classifier import classify_remote_model
 
 
 NON_REMOTE_KEYWORDS = [
@@ -52,3 +55,47 @@ def evaluate_policy(job: Dict) -> Tuple[bool, Optional[str]]:
         return False, "geo_restriction"
 
     return True, None
+
+
+audit_logger = logging.getLogger("openjobseu.policy.audit")
+
+
+def apply_policy_v1(job: Optional[Dict], *, source: str) -> Tuple[Optional[Dict], Optional[str]]:
+    """
+    Apply policy v1 and annotate compliance metadata.
+
+    This function does not hard-reject jobs.
+    It returns policy reason as a soft signal.
+    """
+    if job is None:
+        return None, None
+
+    decision, reason = evaluate_policy(job)
+
+    try:
+        classification = classify_remote_model(
+            str(job.get("title") or ""),
+            str(job.get("description") or ""),
+        )
+        remote_model = classification.get("remote_model")
+    except Exception:
+        remote_model = "unknown"
+
+    job["_compliance"] = {
+        "policy_version": "v1",
+        "policy_reason": reason,
+        "remote_model": remote_model,
+    }
+
+    if not decision:
+        audit_logger.info(
+            f"policy_flag[{source}]",
+            extra={
+                "component": "policy",
+                "job_id": job.get("job_id"),
+                "reason": reason,
+                "policy_version": "v1",
+            },
+        )
+
+    return job, reason

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from time import perf_counter
 from typing import Iterable, Dict, Callable, List
 
+from app.workers.compliance_resolution import run_compliance_resolution
 from app.workers.post_ingestion import run_post_ingestion
 
 logger = logging.getLogger("openjobseu.pipeline")
@@ -57,7 +58,7 @@ def run_tick_pipeline(
 ) -> dict:
     """
     Execute full tick pipeline:
-    ingestion → post_ingestion
+    ingestion → compliance_resolution → post_ingestion
     """
 
     requested_sources = list(ingestion_sources)
@@ -154,6 +155,9 @@ def run_tick_pipeline(
             for key in REMOTE_MODEL_KEYS:
                 remote_model_totals[key] += source_remote_model[key]
 
+    # --- Compliance resolution ---
+    compliance_summary = run_compliance_resolution()
+
     # --- Post-ingestion (availability + lifecycle) ---
     run_post_ingestion()
 
@@ -175,6 +179,7 @@ def run_tick_pipeline(
             "remote_model_totals": remote_model_totals,
             "per_source": per_source,
         },
+        "compliance": compliance_summary,
     }
 
     logger.info(

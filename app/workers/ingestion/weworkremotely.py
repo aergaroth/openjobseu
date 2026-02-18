@@ -6,7 +6,7 @@ from app.workers.normalization.weworkremotely import (
     normalize_weworkremotely_job,
 )
 from app.workers.ingestion.log_helpers import log_ingestion
-from app.workers.policy.enforcement import apply_policy_v1
+from app.workers.policy.v1 import apply_policy_v1
 from storage.sqlite import init_db, upsert_job
 
 SOURCE = "weworkremotely"
@@ -55,12 +55,10 @@ def run_weworkremotely_ingestion() -> dict:
             if model not in remote_model_counts:
                 model = "unknown"
             remote_model_counts[model] += 1
-            if not job:
+
+            if reason in rejected_by_reason:
                 rejected_policy_count += 1
-                if reason in rejected_by_reason:
-                    rejected_by_reason[reason] += 1
-                skipped += 1
-                continue
+                rejected_by_reason[reason] += 1
 
             upsert_job(job)
             accepted_count += 1
