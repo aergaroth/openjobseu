@@ -10,8 +10,9 @@ on:
     types: [completed]
 
 jobs:
-  build:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+  build-dev:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch != 'main' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -21,34 +22,50 @@ jobs:
 
       - uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: ${{ secrets.GCP_SA_KEY_DEV }}
 
       - uses: google-github-actions/setup-gcloud@v2
 
       - name: Configure Docker
         run: gcloud auth configure-docker europe-north1-docker.pkg.dev
 
-      - name: Set target project
-        run: |
-          BRANCH="${{ github.event.workflow_run.head_branch }}"
-          echo "Branch: $BRANCH"
-
-          if [ "$BRANCH" = "main" ]; then
-            echo "PROJECT_ID=openjobseu" >> $GITHUB_ENV
-          else
-            echo "PROJECT_ID=dev-openjobseu" >> $GITHUB_ENV
-
-      - name: Build & push
+      - name: Build & push (DEV)
         env:
+          PROJECT_ID: dev-openjobseu
           SHA: ${{ github.event.workflow_run.head_sha }}
-
         run: |
-
           IMAGE=europe-north1-docker.pkg.dev/$PROJECT_ID/$PROJECT_ID/$PROJECT_ID
 
+          echo "Pushing to DEV project: $PROJECT_ID"
           docker build -t $IMAGE:$SHA .
           docker push $IMAGE:$SHA
 
 
+  build-prod:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    runs-on: ubuntu-latest
 
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_PROD }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker europe-north1-docker.pkg.dev
+
+      - name: Build & push (PROD)
+        env:
+          PROJECT_ID: openjobseu
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          IMAGE=europe-north1-docker.pkg.dev/$PROJECT_ID/$PROJECT_ID/$PROJECT_ID
+
+          echo "Pushing to PROD project: $PROJECT_ID"
+          docker build -t $IMAGE:$SHA .
+          docker push $IMAGE:$SHA

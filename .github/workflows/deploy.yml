@@ -10,19 +10,40 @@ on:
     types: [completed]
 
 jobs:
-  deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+  deploy-dev:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch != 'main' }}
     runs-on: ubuntu-latest
 
     steps:
       - uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: ${{ secrets.GCP_SA_KEY_DEV }}
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      - name: Deploy to Cloud Run
+      - name: Deploy to Cloud Run (DEV)
+        run: |
+          gcloud run services update dev-openjobseu \
+            --project dev-openjobseu \
+            --region europe-north1 \
+            --image europe-north1-docker.pkg.dev/dev-openjobseu/dev-openjobseu/dev-openjobseu:${{ github.event.workflow_run.head_sha }}
+
+
+  deploy-prod:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_PROD }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run (PROD)
         run: |
           gcloud run services update openjobseu \
+            --project openjobseu \
             --region europe-north1 \
             --image europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu:${{ github.event.workflow_run.head_sha }}
