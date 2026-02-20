@@ -28,13 +28,27 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker europe-north1-docker.pkg.dev
 
+      - name: Set target project
+        run: |
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          echo "Branch: $BRANCH"
+
+          if [ "$BRANCH" = "main" ]; then
+            echo "PROJECT_ID=openjobseu" >> $GITHUB_ENV
+          else
+            echo "PROJECT_ID=dev-openjobseu" >> $GITHUB_ENV
+
       - name: Build & push
         env:
-          IMAGE: europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu
           SHA: ${{ github.event.workflow_run.head_sha }}
+
         run: |
+
+          IMAGE=europe-north1-docker.pkg.dev/$PROJECT_ID/$PROJECT_ID/$PROJECT_ID
+
           docker build -t $IMAGE:$SHA .
           docker push $IMAGE:$SHA
 
-          docker tag $IMAGE:$SHA $IMAGE:latest
-          docker push $IMAGE:latest
+
+
+
