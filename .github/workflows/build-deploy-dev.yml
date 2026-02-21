@@ -42,6 +42,7 @@ jobs:
         run: |
           terraform init -input=false
           terraform apply -auto-approve \
+            -var="project_id=dev-openjobseu" \
             -var="image=europe-north1-docker.pkg.dev/dev-openjobseu/dev-openjobseu/dev-openjobseu:${{ github.sha }}"
 
       - name: Show deployed revision
