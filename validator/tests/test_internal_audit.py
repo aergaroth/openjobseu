@@ -70,29 +70,30 @@ def test_internal_audit_page_renders_html():
 
 def test_internal_audit_jobs_filters_and_counts():
     init_db()
+    marker = "audit-panel-20260221"
 
     job_1 = _make_job(
         "audit:1",
         source="remotive",
         status="new",
-        company="Acme",
-        title="Backend Engineer",
+        company=f"{marker}-alpha",
+        title=f"{marker} Backend Engineer",
         remote_scope="EU-wide",
     )
     job_2 = _make_job(
         "audit:2",
         source="remotive",
         status="active",
-        company="Beta",
-        title="Frontend Engineer",
+        company=f"{marker}-beta",
+        title=f"{marker} Frontend Engineer",
         remote_scope="Poland",
     )
     job_3 = _make_job(
         "audit:3",
         source="remoteok",
         status="new",
-        company="Acme Corp",
-        title="Data Engineer",
+        company=f"{marker}-gamma",
+        title=f"{marker} Data Engineer",
         remote_scope="USA only",
     )
 
@@ -126,6 +127,7 @@ def test_internal_audit_jobs_filters_and_counts():
         "/internal/audit/jobs",
         params={
             "source": "remotive",
+            "company": marker,
             "limit": 1,
         },
     )
@@ -144,7 +146,7 @@ def test_internal_audit_jobs_filters_and_counts():
     response_filtered = client.get(
         "/internal/audit/jobs",
         params={
-            "company": "acme",
+            "company": f"{marker}-alpha",
             "min_compliance_score": 80,
         },
     )
