@@ -1,7 +1,7 @@
 terraform {
 
   backend "gcs" {
-    bucket  = "openjobseu-tfstate"
+    bucket  = "dev-openjobseu-tfstate"
     prefix  = "dev/cloud-run"
   }
 
