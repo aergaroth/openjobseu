@@ -8,6 +8,8 @@ on:
   workflow_run:
     workflows: ["Build image"]
     types: [completed]
+    branches:
+     - develop
 
 jobs:
 
