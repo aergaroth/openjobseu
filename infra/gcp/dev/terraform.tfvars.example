@@ -1,0 +1,3 @@
+project_id = "dev-openjobseu"
+image      = "europe-north1-docker.pkg.dev/dev-openjobseu/dev-openjobseu/dev-openjobseu:latest"
+region     = "europe-north1"
