@@ -33,9 +33,14 @@ jobs:
           docker build -t $IMAGE:$SHA .
           docker push $IMAGE:$SHA
 
-      - name: Deploy to Cloud Run (PROD)
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Terraform Apply (PROD)
+        working-directory: infra/gcp/prod
         run: |
-          gcloud run services update openjobseu \
-            --project openjobseu \
-            --region europe-north1 \
-            --image europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu:${{ github.sha }}
+          terraform init -input=false
+          terraform apply -auto-approve \
+            -var="project_id=openjobseu" \ 
+            -var="image=europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu:${{ github.sha }}"

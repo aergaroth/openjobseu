@@ -7,6 +7,10 @@ resource "google_cloud_run_v2_service" "this" {
   name     = var.service_name
   location = var.region
 
+  lifecycle {
+      ignore_changes = [scaling]
+  }
+
   template {
     containers {
       image = var.image
@@ -30,6 +34,7 @@ resource "google_cloud_run_v2_service" "this" {
     percent = 100
     type    = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
   }
+
 }
 
 resource "google_cloud_run_v2_service_iam_member" "public" {
