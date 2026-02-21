@@ -20,13 +20,6 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
-      - uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY_DEV }}
-
-      - uses: google-github-actions/setup-gcloud@v2
-
-
       - name: Debug secret presence
         run: |
           if [ -z "${{ secrets.GCP_SA_KEY_DEV }}" ]; then
@@ -35,6 +28,12 @@ jobs:
             echo "DEV secret exists"
           fi
 
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_DEV }}
+
+      - uses: google-github-actions/setup-gcloud@v2
 
       - name: Configure Docker
         run: gcloud auth configure-docker europe-north1-docker.pkg.dev
