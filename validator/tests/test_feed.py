@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.api import jobs as jobs_api
 from app.main import app
 
 client = TestClient(app)
@@ -59,3 +60,18 @@ def test_jobs_feed_cache_header_present():
     r = client.get("/jobs/feed")
     assert "cache-control" in r.headers
     assert "max-age=300" in r.headers["cache-control"]
+
+
+def test_jobs_feed_applies_compliance_score_threshold(monkeypatch):
+    captured = {}
+
+    def fake_get_jobs(**kwargs):
+        captured.update(kwargs)
+        return []
+
+    monkeypatch.setattr(jobs_api, "get_jobs", fake_get_jobs)
+
+    r = client.get("/jobs/feed")
+    assert r.status_code == 200
+    assert captured["status"] == "visible"
+    assert captured["min_compliance_score"] == 80
