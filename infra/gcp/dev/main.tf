@@ -8,6 +8,13 @@ resource "google_cloud_run_v2_service" "this" {
   location = var.region
   deletion_protection = false
 
+  lifecycle {
+   ignore_changes = [
+     scaling
+   ]
+  }
+
+
   template {
     containers {
       image = var.image

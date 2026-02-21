@@ -7,6 +7,10 @@ resource "google_cloud_run_v2_service" "this" {
   name     = var.service_name
   location = var.region
 
+  lifecycle {
+      ignore_changes = [scaling]
+  }
+
   template {
     containers {
       image = var.image
