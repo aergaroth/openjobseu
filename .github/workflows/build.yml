@@ -26,6 +26,16 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
+
+      - name: Debug secret presence
+        run: |
+          if [ -z "${{ secrets.GCP_SA_KEY_DEV }}" ]; then
+            echo "DEV secret is EMPTY"
+          else
+            echo "DEV secret exists"
+          fi
+
+
       - name: Configure Docker
         run: gcloud auth configure-docker europe-north1-docker.pkg.dev
 
