@@ -42,5 +42,5 @@ jobs:
         run: |
           terraform init -input=false
           terraform apply -auto-approve \
-            -var="project_id=openjobseu" \ 
+            -var="project_id=openjobseu" \
             -var="image=europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu:${{ github.sha }}"
