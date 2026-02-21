@@ -1,32 +1,83 @@
 from typing import Dict
 
 
-def _clamp_score(score: int) -> int:
-    return max(0, min(score, 100))
+def _normalize_remote_class(remote_class: str | None) -> str:
+    value = str(remote_class or "").strip().lower()
+    if value in {
+        "remote_only",
+        "remote_but_geo_restricted",
+        "unknown",
+        "non_remote",
+    }:
+        return value
+    if value in {"office_first", "hybrid"}:
+        return "non_remote"
+    return "unknown"
+
+
+def _normalize_geo_class(geo_class: str | None) -> str:
+    value = str(geo_class or "").strip().lower()
+    aliases = {
+        "eu_member_state": "eu_member_state",
+        "eu_region": "eu_region",
+        "eu_explicit": "eu_explicit",
+        "eog": "eu_region",
+        "uk": "uk",
+        "worldwide": "unknown",
+        "global": "unknown",
+        "eu_friendly": "unknown",
+        "non_eu": "non_eu",
+        "non_eu_restricted": "non_eu",
+        "unknown": "unknown",
+    }
+    return aliases.get(value, "unknown")
+
+
+def _resolve_score_and_status(remote_class: str | None, geo_class: str | None) -> tuple[int, str]:
+    remote = _normalize_remote_class(remote_class)
+    geo = _normalize_geo_class(geo_class)
+
+    # 1) Hard reject
+    if remote == "non_remote":
+        return 0, "rejected"
+    if geo == "non_eu":
+        return 0, "rejected"
+
+    # 2) remote_only
+    if remote == "remote_only" and geo == "eu_member_state":
+        return 100, "approved"
+    if remote == "remote_only" and geo == "eu_explicit":
+        return 90, "approved"
+    if remote == "remote_only" and geo == "eu_region":
+        return 90, "approved"
+    if remote == "remote_only" and geo == "uk":
+        return 85, "approved"
+
+    # 3) remote_but_geo_restricted
+    if remote == "remote_but_geo_restricted" and geo == "eu_member_state":
+        return 70, "review"
+    if remote == "remote_but_geo_restricted" and geo == "eu_explicit":
+        return 65, "review"
+    if remote == "remote_but_geo_restricted" and geo == "eu_region":
+        return 65, "review"
+
+    # 4) unknown remote
+    if remote == "unknown" and geo == "eu_member_state":
+        return 60, "review"
+    if remote == "unknown" and geo == "eu_explicit":
+        return 55, "review"
+    if remote == "unknown" and geo == "eu_region":
+        return 55, "review"
+    if remote == "unknown" and geo == "uk":
+        return 55, "review"
+
+    # 5) everything else
+    return 20, "rejected"
 
 
 def calculate_compliance_score(remote_class: str | None, geo_class: str | None) -> int:
-    score = 0
-
-    # Remote scoring
-    if remote_class == "remote_only":
-        score += 40
-    elif remote_class == "unknown":
-        score += 10
-    elif remote_class == "remote_but_geo_restricted":
-        score -= 20
-    elif remote_class == "non_remote":
-        score -= 100
-
-    # Geo scoring
-    if geo_class == "eu_explicit":
-        score += 40
-    elif geo_class == "eu_friendly":
-        score += 25
-    elif geo_class == "non_eu":
-        score -= 100
-
-    return _clamp_score(score)
+    score, _status = _resolve_score_and_status(remote_class, geo_class)
+    return score
 
 
 def resolve_compliance(remote_class: str | None, geo_class: str | None) -> Dict:
@@ -37,30 +88,8 @@ def resolve_compliance(remote_class: str | None, geo_class: str | None) -> Dict:
             "compliance_score": int
         }
     """
-
-    # Hard rejects
-    if remote_class == "non_remote":
-        return {"compliance_status": "rejected", "compliance_score": 0}
-
-    if geo_class == "non_eu":
-        return {"compliance_status": "rejected", "compliance_score": 0}
-
-    # Approved
-    if (
-        remote_class == "remote_only"
-        and geo_class in ("eu_explicit", "eu_friendly")
-    ):
-        score = calculate_compliance_score(remote_class, geo_class)
-        return {"compliance_status": "approved", "compliance_score": score}
-
-    # Review (risk bucket)
-    if (
-        remote_class == "unknown"
-        and geo_class in ("eu_explicit", "eu_friendly")
-    ):
-        score = calculate_compliance_score(remote_class, geo_class)
-        return {"compliance_status": "review", "compliance_score": score}
-
-    # Everything else
-    score = calculate_compliance_score(remote_class, geo_class)
-    return {"compliance_status": "unknown", "compliance_score": score}
+    score, status = _resolve_score_and_status(remote_class, geo_class)
+    return {
+        "compliance_status": status,
+        "compliance_score": score,
+    }
