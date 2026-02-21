@@ -18,14 +18,21 @@ jobs:
       run:
         working-directory: infra/gcp/dev
 
+    env:
+      TF_VAR_project_id: dev-openjobseu
+      TF_VAR_image: europe-north1-docker.pkg.dev/dev-openjobseu/dev-openjobseu/dev-openjobseu:pr-placeholder
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
+
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY_DEV }}
+
       - run: terraform init -input=false
       - run: terraform validate
       - run: terraform plan -input=false
@@ -38,14 +45,21 @@ jobs:
       run:
         working-directory: infra/gcp/prod
 
+    env:
+      TF_VAR_project_id: openjobseu
+      TF_VAR_image: europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu:pr-placeholder
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
+
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY_PROD }}
+
       - run: terraform init -input=false
       - run: terraform validate
       - run: terraform plan -input=false
