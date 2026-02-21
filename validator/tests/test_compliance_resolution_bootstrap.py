@@ -1,0 +1,93 @@
+from app.workers.compliance_resolution import run_compliance_resolution_for_existing_db
+from storage.sqlite import get_conn, init_db, upsert_job
+
+
+def _make_job(job_id: str, remote_scope: str, *, remote_source_flag: bool = True) -> dict:
+    return {
+        "job_id": job_id,
+        "source": "remoteok",
+        "source_job_id": job_id.split(":")[-1],
+        "source_url": f"https://example.com/jobs/{job_id}",
+        "title": "Backend Engineer",
+        "company_name": "Acme",
+        "description": "Role description",
+        "remote_source_flag": remote_source_flag,
+        "remote_scope": remote_scope,
+        "status": "new",
+        "first_seen_at": "2026-01-05T10:00:00+00:00",
+    }
+
+
+def test_bootstrap_runs_for_existing_db_rows():
+    init_db()
+
+    approved = _make_job("seed:approved", "EU-wide")
+    review = _make_job("seed:review", "Poland", remote_source_flag=False)
+    rejected = _make_job("seed:rejected", "USA only")
+
+    upsert_job(approved)
+    upsert_job(review)
+    upsert_job(rejected)
+
+    with get_conn() as conn:
+        conn.execute(
+            """
+            UPDATE jobs
+            SET
+                remote_class = NULL,
+                geo_class = NULL,
+                compliance_status = NULL,
+                compliance_score = NULL
+            WHERE job_id IN (?, ?, ?)
+            """,
+            (
+                approved["job_id"],
+                review["job_id"],
+                rejected["job_id"],
+            ),
+        )
+        conn.commit()
+
+    summary = run_compliance_resolution_for_existing_db(batch_size=2, max_batches=10)
+
+    assert summary["initial_missing"] >= 3
+    assert summary["remaining_missing"] == 0
+    assert summary["updated"] >= 3
+
+    with get_conn() as conn:
+        approved_row = conn.execute(
+            """
+            SELECT compliance_status, compliance_score
+            FROM jobs
+            WHERE job_id = ?
+            """,
+            (approved["job_id"],),
+        ).fetchone()
+        review_row = conn.execute(
+            """
+            SELECT compliance_status, compliance_score
+            FROM jobs
+            WHERE job_id = ?
+            """,
+            (review["job_id"],),
+        ).fetchone()
+        rejected_row = conn.execute(
+            """
+            SELECT compliance_status, compliance_score
+            FROM jobs
+            WHERE job_id = ?
+            """,
+            (rejected["job_id"],),
+        ).fetchone()
+
+    assert approved_row is not None
+    assert approved_row[0] == "approved"
+    assert approved_row[1] >= 80
+
+    assert review_row is not None
+    assert review_row[0] == "review"
+    assert 50 <= review_row[1] <= 79
+
+    assert rejected_row is not None
+    assert rejected_row[0] == "rejected"
+    assert rejected_row[1] == 0

@@ -3,13 +3,98 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone
 
+from app.workers.policy.v2.geo_classifier import classify_geo_scope
+
+
 def get_db_path() -> Path:
     path = Path(os.getenv("OPENJOBSEU_DB_PATH", "data/openjobseu.db"))
     path.parent.mkdir(exist_ok=True)
     return path
 
+
 def get_conn():
     return sqlite3.connect(get_db_path())
+
+
+def _derive_remote_class(job: dict) -> str:
+    compliance = job.get("_compliance")
+    if not isinstance(compliance, dict):
+        return "remote_only" if bool(job.get("remote_source_flag")) else "unknown"
+
+    policy_reason = str(compliance.get("policy_reason") or "").strip().lower()
+    remote_model = str(compliance.get("remote_model") or "").strip().lower()
+
+    if policy_reason == "non_remote":
+        return "non_remote"
+
+    mapping = {
+        "remote_only": "remote_only",
+        "remote_but_geo_restricted": "remote_but_geo_restricted",
+        "hybrid": "non_remote",
+        "office_first": "non_remote",
+        "non_remote": "non_remote",
+        "unknown": "unknown",
+    }
+    return mapping.get(remote_model, "unknown")
+
+
+def _normalize_geo_class_value(value: str | None) -> str:
+    geo = str(value or "").strip().lower()
+    mapping = {
+        "eu_member_state": "eu_member_state",
+        "eu_region": "eu_region",
+        "eu_explicit": "eu_explicit",
+        "eog": "eu_region",
+        "uk": "uk",
+        "worldwide": "unknown",
+        "global": "unknown",
+        "eu_friendly": "unknown",
+        "non_eu": "non_eu",
+        "non_eu_restricted": "non_eu",
+        "unknown": "unknown",
+    }
+    return mapping.get(geo, "unknown")
+
+
+def _derive_geo_class(job: dict) -> str:
+    compliance = job.get("_compliance")
+    policy_reason = ""
+    remote_model = ""
+    explicit_geo_class = None
+
+    if isinstance(compliance, dict):
+        policy_reason = str(compliance.get("policy_reason") or "").strip().lower()
+        remote_model = str(compliance.get("remote_model") or "").strip().lower()
+        explicit_geo_class = compliance.get("geo_class")
+
+    if explicit_geo_class:
+        normalized = _normalize_geo_class_value(str(explicit_geo_class))
+        if normalized != "unknown":
+            return normalized
+
+    if policy_reason == "geo_restriction" or remote_model == "remote_but_geo_restricted":
+        return "non_eu"
+
+    classifier_result = classify_geo_scope(
+        str(job.get("title") or ""),
+        str(job.get("description") or ""),
+    )
+    normalized_classifier_geo = _normalize_geo_class_value(
+        str(classifier_result.get("geo_class") or "")
+    )
+    if normalized_classifier_geo != "unknown":
+        return normalized_classifier_geo
+
+    remote_scope = str(job.get("remote_scope") or "").strip()
+    if remote_scope:
+        remote_scope_result = classify_geo_scope(remote_scope, "")
+        normalized_remote_scope_geo = _normalize_geo_class_value(
+            str(remote_scope_result.get("geo_class") or "")
+        )
+        if normalized_remote_scope_geo != "unknown":
+            return normalized_remote_scope_geo
+
+    return "unknown"
 
 
 def init_db():
@@ -59,6 +144,8 @@ def upsert_job(job: dict):
     """
     now = datetime.now(timezone.utc).isoformat()
     first_seen_at = job.get("first_seen_at") or now
+    remote_class = _derive_remote_class(job)
+    geo_class = _derive_geo_class(job)
 
     with get_conn() as conn:
         conn.execute(
@@ -75,9 +162,11 @@ def upsert_job(job: dict):
                 remote_scope,
                 status,
                 first_seen_at,
-                last_seen_at
+                last_seen_at,
+                remote_class,
+                geo_class
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(job_id) DO UPDATE SET
                 source_url = excluded.source_url,
                 title = excluded.title,
@@ -86,6 +175,8 @@ def upsert_job(job: dict):
                 remote_source_flag = excluded.remote_source_flag,
                 remote_scope = excluded.remote_scope,
                 status = excluded.status,
+                remote_class = excluded.remote_class,
+                geo_class = excluded.geo_class,
                 first_seen_at = CASE
                     WHEN excluded.first_seen_at < jobs.first_seen_at THEN excluded.first_seen_at
                     ELSE jobs.first_seen_at
@@ -105,6 +196,8 @@ def upsert_job(job: dict):
                 job["status"],
                 first_seen_at,
                 now,
+                remote_class,
+                geo_class,
             ),
         )
 
@@ -171,7 +264,20 @@ def update_job_availability(
     conn.close()
 
 
-def get_jobs_for_compliance_resolution(limit: int = 500) -> list[dict]:
+def count_jobs_missing_compliance() -> int:
+    conn = get_conn()
+    row = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM jobs
+        WHERE compliance_status IS NULL OR compliance_score IS NULL
+        """
+    ).fetchone()
+    conn.close()
+    return int(row[0]) if row else 0
+
+
+def backfill_missing_compliance_classes(limit: int = 1000) -> int:
     conn = get_conn()
     conn.row_factory = sqlite3.Row
 
@@ -179,9 +285,79 @@ def get_jobs_for_compliance_resolution(limit: int = 500) -> list[dict]:
         """
         SELECT
             job_id,
+            title,
+            description,
+            remote_source_flag,
+            remote_scope,
+            policy_v1_reason,
             remote_class,
             geo_class
         FROM jobs
+        WHERE remote_class IS NULL OR geo_class IS NULL
+        ORDER BY COALESCE(last_seen_at, '1970-01-01') DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+
+    if not rows:
+        conn.close()
+        return 0
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    for row in rows:
+        payload = dict(row)
+        if payload.get("policy_v1_reason"):
+            payload["_compliance"] = {
+                "policy_reason": payload["policy_v1_reason"],
+                "remote_model": "unknown",
+            }
+
+        remote_class = payload.get("remote_class") or _derive_remote_class(payload)
+        geo_class = payload.get("geo_class") or _derive_geo_class(payload)
+
+        conn.execute(
+            """
+            UPDATE jobs
+            SET
+                remote_class = ?,
+                geo_class = ?,
+                updated_at = ?
+            WHERE job_id = ?
+            """,
+            (
+                remote_class,
+                geo_class,
+                now,
+                payload["job_id"],
+            ),
+        )
+
+    conn.commit()
+    conn.close()
+    return len(rows)
+
+
+def get_jobs_for_compliance_resolution(
+    limit: int = 500,
+    only_missing: bool = False,
+) -> list[dict]:
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+
+    where_clause = ""
+    if only_missing:
+        where_clause = "WHERE compliance_status IS NULL OR compliance_score IS NULL"
+
+    rows = conn.execute(
+        f"""
+        SELECT
+            job_id,
+            remote_class,
+            geo_class
+        FROM jobs
+        {where_clause}
         ORDER BY COALESCE(last_seen_at, '1970-01-01') DESC
         LIMIT ?
         """,
@@ -226,6 +402,7 @@ def get_jobs(
     title: str | None = None,
     source: str | None = None,
     remote_scope: str | None = None,
+    min_compliance_score: int | None = None,
     limit: int = 20,
     offset: int = 0,
 ) -> list[dict]:
@@ -270,6 +447,10 @@ def get_jobs(
     if remote_scope:
         clauses.append("remote_scope = ?")
         params.append(remote_scope)
+
+    if min_compliance_score is not None:
+        clauses.append("COALESCE(compliance_score, 0) >= ?")
+        params.append(int(min_compliance_score))
 
     if clauses:
         query += " WHERE " + " AND ".join(clauses)

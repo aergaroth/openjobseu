@@ -8,6 +8,7 @@ from app.logging import configure_logging
 from app.api.jobs import router as jobs_router
 
 from storage.sqlite import init_db
+from app.workers.compliance_resolution import run_compliance_resolution_for_existing_db
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -16,6 +17,10 @@ logging.getLogger(__name__).info("logging configured")
 
 
 init_db()
+try:
+    run_compliance_resolution_for_existing_db()
+except Exception:
+    logging.getLogger(__name__).exception("initial compliance bootstrap failed")
 
 
 app = FastAPI(title="OpenJobsEU Runtime", version="0.1.0")
