@@ -1,4 +1,4 @@
-name: terraform-plan
+name: Terraform Plan
 
 on:
   pull_request:
@@ -10,39 +10,42 @@ permissions:
   pull-requests: read
 
 jobs:
-  terraform-plan:
+
+  plan-dev:
+    if: github.base_ref == 'develop'
     runs-on: ubuntu-latest
-
-    env:
-      TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
-      TF_VAR_image: ${{ secrets.TF_VAR_image }}
-
     defaults:
       run:
-        working-directory: infra/gcp
+        working-directory: infra/gcp/dev
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
-
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
+      - uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: ${{ secrets.GCP_SA_KEY_DEV }}
+      - run: terraform init -input=false
+      - run: terraform validate
+      - run: terraform plan -input=false
 
-      - name: Terraform Init
-        run: terraform init -input=false
 
-      - name: Terraform Validate
-        run: terraform validate
+  plan-prod:
+    if: github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/gcp/prod
 
-      - name: Terraform Plan
-        run: |
-          terraform plan \
-            -input=false \
-            -var="project_id=${{ secrets.GCP_PROJECT_ID }}"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_PROD }}
+      - run: terraform init -input=false
+      - run: terraform validate
+      - run: terraform plan -input=false

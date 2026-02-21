@@ -1,0 +1,41 @@
+name: Build & Deploy PROD
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-deploy-prod:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_PROD }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker europe-north1-docker.pkg.dev
+
+      - name: Build & push image (PROD)
+        env:
+          PROJECT_ID: openjobseu
+          SHA: ${{ github.sha }}
+        run: |
+          IMAGE=europe-north1-docker.pkg.dev/$PROJECT_ID/$PROJECT_ID/$PROJECT_ID
+          docker build -t $IMAGE:$SHA .
+          docker push $IMAGE:$SHA
+
+      - name: Deploy to Cloud Run (PROD)
+        run: |
+          gcloud run services update openjobseu \
+            --project openjobseu \
+            --region europe-north1 \
+            --image europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu:${{ github.sha }}
