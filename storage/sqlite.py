@@ -396,6 +396,213 @@ def update_job_compliance_resolution(
     conn.close()
 
 
+def _build_jobs_audit_filter_clauses(
+    *,
+    status: str | None = None,
+    source: str | None = None,
+    company: str | None = None,
+    title: str | None = None,
+    remote_scope: str | None = None,
+    remote_class: str | None = None,
+    geo_class: str | None = None,
+    compliance_status: str | None = None,
+    min_compliance_score: int | None = None,
+    max_compliance_score: int | None = None,
+) -> tuple[list[str], list]:
+    clauses: list[str] = []
+    params: list = []
+
+    if status:
+        clauses.append("status = ?")
+        params.append(status)
+
+    if source:
+        clauses.append("source = ?")
+        params.append(source)
+
+    if company:
+        clauses.append("LOWER(company_name) LIKE ?")
+        params.append(f"%{company.lower()}%")
+
+    if title:
+        clauses.append("LOWER(title) LIKE ?")
+        params.append(f"%{title.lower()}%")
+
+    if remote_scope:
+        clauses.append("LOWER(remote_scope) LIKE ?")
+        params.append(f"%{remote_scope.lower()}%")
+
+    if remote_class:
+        clauses.append("remote_class = ?")
+        params.append(remote_class)
+
+    if geo_class:
+        clauses.append("geo_class = ?")
+        params.append(geo_class)
+
+    if compliance_status:
+        clauses.append("compliance_status = ?")
+        params.append(compliance_status)
+
+    if min_compliance_score is not None:
+        clauses.append("COALESCE(compliance_score, 0) >= ?")
+        params.append(int(min_compliance_score))
+
+    if max_compliance_score is not None:
+        clauses.append("COALESCE(compliance_score, 0) <= ?")
+        params.append(int(max_compliance_score))
+
+    return clauses, params
+
+
+def _rows_to_count_map(rows: list[sqlite3.Row]) -> dict[str, int]:
+    result: dict[str, int] = {}
+    for row in rows:
+        key = str(row["label"])
+        result[key] = int(row["count"])
+    return result
+
+
+def get_jobs_audit(
+    *,
+    status: str | None = None,
+    source: str | None = None,
+    company: str | None = None,
+    title: str | None = None,
+    remote_scope: str | None = None,
+    remote_class: str | None = None,
+    geo_class: str | None = None,
+    compliance_status: str | None = None,
+    min_compliance_score: int | None = None,
+    max_compliance_score: int | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict:
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+
+    clauses, params = _build_jobs_audit_filter_clauses(
+        status=status,
+        source=source,
+        company=company,
+        title=title,
+        remote_scope=remote_scope,
+        remote_class=remote_class,
+        geo_class=geo_class,
+        compliance_status=compliance_status,
+        min_compliance_score=min_compliance_score,
+        max_compliance_score=max_compliance_score,
+    )
+
+    where_clause = ""
+    if clauses:
+        where_clause = "WHERE " + " AND ".join(clauses)
+
+    jobs_rows = conn.execute(
+        f"""
+        SELECT
+            job_id,
+            source,
+            source_url,
+            title,
+            company_name,
+            remote_scope,
+            status,
+            remote_class,
+            geo_class,
+            compliance_status,
+            compliance_score,
+            first_seen_at,
+            last_seen_at
+        FROM jobs
+        {where_clause}
+        ORDER BY COALESCE(last_seen_at, '1970-01-01') DESC
+        LIMIT ? OFFSET ?
+        """,
+        [*params, int(limit), int(offset)],
+    ).fetchall()
+
+    total_row = conn.execute(
+        f"""
+        SELECT COUNT(*) AS total
+        FROM jobs
+        {where_clause}
+        """,
+        params,
+    ).fetchone()
+
+    status_rows = conn.execute(
+        f"""
+        SELECT COALESCE(status, 'null') AS label, COUNT(*) AS count
+        FROM jobs
+        {where_clause}
+        GROUP BY COALESCE(status, 'null')
+        ORDER BY count DESC, label ASC
+        """,
+        params,
+    ).fetchall()
+
+    source_rows = conn.execute(
+        f"""
+        SELECT COALESCE(source, 'null') AS label, COUNT(*) AS count
+        FROM jobs
+        {where_clause}
+        GROUP BY COALESCE(source, 'null')
+        ORDER BY count DESC, label ASC
+        """,
+        params,
+    ).fetchall()
+
+    compliance_rows = conn.execute(
+        f"""
+        SELECT COALESCE(compliance_status, 'null') AS label, COUNT(*) AS count
+        FROM jobs
+        {where_clause}
+        GROUP BY COALESCE(compliance_status, 'null')
+        ORDER BY count DESC, label ASC
+        """,
+        params,
+    ).fetchall()
+
+    remote_class_rows = conn.execute(
+        f"""
+        SELECT COALESCE(remote_class, 'null') AS label, COUNT(*) AS count
+        FROM jobs
+        {where_clause}
+        GROUP BY COALESCE(remote_class, 'null')
+        ORDER BY count DESC, label ASC
+        """,
+        params,
+    ).fetchall()
+
+    geo_class_rows = conn.execute(
+        f"""
+        SELECT COALESCE(geo_class, 'null') AS label, COUNT(*) AS count
+        FROM jobs
+        {where_clause}
+        GROUP BY COALESCE(geo_class, 'null')
+        ORDER BY count DESC, label ASC
+        """,
+        params,
+    ).fetchall()
+
+    conn.close()
+
+    return {
+        "total": int(total_row["total"]) if total_row else 0,
+        "limit": int(limit),
+        "offset": int(offset),
+        "items": [dict(row) for row in jobs_rows],
+        "counts": {
+            "status": _rows_to_count_map(status_rows),
+            "source": _rows_to_count_map(source_rows),
+            "compliance_status": _rows_to_count_map(compliance_rows),
+            "remote_class": _rows_to_count_map(remote_class_rows),
+            "geo_class": _rows_to_count_map(geo_class_rows),
+        },
+    }
+
+
 def get_jobs(
     status: str | None = None,
     company: str | None = None,
