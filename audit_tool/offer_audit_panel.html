@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenJobsEU Audit Panel</title>
+  <style>
+    :root {
+      --bg: #f4f2ec;
+      --card: #fffaf0;
+      --line: #d8d0be;
+      --text: #1e2a32;
+      --muted: #61717a;
+      --accent: #0d6b56;
+      --accent-2: #17425f;
+      --danger: #8a3b2f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 500px at 90% -10%, #d6e2dc 0%, transparent 60%),
+        radial-gradient(1000px 400px at -10% 0%, #f0dcc7 0%, transparent 60%),
+        var(--bg);
+    }
+    .wrap {
+      max-width: 1280px;
+      margin: 24px auto;
+      padding: 0 16px 32px;
+    }
+    .head {
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.4rem;
+      letter-spacing: 0.02em;
+    }
+    .head-actions { display: flex; gap: 8px; }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+      margin-bottom: 14px;
+      padding: 14px;
+    }
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(150px, 1fr));
+      gap: 10px;
+    }
+    label { font-size: 0.78rem; color: var(--muted); display: block; }
+    input, select, button {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-top: 4px;
+      font-size: 0.9rem;
+    }
+    button {
+      cursor: pointer;
+      width: auto;
+      min-width: 140px;
+      border: 0;
+      color: #fff;
+      background: linear-gradient(130deg, var(--accent-2), var(--accent));
+      transition: transform .12s ease, opacity .2s ease;
+    }
+    button:disabled { opacity: .65; cursor: wait; }
+    button:hover { transform: translateY(-1px); }
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      font-size: 0.88rem;
+    }
+    .chip-box {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fff;
+      min-height: 84px;
+    }
+    .chip-box h3 {
+      margin: 0 0 8px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .chip {
+      display: inline-block;
+      border-radius: 999px;
+      border: 1px solid #c9c1af;
+      background: #fff;
+      padding: 2px 8px;
+      font-size: 0.77rem;
+      color: #31424d;
+    }
+    .summary {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .summary strong { font-size: 1.2rem; }
+    .summary small { color: var(--muted); }
+    .table-wrap { overflow: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 980px;
+      font-size: 0.85rem;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      padding: 8px 6px;
+    }
+    th {
+      background: #f5f0e5;
+      color: #35454f;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    td a { color: var(--accent-2); text-decoration: none; }
+    td a:hover { text-decoration: underline; }
+    .mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+    .tick-output {
+      margin-top: 8px;
+      border: 1px solid #cbbca5;
+      border-radius: 8px;
+      background: #2a3238;
+      color: #e8edf1;
+      padding: 10px;
+      white-space: pre-wrap;
+      min-height: 80px;
+      max-height: 260px;
+      overflow: auto;
+      font-size: 0.8rem;
+    }
+    .error { color: var(--danger); font-weight: 600; }
+    @media (max-width: 1080px) {
+      .filters { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+      .stats { grid-template-columns: 1fr; }
+      .head { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="head">
+      <h1>Offer Audit Panel</h1>
+      <div class="head-actions">
+        <button id="refresh-btn" type="button">Refresh</button>
+        <button id="tick-btn" type="button">Run tick-dev.sh</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="filters" id="filters">
+        <label>Status<input id="status" placeholder="new / active / stale" /></label>
+        <label>Source<input id="source" placeholder="remotive / remoteok" /></label>
+        <label>Company<input id="company" placeholder="contains..." /></label>
+        <label>Title<input id="title" placeholder="contains..." /></label>
+        <label>Remote scope<input id="remote_scope" placeholder="contains..." /></label>
+        <label>Remote class<input id="remote_class" placeholder="remote_only / unknown" /></label>
+        <label>Geo class<input id="geo_class" placeholder="eu_region / non_eu / uk" /></label>
+        <label>Compliance<input id="compliance_status" placeholder="approved / review / rejected" /></label>
+        <label>Min score<input id="min_compliance_score" type="number" min="0" max="100" /></label>
+        <label>Max score<input id="max_compliance_score" type="number" min="0" max="100" /></label>
+        <label>Limit<input id="limit" type="number" min="1" max="500" value="50" /></label>
+        <label>Offset<input id="offset" type="number" min="0" value="0" /></label>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="summary">
+        <strong id="total-count">0</strong>
+        <small>jobs match current filter</small>
+      </div>
+      <div class="stats">
+        <div class="chip-box">
+          <h3>Status</h3>
+          <div class="chips" id="count-status"></div>
+        </div>
+        <div class="chip-box">
+          <h3>Source</h3>
+          <div class="chips" id="count-source"></div>
+        </div>
+        <div class="chip-box">
+          <h3>Compliance</h3>
+          <div class="chips" id="count-compliance"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Source</th>
+            <th>Title</th>
+            <th>Company</th>
+            <th>Status</th>
+            <th>Remote class</th>
+            <th>Geo class</th>
+            <th>Compliance</th>
+            <th>Score</th>
+            <th>First seen</th>
+            <th>Last seen</th>
+            <th>URL</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <strong>tick-dev.sh output</strong>
+      <div id="tick-meta"></div>
+      <pre class="tick-output" id="tick-output">No run yet.</pre>
+    </div>
+  </div>
+
+  <script>
+    const ids = [
+      "status",
+      "source",
+      "company",
+      "title",
+      "remote_scope",
+      "remote_class",
+      "geo_class",
+      "compliance_status",
+      "min_compliance_score",
+      "max_compliance_score",
+      "limit",
+      "offset"
+    ];
+
+    let debounceTimer = null;
+
+    function esc(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function paramsFromFilters() {
+      const params = new URLSearchParams();
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const value = (el.value || "").trim();
+        if (value !== "") params.set(id, value);
+      }
+      return params;
+    }
+
+    function renderCountMap(nodeId, counts) {
+      const node = document.getElementById(nodeId);
+      if (!node) return;
+      const entries = Object.entries(counts || {});
+      if (entries.length === 0) {
+        node.innerHTML = '<span class="chip">none</span>';
+        return;
+      }
+      node.innerHTML = entries
+        .map(([key, value]) => `<span class="chip">${esc(key)}: ${esc(value)}</span>`)
+        .join("");
+    }
+
+    function renderRows(items) {
+      const body = document.getElementById("rows");
+      if (!body) return;
+      if (!items || items.length === 0) {
+        body.innerHTML = '<tr><td colspan="12">No jobs found for current filter.</td></tr>';
+        return;
+      }
+      body.innerHTML = items.map((job) => {
+        const url = esc(job.source_url || "");
+        const label = url ? "open" : "";
+        return `
+          <tr>
+            <td class="mono">${esc(job.job_id)}</td>
+            <td>${esc(job.source)}</td>
+            <td>${esc(job.title)}</td>
+            <td>${esc(job.company_name)}</td>
+            <td>${esc(job.status)}</td>
+            <td>${esc(job.remote_class)}</td>
+            <td>${esc(job.geo_class)}</td>
+            <td>${esc(job.compliance_status)}</td>
+            <td>${esc(job.compliance_score)}</td>
+            <td class="mono">${esc(job.first_seen_at)}</td>
+            <td class="mono">${esc(job.last_seen_at)}</td>
+            <td>${url ? `<a href="${url}" target="_blank" rel="noreferrer">${label}</a>` : ""}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function loadJobs() {
+      const params = paramsFromFilters();
+      const response = await fetch(`/internal/audit/jobs?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(`audit request failed with status ${response.status}`);
+      }
+      const data = await response.json();
+      document.getElementById("total-count").textContent = String(data.total || 0);
+      renderCountMap("count-status", data.counts?.status || {});
+      renderCountMap("count-source", data.counts?.source || {});
+      renderCountMap("count-compliance", data.counts?.compliance_status || {});
+      renderRows(data.items || []);
+    }
+
+    async function safeLoadJobs() {
+      try {
+        await loadJobs();
+      } catch (error) {
+        const body = document.getElementById("rows");
+        body.innerHTML = `<tr><td class="error" colspan="12">${esc(error.message)}</td></tr>`;
+      }
+    }
+
+    async function runTickDev() {
+      const button = document.getElementById("tick-btn");
+      const meta = document.getElementById("tick-meta");
+      const out = document.getElementById("tick-output");
+      button.disabled = true;
+      meta.textContent = "running...";
+      out.textContent = "";
+
+      try {
+        const response = await fetch("/internal/audit/tick-dev", { method: "POST" });
+        const data = await response.json();
+        meta.textContent = `status=${data.status} returncode=${data.returncode}`;
+        const stdout = data.stdout || "";
+        const stderr = data.stderr || "";
+        out.textContent = [
+          "STDOUT:",
+          stdout || "(empty)",
+          "",
+          "STDERR:",
+          stderr || "(empty)"
+        ].join("\n");
+      } catch (error) {
+        meta.textContent = "failed";
+        out.textContent = String(error);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function scheduleLoad() {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(safeLoadJobs, 250);
+    }
+
+    for (const id of ids) {
+      const node = document.getElementById(id);
+      if (!node) continue;
+      node.addEventListener("input", scheduleLoad);
+      node.addEventListener("change", scheduleLoad);
+    }
+
+    document.getElementById("refresh-btn").addEventListener("click", safeLoadJobs);
+    document.getElementById("tick-btn").addEventListener("click", runTickDev);
+
+    safeLoadJobs();
+  </script>
+</body>
+</html>

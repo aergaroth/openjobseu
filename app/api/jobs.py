@@ -7,6 +7,7 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 FEED_LIMIT = 200
 FEED_VERSION = "v1"
+FEED_MIN_COMPLIANCE_SCORE = 80
 
 
 def _utc_now_iso() -> str:
@@ -53,6 +54,7 @@ def serialize_feed_job(job: dict) -> dict:
 def jobs_feed(response: Response):
     jobs = get_jobs(
         status="visible",
+        min_compliance_score=FEED_MIN_COMPLIANCE_SCORE,
         limit=FEED_LIMIT,
         offset=0,
     )

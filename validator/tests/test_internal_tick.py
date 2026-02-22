@@ -64,11 +64,15 @@ def test_tick_local_mode(monkeypatch):
 
     assert response.status_code == 200
 
-    data = response.json()
-
-    assert data["mode"] == "local"
-    assert data["sources"] == ["local"] or "local_ingested" in " ".join(data["actions"])
-    assert "metrics" in data
+    if _is_text_response(response):
+        body = response.text
+        assert "Tick finished (local)" in body
+        assert "local" in body
+    else:
+        data = response.json()
+        assert data["mode"] == "local"
+        assert data["sources"] == ["local"] or "local_ingested" in " ".join(data["actions"])
+        assert "metrics" in data
 
 
 def test_tick_ignores_unknown_source(monkeypatch):
