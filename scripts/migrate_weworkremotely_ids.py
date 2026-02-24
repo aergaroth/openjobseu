@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import sqlite3
 from pathlib import Path
 import os
 import sys
@@ -11,24 +10,28 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from app.workers.normalization.weworkremotely import _safe_wwr_source_job_id
+from sqlalchemy import text
+from storage.db import get_engine
+
+engine = get_engine()
 
 
-def migrate(conn: sqlite3.Connection, apply: bool) -> tuple[int, int]:
-    conn.row_factory = sqlite3.Row
+
+def migrate(conn, apply: bool) -> tuple[int, int]:
     rows = conn.execute(
-        """
-        SELECT job_id, source_job_id, source_url
-        FROM jobs
-        WHERE source = 'weworkremotely'
-        """
-    ).fetchall()
+        text("""
+            SELECT job_id, source_job_id, source_url
+            FROM jobs
+            WHERE source = 'weworkremotely'
+        """),
+    ).mappings().all()
 
     updates = []
     skipped_collisions = 0
 
     existing_ids = {
-        row[0]
-        for row in conn.execute("SELECT job_id FROM jobs").fetchall()
+        r[0]
+        for r in conn.execute(text("SELECT job_id FROM jobs")).fetchall()
     }
 
     for row in rows:
@@ -52,16 +55,20 @@ def migrate(conn: sqlite3.Connection, apply: bool) -> tuple[int, int]:
         updates.append((new_job_id, new_source_job_id, old_job_id))
 
     if apply and updates:
-        with conn:
-            conn.executemany(
-                """
-                UPDATE jobs
-                SET
-                    job_id = ?,
-                    source_job_id = ?
-                WHERE job_id = ?
-                """,
-                updates,
+        payloads = [
+            {"job_id": new, "source_job_id": src, "old_job_id": old}
+            for new, src, old in updates
+        ]
+        with engine.begin() as begin_conn:
+            begin_conn.execute(
+                text("""
+                    UPDATE jobs
+                    SET
+                        job_id = :job_id,
+                        source_job_id = :source_job_id
+                    WHERE job_id = :old_job_id
+                """),
+                payloads,
             )
 
     return len(updates), skipped_collisions
@@ -88,13 +95,10 @@ def main() -> int:
         print(f"DB not found: {db_path}")
         return 2
 
-    conn = sqlite3.connect(str(db_path))
-    try:
-        planned, skipped = migrate(conn, apply=args.apply)
-        mode = "apply" if args.apply else "dry_run"
-        print(f"mode={mode} planned_updates={planned} skipped_collisions={skipped}")
-    finally:
-        conn.close()
+        with engine.connect() as conn:
+            planned, skipped = migrate(conn, apply=args.apply)
+            mode = "apply" if args.apply else "dry_run"
+            print(f"mode={mode} planned_updates={planned} skipped_collisions={skipped}")
 
     return 0
 

@@ -1,7 +1,9 @@
-import sqlite3
 from collections import Counter, defaultdict
+from sqlalchemy import text
+from storage.db import get_engine
 
-DB_PATH = "data/openjobseu.db"
+engine = get_engine()  
+
 SOURCE = "remoteok"
 
 NON_REMOTE_KEYWORDS = [
@@ -40,12 +42,11 @@ def location_suspicious(location: str) -> bool:
 
 
 def main():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
-
-    cur.execute("SELECT * FROM jobs WHERE source = ?", (SOURCE,))
-    rows = cur.fetchall()
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT * FROM jobs WHERE source = :source"),
+            {"source": SOURCE},
+        ).mappings().all()
 
     total = len(rows)
     counter = Counter()
@@ -84,7 +85,7 @@ def main():
         for t in titles:
             print(f"- {t}")
 
-    conn.close()
+    # connection closed by context manager
 
 
 if __name__ == "__main__":

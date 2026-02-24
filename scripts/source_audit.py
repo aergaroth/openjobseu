@@ -1,8 +1,11 @@
-import sqlite3
 import re
 from collections import Counter, defaultdict
+from sqlalchemy import text
+from storage.db import get_engine
 
-DB_PATH = "data/openjobseu.db"
+engine = get_engine()
+
+
 SOURCE = "remoteok"  # zmień na inne źródło do audytu
 
 # --- heurystyki do audytu ---
@@ -43,12 +46,11 @@ def contains_any(text: str, keywords: list[str]) -> bool:
 
 
 def main():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
-
-    cur.execute("SELECT * FROM jobs WHERE source = ?", (SOURCE,))
-    rows = cur.fetchall()
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT * FROM jobs WHERE source = :source"),
+            {"source": SOURCE},
+        ).mappings().all()
 
     total = len(rows)
     print(f"\n=== AUDIT FOR SOURCE: {SOURCE} ===")
@@ -95,7 +97,7 @@ def main():
         for t in titles[:5]:
             print(f"- {t}")
 
-    conn.close()
+    # connection closed by context manager
 
 
 if __name__ == "__main__":

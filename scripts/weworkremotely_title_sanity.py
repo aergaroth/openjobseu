@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 
 import argparse
-import sqlite3
 from pathlib import Path
+from sqlalchemy import text
+from storage.db import get_engine
+
+engine = get_engine()
 
 
 def looks_like_url_fragment(value: str) -> bool:
@@ -53,18 +56,17 @@ def split_url_prefixed_title(title: str) -> tuple[str, str] | None:
     return prefix, suffix
 
 
-def find_suspicious_wwr_rows(conn: sqlite3.Connection) -> list[dict]:
-    conn.row_factory = sqlite3.Row
+def find_suspicious_wwr_rows(conn) -> list[dict]:
     rows = conn.execute(
-        """
-        SELECT
-            job_id,
-            title,
-            source_url
-        FROM jobs
-        WHERE source = 'weworkremotely'
-        """
-    ).fetchall()
+        text("""
+            SELECT
+                job_id,
+                title,
+                source_url
+            FROM jobs
+            WHERE source = 'weworkremotely'
+        """),
+    ).mappings().all()
 
     suspicious = []
     for row in rows:
@@ -92,7 +94,7 @@ def find_suspicious_wwr_rows(conn: sqlite3.Connection) -> list[dict]:
     return suspicious
 
 
-def apply_safe_fixes(conn: sqlite3.Connection, suspicious_rows: list[dict]) -> int:
+def apply_safe_fixes(conn, suspicious_rows: list[dict]) -> int:
     fixed = 0
 
     for row in suspicious_rows:
@@ -102,12 +104,12 @@ def apply_safe_fixes(conn: sqlite3.Connection, suspicious_rows: list[dict]) -> i
 
         _prefix, clean_title = parsed
         conn.execute(
-            """
-            UPDATE jobs
-            SET title = ?
-            WHERE job_id = ?
-            """,
-            (clean_title, row["job_id"]),
+            text("""
+                UPDATE jobs
+                SET title = :title
+                WHERE job_id = :job_id
+            """),
+            {"title": clean_title, "job_id": row["job_id"]},
         )
         fixed += 1
 
@@ -144,9 +146,7 @@ def main() -> int:
         print(f"DB not found: {db_path}")
         return 2
 
-    conn = sqlite3.connect(str(db_path))
-
-    try:
+    with engine.connect() as conn:
         suspicious = find_suspicious_wwr_rows(conn)
         print(f"suspicious_rows={len(suspicious)}")
 
@@ -159,12 +159,12 @@ def main() -> int:
             print(f"source_url:  {row['source_url']}")
 
         if args.fix:
-            fixed = apply_safe_fixes(conn, suspicious)
+            with engine.begin() as begin_conn:
+                fixed = apply_safe_fixes(begin_conn, suspicious)
             print(f"fixed_rows={fixed}")
         else:
             print("dry_run_only=1 (run with --fix to apply safe fixes)")
-    finally:
-        conn.close()
+    # connection closed by context manager
 
     return 0
 

@@ -1,5 +1,4 @@
 # scripts/db_smoke_check.py
-import sqlite3
 import requests
 from collections import Counter
 
@@ -25,20 +24,20 @@ def run_tick():
 
 def db_check():
     print("→ db inspection")
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
+    from sqlalchemy import text
+    from app.db import get_engine
 
-    cur.execute("SELECT COUNT(*) AS cnt FROM jobs")
-    total = cur.fetchone()["cnt"]
+    engine = get_engine()
 
-    cur.execute("SELECT job_id FROM jobs")
-    ids = [r["job_id"] for r in cur.fetchall()]
+    with engine.connect() as conn:
+        total_row = conn.execute(text("SELECT COUNT(*) AS cnt FROM jobs")).fetchone()
+        total = total_row[0] if total_row is not None else 0
 
-    cur.execute("SELECT status, COUNT(*) AS cnt FROM jobs GROUP BY status")
-    statuses = {r["status"]: r["cnt"] for r in cur.fetchall()}
+        ids_rows = conn.execute(text("SELECT job_id FROM jobs")).mappings().all()
+        ids = [r["job_id"] for r in ids_rows]
 
-    conn.close()
+        status_rows = conn.execute(text("SELECT status, COUNT(*) AS cnt FROM jobs GROUP BY status")).mappings().all()
+        statuses = {r["status"]: r["cnt"] for r in status_rows}
 
     print(f"  jobs total: {total}")
     print(f"  unique job_ids: {len(set(ids))}")
