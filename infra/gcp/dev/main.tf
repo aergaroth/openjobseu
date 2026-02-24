@@ -16,12 +16,33 @@ resource "google_cloud_run_v2_service" "this" {
 
 
   template {
+    timeout = "180s"
     containers {
       image = var.image
+      resources {
+        cpu_idle = true
+      }
 
-      env {
+
+     env {
         name  = "INGESTION_MODE"
         value = "dev"
+     }
+
+
+     env {
+        name = "DB_MODE"
+        value = "standard"
+     }
+
+      env {
+        name = "DATABASE_URL"
+        value_source {
+          secret_key_ref {
+            secret  = "openjobseu-db-url"
+            version = "latest"
+          }
+        }
       }
       ports {
         container_port = 8000
