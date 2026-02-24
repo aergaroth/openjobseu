@@ -7,34 +7,33 @@ resource "google_cloud_run_v2_service" "this" {
   name     = var.service_name
   location = var.region
   deletion_protection = false
-  service_account = "cloudrun-dev-runtime@dev-openjobseu.iam.gserviceaccount.com"
 
   lifecycle {
-   ignore_changes = [
-     scaling
-   ]
+    ignore_changes = [scaling]
   }
 
-
   template {
+
+    service_account = "cloudrun-dev-runtime@dev-openjobseu.iam.gserviceaccount.com"
+
     timeout = "180s"
+
     containers {
       image = var.image
+
       resources {
         cpu_idle = true
       }
 
-
-     env {
+      env {
         name  = "INGESTION_MODE"
         value = "dev"
-     }
+      }
 
-
-     env {
-        name = "DB_MODE"
+      env {
+        name  = "DB_MODE"
         value = "standard"
-     }
+      }
 
       env {
         name = "DATABASE_URL"
@@ -45,6 +44,7 @@ resource "google_cloud_run_v2_service" "this" {
           }
         }
       }
+
       ports {
         container_port = 8000
       }
@@ -60,7 +60,6 @@ resource "google_cloud_run_v2_service" "this" {
     percent = 100
     type    = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
   }
-
 }
 
 resource "google_cloud_run_v2_service_iam_member" "public" {
