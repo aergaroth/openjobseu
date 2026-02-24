@@ -2,9 +2,13 @@ from fastapi.testclient import TestClient
 
 import app.internal as internal_api
 from app.main import app
-from storage.sqlite import get_conn, init_db, upsert_job
+from storage.sqlite import init_db, upsert_job
+from storage.db import get_engine
+from sqlalchemy import text
 
 client = TestClient(app)
+
+engine = get_engine()
 
 
 def _make_job(
@@ -39,26 +43,25 @@ def _set_compliance(
     remote_class: str,
     geo_class: str,
 ) -> None:
-    with get_conn() as conn:
+    with engine.begin() as conn:
         conn.execute(
-            """
-            UPDATE jobs
-            SET
-                compliance_status = ?,
-                compliance_score = ?,
-                remote_class = ?,
-                geo_class = ?
-            WHERE job_id = ?
-            """,
-            (
-                compliance_status,
-                int(compliance_score),
-                remote_class,
-                geo_class,
-                job_id,
-            ),
+            text("""
+                UPDATE jobs
+                SET
+                    compliance_status = :compliance_status,
+                    compliance_score = :compliance_score,
+                    remote_class = :remote_class,
+                    geo_class = :geo_class
+                WHERE job_id = :job_id
+            """),
+            {
+                "compliance_status": compliance_status,
+                "compliance_score": int(compliance_score),
+                "remote_class": remote_class,
+                "geo_class": geo_class,
+                "job_id": job_id,
+            },
         )
-        conn.commit()
 
 
 def test_internal_audit_page_renders_html():

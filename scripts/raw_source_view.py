@@ -1,10 +1,13 @@
-import sqlite3
+from sqlalchemy import text
+from storage.db import get_engine
 
-conn = sqlite3.connect("data/openjobseu.db")
-conn.row_factory = sqlite3.Row
-cur = conn.cursor()
+engine = get_engine()
 
-cur.execute("SELECT description FROM jobs WHERE source='remoteok' LIMIT 1")
-row = cur.fetchone()
+with engine.connect() as conn:
+	row = conn.execute(
+		text("SELECT description FROM jobs WHERE source = :source LIMIT 1"),
+		{"source": "remoteok"},
+	).mappings().first()
 
-print(repr(row["description"]))
+if row:
+	print(repr(row["description"]))

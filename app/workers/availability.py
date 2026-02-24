@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 import logging
 import requests
-from storage.sqlite import get_jobs_for_verification, update_job_availability, init_db
+from storage.sqlite import get_jobs_for_verification, update_job_availability
 
 logger = logging.getLogger("openjobseu.worker.availability")
 
@@ -81,7 +81,7 @@ def run_availability_pipeline() -> dict:
     # init_db()  # initialized at app startup in app/main.py
 
     jobs = get_jobs_for_verification(limit=20)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
 
     summary = {
         "checked": 0,
