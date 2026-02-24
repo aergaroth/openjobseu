@@ -96,7 +96,6 @@ def _derive_geo_class(job: dict) -> str:
 
 
 def init_db():
-    print("INIT DB CALLED")
     with engine.begin() as conn:
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS jobs (
@@ -128,7 +127,6 @@ def init_db():
 
 
 def upsert_job(job: dict):
-    print("upsert_job CALLED")
     now = datetime.now(timezone.utc)
     first_seen_at = job.get("first_seen_at") or now
     remote_class = _derive_remote_class(job)
@@ -205,7 +203,6 @@ def upsert_job(job: dict):
         )
 
 def get_jobs_for_verification(limit: int = 20) -> list[dict]:
-    print("get_jobs_for_verification CALLED")
     with engine.connect() as conn:
         rows = conn.execute(
             text("""
@@ -232,7 +229,7 @@ def update_job_availability(
     verified_at: datetime | None = None,
     failure: bool = False,
 ):
-    print("update_job_availability CALLED")
+
     if verified_at is None:
         verified_at = datetime.now(timezone.utc)
 
@@ -273,7 +270,6 @@ def count_jobs_missing_compliance() -> int:
 
 
 def backfill_missing_compliance_classes(limit: int = 1000) -> int:
-    print("backfill_missing_compliance_classes CALLED")
     with engine.connect() as conn:
         rows = conn.execute(
             text("""
