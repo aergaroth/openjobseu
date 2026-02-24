@@ -7,6 +7,7 @@ resource "google_cloud_run_v2_service" "this" {
   name     = var.service_name
   location = var.region
   deletion_protection = false
+  service_account = "cloudrun-dev-runtime@dev-openjobseu.iam.gserviceaccount.com"
 
   lifecycle {
    ignore_changes = [
