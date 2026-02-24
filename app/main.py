@@ -1,29 +1,50 @@
 from fastapi import FastAPI
 from datetime import datetime, timezone
 import logging
-
-from app.internal import router as internal_router
-from app.logging import configure_logging
-
-from app.api.jobs import router as jobs_router
-
-from storage.sqlite import init_db
-from app.workers.compliance_resolution import run_compliance_resolution_for_existing_db
+from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+
+from storage.db import get_engine, db_healthcheck
+from storage.sqlite import init_db
+from app.workers.compliance_resolution import (
+    run_compliance_resolution_for_existing_db,
+)
+from app.internal import router as internal_router
+from app.api.jobs import router as jobs_router
+from app.logging import configure_logging
 
 
 configure_logging()
-logging.getLogger(__name__).info("logging configured")
+logger = logging.getLogger(__name__)
+logger.info("logging configured")
 
 
-init_db()
-try:
-    run_compliance_resolution_for_existing_db()
-except Exception:
-    logging.getLogger(__name__).exception("initial compliance bootstrap failed")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    engine = get_engine()
+
+    # --- DB bootstrap ---
+    init_db()
+    db_healthcheck()
+
+    try:
+        run_compliance_resolution_for_existing_db()
+    except Exception:
+        logger.exception("initial compliance bootstrap failed")
+
+    yield
+
+    # --- Graceful shutdown ---
+    engine.dispose()
 
 
-app = FastAPI(title="OpenJobsEU Runtime", version="0.1.0")
+app = FastAPI(
+    title="OpenJobsEU Runtime",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,6 +56,7 @@ app.add_middleware(
 app.include_router(internal_router)
 app.include_router(jobs_router)
 
+
 @app.get("/health")
 def health():
     return {
@@ -45,6 +67,4 @@ def health():
 
 @app.get("/ready")
 def ready():
-    return {
-        "ready": True
-    }
+    return {"ready": True}

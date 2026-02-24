@@ -77,6 +77,6 @@ def run_lifecycle_pipeline() -> None:
             update_job_availability(
                 job_id=job["job_id"],
                 status=new_status,
-                verified_at=now.isoformat(),
+                verified_at=now,
                 failure=False,
             )

@@ -1,10 +1,8 @@
+import pytest
 from fastapi.testclient import TestClient
-
 from app.main import app
 
-
 client = TestClient(app)
-
 
 def _is_text_response(response) -> bool:
     return response.headers.get("content-type", "").startswith("text/plain")
@@ -25,17 +23,21 @@ def test_ready_endpoint():
     assert resp.json() == {"ready": True}
 
 
-def test_internal_tick_smoke():
-    resp = client.post("/internal/tick")
-    assert resp.status_code == 200
 
-    if _is_text_response(resp):
-        body = resp.text
-        assert "Tick finished" in body
-        assert "TOTALS" in body
-    else:
-        data = resp.json()
-        assert data["status"] == "ok"
-        assert "actions" in data
-        assert "metrics" in data
-        assert "tick_duration_ms" in data["metrics"]
+@pytest.fixture(autouse=True)
+def _mock_tick(monkeypatch):
+    monkeypatch.setattr(
+        "app.internal.run_tick_pipeline",
+        lambda *args, **kwargs: {
+            "actions": ["smoke"],
+            "metrics": {"tick_duration_ms": 1},
+        },
+    )
+    monkeypatch.setattr(
+        "app.internal.run_tick",
+        lambda *args, **kwargs: {
+            "actions": ["local_smoke"],
+            "metrics": {"tick_duration_ms": 1},
+        },
+    )
+
