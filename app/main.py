@@ -25,8 +25,12 @@ async def lifespan(app: FastAPI):
     engine = get_engine()
 
     # --- DB bootstrap ---
-    init_db()
-    db_healthcheck()
+    try:
+        init_db()
+        db_healthcheck()
+    except Exception as e:
+        logger.exception("DB bootstrap failed")
+
 
     try:
         run_compliance_resolution_for_existing_db()
