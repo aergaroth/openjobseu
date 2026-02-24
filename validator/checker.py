@@ -35,7 +35,7 @@ class AvailabilityChecker:
                 job["status"] = "expired"
             elif response.status_code < 400:
                 job["status"] = "active"
-                job["last_verified_at"] = now.isoformat()
+                job["last_verified_at"] = now
                 job["verification_failures"] = 0
             else:
                 job["status"] = "unreachable"

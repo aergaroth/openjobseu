@@ -1,19 +1,17 @@
+''' 
+this file now uses SQLAlchemy Core for database interactions, 
+but retains the same function signatures and overall structure 
+as before to minimize impact on other parts of the codebase. 
+'''
+
 import os
-import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone
-
+from sqlalchemy import text
+from storage.db import get_engine
 from app.workers.policy.v2.geo_classifier import classify_geo_scope
 
-
-def get_db_path() -> Path:
-    path = Path(os.getenv("OPENJOBSEU_DB_PATH", "data/openjobseu.db"))
-    path.parent.mkdir(exist_ok=True)
-    return path
-
-
-def get_conn():
-    return sqlite3.connect(get_db_path())
+engine = get_engine()
 
 
 def _derive_remote_class(job: dict) -> str:
@@ -98,244 +96,238 @@ def _derive_geo_class(job: dict) -> str:
 
 
 def init_db():
-    with get_conn() as conn:
-        conn.execute("""
-        CREATE TABLE IF NOT EXISTS jobs (
-          job_id TEXT PRIMARY KEY,
-          source TEXT,
-          source_job_id TEXT,
-          source_url TEXT,
-	      title TEXT,
-	      company_name TEXT,
-	      description TEXT,
-	      remote_source_flag INTEGER,
-	      remote_scope TEXT,
-	      status TEXT,
-	      first_seen_at TEXT,
-	      last_seen_at TEXT,
-	      last_verified_at TEXT,
-	      verification_failures INTEGER DEFAULT 0,
-	      updated_at TEXT,
-          remote_class TEXT DEFAULT NULL,
-          geo_class TEXT DEFAULT NULL,
-          
-          policy_v1_decision TEXT DEFAULT NULL,
-          policy_v1_reason TEXT DEFAULT NULL,
+    print("INIT DB CALLED")
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS jobs (
+                job_id TEXT PRIMARY KEY,
+                source TEXT,
+                source_job_id TEXT,
+                source_url TEXT,
+                title TEXT,
+                company_name TEXT,
+                description TEXT,
+                remote_source_flag BOOLEAN,
+                remote_scope TEXT,
+                status TEXT,
+                first_seen_at TIMESTAMP WITH TIME ZONE,
+                last_seen_at TIMESTAMP WITH TIME ZONE,
+                last_verified_at TIMESTAMP WITH TIME ZONE,
+                verification_failures INTEGER NOT NULL DEFAULT 0,
+                updated_at TIMESTAMP WITH TIME ZONE,
+                remote_class TEXT,
+                geo_class TEXT,
+                policy_v1_decision TEXT,
+                policy_v1_reason TEXT,
+                policy_v2_decision TEXT,
+                policy_v2_reason TEXT,
+                compliance_status TEXT,
+                compliance_score INTEGER
+            );
+        """))
 
-          policy_v2_decision TEXT DEFAULT NULL,
-          policy_v2_reason TEXT DEFAULT NULL,
-
-          compliance_status TEXT DEFAULT NULL,
-          compliance_score INTEGER DEFAULT NULL
-         
-        )
-        """)
 
 def upsert_job(job: dict):
-    """
-    Idempotent upsert of a job record.
-
-    Ingestion is treated as the source of truth for all job metadata
-    (title, company, description, remote_scope, etc.).
-    On conflict, all ingestion fields are refreshed to allow
-    canonical model evolution over time.
-
-    Availability and lifecycle workers may later update status-related fields.
-    """
-    now = datetime.now(timezone.utc).isoformat()
+    print("upsert_job CALLED")
+    now = datetime.now(timezone.utc)
     first_seen_at = job.get("first_seen_at") or now
     remote_class = _derive_remote_class(job)
     geo_class = _derive_geo_class(job)
 
-    with get_conn() as conn:
+    with engine.begin() as conn:
         conn.execute(
-            """
-            INSERT INTO jobs (
-                job_id,
-                source,
-                source_job_id,
-                source_url,
-                title,
-                company_name,
-                description,
-                remote_source_flag,
-                remote_scope,
-                status,
-                first_seen_at,
-                last_seen_at,
-                remote_class,
-                geo_class
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(job_id) DO UPDATE SET
-                source_url = excluded.source_url,
-                title = excluded.title,
-                company_name = excluded.company_name,
-                description = excluded.description,
-                remote_source_flag = excluded.remote_source_flag,
-                remote_scope = excluded.remote_scope,
-                status = excluded.status,
-                remote_class = excluded.remote_class,
-                geo_class = excluded.geo_class,
-                first_seen_at = CASE
-                    WHEN excluded.first_seen_at < jobs.first_seen_at THEN excluded.first_seen_at
-                    ELSE jobs.first_seen_at
-                END,
-                last_seen_at = excluded.last_seen_at
-            """,
-            (
-                job["job_id"],
-                job["source"],
-                job["source_job_id"],
-                job["source_url"],
-                job["title"],
-                job["company_name"],
-                job["description"],
-                int(job["remote_source_flag"]),
-                job["remote_scope"],
-                job["status"],
-                first_seen_at,
-                now,
-                remote_class,
-                geo_class,
-            ),
+            text("""
+                INSERT INTO jobs (
+                    job_id,
+                    source,
+                    source_job_id,
+                    source_url,
+                    title,
+                    company_name,
+                    description,
+                    remote_source_flag,
+                    remote_scope,
+                    status,
+                    first_seen_at,
+                    last_seen_at,
+                    remote_class,
+                    geo_class
+                )
+                VALUES (
+                    :job_id,
+                    :source,
+                    :source_job_id,
+                    :source_url,
+                    :title,
+                    :company_name,
+                    :description,
+                    :remote_source_flag,
+                    :remote_scope,
+                    :status,
+                    :first_seen_at,
+                    :last_seen_at,
+                    :remote_class,
+                    :geo_class
+                )
+                ON CONFLICT (job_id) DO UPDATE SET
+                    source_url = excluded.source_url,
+                    title = excluded.title,
+                    company_name = excluded.company_name,
+                    description = excluded.description,
+                    remote_source_flag = excluded.remote_source_flag,
+                    remote_scope = excluded.remote_scope,
+                    status = excluded.status,
+                    remote_class = excluded.remote_class,
+                    geo_class = excluded.geo_class,
+                    first_seen_at = CASE
+                        WHEN excluded.first_seen_at < jobs.first_seen_at
+                        THEN excluded.first_seen_at
+                        ELSE jobs.first_seen_at
+                    END,
+                    last_seen_at = excluded.last_seen_at
+            """),
+            {
+                "job_id": job["job_id"],
+                "source": job["source"],
+                "source_job_id": job["source_job_id"],
+                "source_url": job["source_url"],
+                "title": job["title"],
+                "company_name": job["company_name"],
+                "description": job["description"],
+                "remote_source_flag": bool(job["remote_source_flag"]),
+                "remote_scope": job["remote_scope"],
+                "status": job["status"],
+                "first_seen_at": first_seen_at,
+                "last_seen_at": now,
+                "remote_class": remote_class,
+                "geo_class": geo_class,
+            },
         )
 
-
 def get_jobs_for_verification(limit: int = 20) -> list[dict]:
-    conn = get_conn()
-    conn.row_factory = sqlite3.Row
-
-    rows = conn.execute(
-        """
-        SELECT
-            job_id,
-            source_url,
-            status,
-            last_verified_at,
-            verification_failures
-        FROM jobs
-        WHERE status IN ('active', 'stale', 'unreachable')
-        ORDER BY
-            COALESCE(last_verified_at, '1970-01-01') ASC
-        LIMIT ?
-        """,
-        (limit,),
-    ).fetchall()
-
-    conn.close()
+    print("get_jobs_for_verification CALLED")
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT
+                    job_id,
+                    source_url,
+                    status,
+                    last_verified_at,
+                    verification_failures
+                FROM jobs
+                WHERE status IN ('active', 'stale', 'unreachable')
+                ORDER BY
+                    COALESCE(last_seen_at, '1970-01-01T00:00:00+00:00')
+                LIMIT :limit
+            """),
+            {"limit": limit},
+        ).mappings().all()
     return [dict(row) for row in rows]
 
 
 def update_job_availability(
     job_id: str,
     status: str,
-    verified_at: str | None = None,
+    verified_at: datetime | None = None,
     failure: bool = False,
 ):
+    print("update_job_availability CALLED")
     if verified_at is None:
-        verified_at = datetime.now(timezone.utc).isoformat()
+        verified_at = datetime.now(timezone.utc)
 
-    conn = get_conn()
-
-    conn.execute(
-        """
-        UPDATE jobs
-        SET
-            status = ?,
-            last_verified_at = ?,
-            verification_failures = CASE
-                WHEN ? THEN verification_failures + 1
-                ELSE 0
-            END,
-            updated_at = ?
-        WHERE job_id = ?
-        """,
-        (
-            status,
-            verified_at,
-            failure,
-            verified_at,
-            job_id,
-        ),
-    )
-
-    conn.commit()
-    conn.close()
+    with engine.begin() as conn:
+        conn.execute(
+            text("""
+                UPDATE jobs
+                SET
+                    status = :status,
+                    last_verified_at = :verified_at,
+                    verification_failures = CASE
+                        WHEN :failure THEN verification_failures + 1
+                        ELSE 0
+                    END,
+                    updated_at = :updated_at
+                WHERE job_id = :job_id
+            """),
+            {
+                "status": status,
+                "verified_at": verified_at,
+                "failure": failure,
+                "updated_at": verified_at,
+                "job_id": job_id,
+            },
+        )
 
 
 def count_jobs_missing_compliance() -> int:
-    conn = get_conn()
-    row = conn.execute(
-        """
-        SELECT COUNT(*)
-        FROM jobs
-        WHERE compliance_status IS NULL OR compliance_score IS NULL
-        """
-    ).fetchone()
-    conn.close()
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("""
+                SELECT COUNT(*) AS count
+                FROM jobs
+                WHERE compliance_status IS NULL OR compliance_score IS NULL
+            """)
+        ).fetchone()
     return int(row[0]) if row else 0
 
 
 def backfill_missing_compliance_classes(limit: int = 1000) -> int:
-    conn = get_conn()
-    conn.row_factory = sqlite3.Row
-
-    rows = conn.execute(
-        """
-        SELECT
-            job_id,
-            title,
-            description,
-            remote_source_flag,
-            remote_scope,
-            policy_v1_reason,
-            remote_class,
-            geo_class
-        FROM jobs
-        WHERE remote_class IS NULL OR geo_class IS NULL
-        ORDER BY COALESCE(last_seen_at, '1970-01-01') DESC
-        LIMIT ?
-        """,
-        (limit,),
-    ).fetchall()
+    print("backfill_missing_compliance_classes CALLED")
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT
+                    job_id,
+                    title,
+                    description,
+                    remote_source_flag,
+                    remote_scope,
+                    policy_v1_reason,
+                    remote_class,
+                    geo_class
+                FROM jobs
+                WHERE remote_class IS NULL OR geo_class IS NULL
+                ORDER BY COALESCE(last_seen_at, '1970-01-01T00:00:00+00:00') DESC
+                LIMIT :limit
+            """),
+            {"limit": limit},
+        ).mappings().all()
 
     if not rows:
-        conn.close()
         return 0
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
 
-    for row in rows:
-        payload = dict(row)
-        if payload.get("policy_v1_reason"):
-            payload["_compliance"] = {
-                "policy_reason": payload["policy_v1_reason"],
-                "remote_model": "unknown",
-            }
+    with engine.begin() as conn:
+        for row in rows:
+            payload = dict(row)
+            if payload.get("policy_v1_reason"):
+                payload["_compliance"] = {
+                    "policy_reason": payload["policy_v1_reason"],
+                    "remote_model": "unknown",
+                }
 
-        remote_class = payload.get("remote_class") or _derive_remote_class(payload)
-        geo_class = payload.get("geo_class") or _derive_geo_class(payload)
+            remote_class = payload.get("remote_class") or _derive_remote_class(payload)
+            geo_class = payload.get("geo_class") or _derive_geo_class(payload)
 
-        conn.execute(
-            """
-            UPDATE jobs
-            SET
-                remote_class = ?,
-                geo_class = ?,
-                updated_at = ?
-            WHERE job_id = ?
-            """,
-            (
-                remote_class,
-                geo_class,
-                now,
-                payload["job_id"],
-            ),
-        )
+            conn.execute(
+                text("""
+                    UPDATE jobs
+                    SET
+                        remote_class = :remote_class,
+                        geo_class = :geo_class,
+                        updated_at = :updated_at
+                    WHERE job_id = :job_id
+                """),
+                {
+                    "remote_class": remote_class,
+                    "geo_class": geo_class,
+                    "updated_at": now,
+                    "job_id": payload["job_id"],
+                },
+            )
 
-    conn.commit()
-    conn.close()
     return len(rows)
 
 
@@ -343,28 +335,27 @@ def get_jobs_for_compliance_resolution(
     limit: int = 500,
     only_missing: bool = False,
 ) -> list[dict]:
-    conn = get_conn()
-    conn.row_factory = sqlite3.Row
-
     where_clause = ""
     if only_missing:
         where_clause = "WHERE compliance_status IS NULL OR compliance_score IS NULL"
 
-    rows = conn.execute(
-        f"""
+    query = f"""
         SELECT
             job_id,
             remote_class,
             geo_class
         FROM jobs
         {where_clause}
-        ORDER BY COALESCE(last_seen_at, '1970-01-01') DESC
-        LIMIT ?
-        """,
-        (limit,),
-    ).fetchall()
+        ORDER BY COALESCE(last_seen_at, '1970-01-01T00:00:00+00:00') DESC
+        LIMIT :limit
+    """
 
-    conn.close()
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(query),
+            {"limit": limit},
+        ).mappings().all()
+    
     return [dict(row) for row in rows]
 
 
@@ -373,27 +364,25 @@ def update_job_compliance_resolution(
     compliance_status: str,
     compliance_score: int,
 ):
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
 
-    conn = get_conn()
-    conn.execute(
-        """
-        UPDATE jobs
-        SET
-            compliance_status = ?,
-            compliance_score = ?,
-            updated_at = ?
-        WHERE job_id = ?
-        """,
-        (
-            compliance_status,
-            compliance_score,
-            now,
-            job_id,
-        ),
-    )
-    conn.commit()
-    conn.close()
+    with engine.begin() as conn:
+        conn.execute(
+            text("""
+                UPDATE jobs
+                SET
+                    compliance_status = :compliance_status,
+                    compliance_score = :compliance_score,
+                    updated_at = :updated_at
+                WHERE job_id = :job_id
+            """),
+            {
+                "compliance_status": compliance_status,
+                "compliance_score": compliance_score,
+                "updated_at": now,
+                "job_id": job_id,
+            },
+        )
 
 
 def _build_jobs_audit_filter_clauses(
@@ -408,54 +397,65 @@ def _build_jobs_audit_filter_clauses(
     compliance_status: str | None = None,
     min_compliance_score: int | None = None,
     max_compliance_score: int | None = None,
-) -> tuple[list[str], list]:
+) -> tuple[list[str], dict]:
     clauses: list[str] = []
-    params: list = []
+    params: dict = {}
+    param_counter = 0
 
     if status:
-        clauses.append("status = ?")
-        params.append(status)
+        param_counter += 1
+        clauses.append(f"status = :p{param_counter}")
+        params[f"p{param_counter}"] = status
 
     if source:
-        clauses.append("source = ?")
-        params.append(source)
+        param_counter += 1
+        clauses.append(f"source = :p{param_counter}")
+        params[f"p{param_counter}"] = source
 
     if company:
-        clauses.append("LOWER(company_name) LIKE ?")
-        params.append(f"%{company.lower()}%")
+        param_counter += 1
+        clauses.append(f"LOWER(company_name) LIKE :p{param_counter}")
+        params[f"p{param_counter}"] = f"%{company.lower()}%"
 
     if title:
-        clauses.append("LOWER(title) LIKE ?")
-        params.append(f"%{title.lower()}%")
+        param_counter += 1
+        clauses.append(f"LOWER(title) LIKE :p{param_counter}")
+        params[f"p{param_counter}"] = f"%{title.lower()}%"
 
     if remote_scope:
-        clauses.append("LOWER(remote_scope) LIKE ?")
-        params.append(f"%{remote_scope.lower()}%")
+        param_counter += 1
+        clauses.append(f"LOWER(remote_scope) LIKE :p{param_counter}")
+        params[f"p{param_counter}"] = f"%{remote_scope.lower()}%"
 
     if remote_class:
-        clauses.append("remote_class = ?")
-        params.append(remote_class)
+        param_counter += 1
+        clauses.append(f"remote_class = :p{param_counter}")
+        params[f"p{param_counter}"] = remote_class
 
     if geo_class:
-        clauses.append("geo_class = ?")
-        params.append(geo_class)
+        param_counter += 1
+        clauses.append(f"geo_class = :p{param_counter}")
+        params[f"p{param_counter}"] = geo_class
 
     if compliance_status:
-        clauses.append("compliance_status = ?")
-        params.append(compliance_status)
+        param_counter += 1
+        clauses.append(f"compliance_status = :p{param_counter}")
+        params[f"p{param_counter}"] = compliance_status
 
     if min_compliance_score is not None:
-        clauses.append("COALESCE(compliance_score, 0) >= ?")
-        params.append(int(min_compliance_score))
+        param_counter += 1
+        clauses.append(f"COALESCE(compliance_score, 0) >= :p{param_counter}")
+        params[f"p{param_counter}"] = int(min_compliance_score)
 
     if max_compliance_score is not None:
-        clauses.append("COALESCE(compliance_score, 0) <= ?")
-        params.append(int(max_compliance_score))
+        param_counter += 1
+        clauses.append(f"COALESCE(compliance_score, 0) <= :p{param_counter}")
+        params[f"p{param_counter}"] = int(max_compliance_score)
 
     return clauses, params
 
 
-def _rows_to_count_map(rows: list[sqlite3.Row]) -> dict[str, int]:
+def _rows_to_count_map(rows: list) -> dict[str, int]:
     result: dict[str, int] = {}
     for row in rows:
         key = str(row["label"])
@@ -478,9 +478,6 @@ def get_jobs_audit(
     limit: int = 50,
     offset: int = 0,
 ) -> dict:
-    conn = get_conn()
-    conn.row_factory = sqlite3.Row
-
     clauses, params = _build_jobs_audit_filter_clauses(
         status=status,
         source=source,
@@ -498,98 +495,100 @@ def get_jobs_audit(
     if clauses:
         where_clause = "WHERE " + " AND ".join(clauses)
 
-    jobs_rows = conn.execute(
-        f"""
-        SELECT
-            job_id,
-            source,
-            source_url,
-            title,
-            company_name,
-            remote_scope,
-            status,
-            remote_class,
-            geo_class,
-            compliance_status,
-            compliance_score,
-            first_seen_at,
-            last_seen_at
-        FROM jobs
-        {where_clause}
-        ORDER BY COALESCE(last_seen_at, '1970-01-01') DESC
-        LIMIT ? OFFSET ?
-        """,
-        [*params, int(limit), int(offset)],
-    ).fetchall()
+    with engine.connect() as conn:
+        # Prepare params for queries
+        query_params = {**params, "limit": limit, "offset": offset}
+        
+        jobs_rows = conn.execute(
+            text(f"""
+                SELECT
+                    job_id,
+                    source,
+                    source_url,
+                    title,
+                    company_name,
+                    remote_scope,
+                    status,
+                    remote_class,
+                    geo_class,
+                    compliance_status,
+                    compliance_score,
+                    first_seen_at,
+                    last_seen_at
+                FROM jobs
+                {where_clause}
+                ORDER BY COALESCE(last_seen_at, '1970-01-01T00:00:00+00:00') DESC
+                LIMIT :limit OFFSET :offset
+            """),
+            query_params,
+        ).mappings().all()
 
-    total_row = conn.execute(
-        f"""
-        SELECT COUNT(*) AS total
-        FROM jobs
-        {where_clause}
-        """,
-        params,
-    ).fetchone()
+        total_row = conn.execute(
+            text(f"""
+                SELECT COUNT(*) AS total
+                FROM jobs
+                {where_clause}
+            """),
+            params,
+        ).fetchone()
 
-    status_rows = conn.execute(
-        f"""
-        SELECT COALESCE(status, 'null') AS label, COUNT(*) AS count
-        FROM jobs
-        {where_clause}
-        GROUP BY COALESCE(status, 'null')
-        ORDER BY count DESC, label ASC
-        """,
-        params,
-    ).fetchall()
+        status_rows = conn.execute(
+            text(f"""
+                SELECT COALESCE(status, 'null') AS label, COUNT(*) AS count
+                FROM jobs
+                {where_clause}
+                GROUP BY COALESCE(status, 'null')
+                ORDER BY count DESC, label ASC
+            """),
+            params,
+        ).mappings().all()
 
-    source_rows = conn.execute(
-        f"""
-        SELECT COALESCE(source, 'null') AS label, COUNT(*) AS count
-        FROM jobs
-        {where_clause}
-        GROUP BY COALESCE(source, 'null')
-        ORDER BY count DESC, label ASC
-        """,
-        params,
-    ).fetchall()
+        source_rows = conn.execute(
+            text(f"""
+                SELECT COALESCE(source, 'null') AS label, COUNT(*) AS count
+                FROM jobs
+                {where_clause}
+                GROUP BY COALESCE(source, 'null')
+                ORDER BY count DESC, label ASC
+            """),
+            params,
+        ).mappings().all()
 
-    compliance_rows = conn.execute(
-        f"""
-        SELECT COALESCE(compliance_status, 'null') AS label, COUNT(*) AS count
-        FROM jobs
-        {where_clause}
-        GROUP BY COALESCE(compliance_status, 'null')
-        ORDER BY count DESC, label ASC
-        """,
-        params,
-    ).fetchall()
+        compliance_rows = conn.execute(
+            text(f"""
+                SELECT COALESCE(compliance_status, 'null') AS label, COUNT(*) AS count
+                FROM jobs
+                {where_clause}
+                GROUP BY COALESCE(compliance_status, 'null')
+                ORDER BY count DESC, label ASC
+            """),
+            params,
+        ).mappings().all()
 
-    remote_class_rows = conn.execute(
-        f"""
-        SELECT COALESCE(remote_class, 'null') AS label, COUNT(*) AS count
-        FROM jobs
-        {where_clause}
-        GROUP BY COALESCE(remote_class, 'null')
-        ORDER BY count DESC, label ASC
-        """,
-        params,
-    ).fetchall()
+        remote_class_rows = conn.execute(
+            text(f"""
+                SELECT COALESCE(remote_class, 'null') AS label, COUNT(*) AS count
+                FROM jobs
+                {where_clause}
+                GROUP BY COALESCE(remote_class, 'null')
+                ORDER BY count DESC, label ASC
+            """),
+            params,
+        ).mappings().all()
 
-    geo_class_rows = conn.execute(
-        f"""
-        SELECT COALESCE(geo_class, 'null') AS label, COUNT(*) AS count
-        FROM jobs
-        {where_clause}
-        GROUP BY COALESCE(geo_class, 'null')
-        ORDER BY count DESC, label ASC
-        """,
-        params,
-    ).fetchall()
-
-    conn.close()
+        geo_class_rows = conn.execute(
+            text(f"""
+                SELECT COALESCE(geo_class, 'null') AS label, COUNT(*) AS count
+                FROM jobs
+                {where_clause}
+                GROUP BY COALESCE(geo_class, 'null')
+                ORDER BY count DESC, label ASC
+            """),
+            params,
+        ).mappings().all()
 
     return {
-        "total": int(total_row["total"]) if total_row else 0,
+        "total": int(total_row[0]) if total_row else 0,
         "limit": int(limit),
         "offset": int(offset),
         "items": [dict(row) for row in jobs_rows],
@@ -613,10 +612,47 @@ def get_jobs(
     limit: int = 20,
     offset: int = 0,
 ) -> list[dict]:
-    conn = get_conn()
-    conn.row_factory = sqlite3.Row
+    clauses = []
+    params = {}
+    param_counter = 0
 
-    query = """
+    if status == "visible":
+        clauses.append("status IN ('new', 'active')")
+    elif status:
+        param_counter += 1
+        clauses.append(f"status = :p{param_counter}")
+        params[f"p{param_counter}"] = status
+
+    if company:
+        param_counter += 1
+        clauses.append(f"LOWER(company_name) LIKE :p{param_counter}")
+        params[f"p{param_counter}"] = f"%{company.lower()}%"
+
+    if title:
+        param_counter += 1
+        clauses.append(f"LOWER(title) LIKE :p{param_counter}")
+        params[f"p{param_counter}"] = f"%{title.lower()}%"
+
+    if source:
+        param_counter += 1
+        clauses.append(f"source = :p{param_counter}")
+        params[f"p{param_counter}"] = source
+
+    if remote_scope:
+        param_counter += 1
+        clauses.append(f"remote_scope = :p{param_counter}")
+        params[f"p{param_counter}"] = remote_scope
+
+    if min_compliance_score is not None:
+        param_counter += 1
+        clauses.append(f"COALESCE(compliance_score, 0) >= :p{param_counter}")
+        params[f"p{param_counter}"] = int(min_compliance_score)
+
+    where_clause = ""
+    if clauses:
+        where_clause = "WHERE " + " AND ".join(clauses)
+
+    query = f"""
         SELECT
             job_id,
             source,
@@ -628,44 +664,18 @@ def get_jobs(
             first_seen_at,
             last_seen_at
         FROM jobs
+        {where_clause}
+        ORDER BY first_seen_at DESC
+        LIMIT :limit OFFSET :offset
     """
 
-    clauses = []
-    params = []
+    params["limit"] = limit
+    params["offset"] = offset
 
-    if status == "visible":
-        clauses.append("status IN ('new', 'active')")
-    elif status:
-        clauses.append("status = ?")
-        params.append(status)
-
-    if company:
-        clauses.append("LOWER(company_name) LIKE ?")
-        params.append(f"%{company.lower()}%")
-
-    if title:
-        clauses.append("LOWER(title) LIKE ?")
-        params.append(f"%{title.lower()}%")
-
-    if source:
-        clauses.append("source = ?")
-        params.append(source)
-
-    if remote_scope:
-        clauses.append("remote_scope = ?")
-        params.append(remote_scope)
-
-    if min_compliance_score is not None:
-        clauses.append("COALESCE(compliance_score, 0) >= ?")
-        params.append(int(min_compliance_score))
-
-    if clauses:
-        query += " WHERE " + " AND ".join(clauses)
-
-    query += " ORDER BY first_seen_at DESC LIMIT ? OFFSET ?"
-    params.extend([limit, offset])
-
-    rows = conn.execute(query, params).fetchall()
-    conn.close()
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(query),
+            params,
+        ).mappings().all()
 
     return [dict(row) for row in rows]

@@ -1,4 +1,9 @@
-from storage.sqlite import get_conn, init_db, upsert_job
+from storage.sqlite import init_db, upsert_job
+from storage.db import get_engine
+from sqlalchemy import text
+from datetime import datetime
+
+engine = get_engine()
 
 
 def _make_job(job_id: str, first_seen_at: str) -> dict:
@@ -24,14 +29,19 @@ def test_upsert_uses_source_first_seen_at():
     job = _make_job("remotive:test-first-seen", source_first_seen)
     upsert_job(job)
 
-    with get_conn() as conn:
+    with engine.begin() as conn:
         row = conn.execute(
-            "SELECT first_seen_at FROM jobs WHERE job_id = ?",
-            (job["job_id"],),
+            text("SELECT first_seen_at FROM jobs WHERE job_id = :job_id"),
+            {"job_id": job["job_id"]},
         ).fetchone()
 
     assert row is not None
-    assert row[0] == source_first_seen
+    v = row[0]
+    if isinstance(v, datetime):
+        v = v.isoformat()
+    else:
+        v = str(v)
+    assert v == source_first_seen
 
 
 def test_upsert_keeps_earliest_first_seen_at_on_conflict():
@@ -44,14 +54,19 @@ def test_upsert_keeps_earliest_first_seen_at_on_conflict():
     upsert_job(older)
     upsert_job(newer)
 
-    with get_conn() as conn:
+    with engine.begin() as conn:
         row = conn.execute(
-            "SELECT first_seen_at FROM jobs WHERE job_id = ?",
-            (job_id,),
+            text("SELECT first_seen_at FROM jobs WHERE job_id = :job_id"),
+            {"job_id": job_id},
         ).fetchone()
 
     assert row is not None
-    assert row[0] == older["first_seen_at"]
+    v = row[0]
+    if isinstance(v, datetime):
+        v = v.isoformat()
+    else:
+        v = str(v)
+    assert v == older["first_seen_at"]
 
 
 def test_upsert_persists_derived_compliance_classes():
@@ -66,10 +81,10 @@ def test_upsert_persists_derived_compliance_classes():
 
     upsert_job(job)
 
-    with get_conn() as conn:
+    with engine.begin() as conn:
         row = conn.execute(
-            "SELECT remote_class, geo_class FROM jobs WHERE job_id = ?",
-            (job["job_id"],),
+            text("SELECT remote_class, geo_class FROM jobs WHERE job_id = :job_id"),
+            {"job_id": job["job_id"]},
         ).fetchone()
 
     assert row is not None
@@ -89,10 +104,10 @@ def test_upsert_marks_geo_non_eu_when_policy_flags_geo_restriction():
 
     upsert_job(job)
 
-    with get_conn() as conn:
+    with engine.begin() as conn:
         row = conn.execute(
-            "SELECT remote_class, geo_class FROM jobs WHERE job_id = ?",
-            (job["job_id"],),
+            text("SELECT remote_class, geo_class FROM jobs WHERE job_id = :job_id"),
+            {"job_id": job["job_id"]},
         ).fetchone()
 
     assert row is not None
