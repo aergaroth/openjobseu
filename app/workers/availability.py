@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import logging
 import requests
+from storage.db import get_engine
 from storage.sqlite import get_jobs_for_verification, update_job_availability
 
 logger = logging.getLogger("openjobseu.worker.availability")
@@ -18,7 +19,6 @@ def check_job_availability(job: dict, timeout: int = DEFAULT_TIMEOUT) -> str:
     url = job.get("source_url")
 
     if not url:
-        logger.warning("job missing source_url", extra={"job_id": job.get("job_id")})
         return "unreachable"
 
     try:
@@ -38,14 +38,7 @@ def check_job_availability(job: dict, timeout: int = DEFAULT_TIMEOUT) -> str:
 
         return "active"
 
-    except requests.RequestException as exc:
-        logger.warning(
-            "availability check failed",
-            extra={
-                "job_id": job.get("job_id"),
-                "error": str(exc),
-            },
-        )
+    except requests.RequestException:
         return "unreachable"
 
 
@@ -89,17 +82,24 @@ def run_availability_pipeline() -> dict:
         "expired": 0,
         "unreachable": 0,
     }
+    updates: list[tuple[str, str, bool]] = []
 
     for job in jobs:
         status = check_job_availability(job)
         summary["checked"] += 1
         summary[status] += 1
 
-        update_job_availability(
-            job_id=job["job_id"],
-            status=status,
-            verified_at=now,
-            failure=(status == "unreachable"),
-        )
+        updates.append((job["job_id"], status, status == "unreachable"))
+
+    db_engine = get_engine()
+    with db_engine.begin() as conn:
+        for job_id, status, failure in updates:
+            update_job_availability(
+                job_id=job_id,
+                status=status,
+                verified_at=now,
+                failure=failure,
+                conn=conn,
+            )
 
     return summary

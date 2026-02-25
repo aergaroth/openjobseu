@@ -7,7 +7,8 @@ from app.workers.normalization.weworkremotely import (
 )
 from app.workers.ingestion.log_helpers import log_ingestion
 from app.workers.policy.v1 import apply_policy_v1
-from storage.sqlite import init_db, upsert_job
+from storage.db import get_engine
+from storage.sqlite import upsert_job
 
 SOURCE = "weworkremotely"
 
@@ -31,6 +32,7 @@ def run_weworkremotely_ingestion() -> dict:
         "unknown": 0,
     }
     skipped = 0
+    write_committed = False
 
     try:
         adapter = WeWorkRemotelyRssAdapter()
@@ -43,25 +45,28 @@ def run_weworkremotely_ingestion() -> dict:
             raw_count=fetched_count,
         )
 
-        for raw in entries:
-            normalized_job = normalize_weworkremotely_job(raw)
-            if not normalized_job:
-                skipped += 1
-                continue
-            normalized_count += 1
+        db_engine = get_engine()
+        with db_engine.begin() as conn:
+            for raw in entries:
+                normalized_job = normalize_weworkremotely_job(raw)
+                if not normalized_job:
+                    skipped += 1
+                    continue
+                normalized_count += 1
 
-            job, reason = apply_policy_v1(normalized_job, source=SOURCE)
-            model = normalized_job.get("_compliance", {}).get("remote_model", "unknown")
-            if model not in remote_model_counts:
-                model = "unknown"
-            remote_model_counts[model] += 1
+                job, reason = apply_policy_v1(normalized_job, source=SOURCE)
+                model = normalized_job.get("_compliance", {}).get("remote_model", "unknown")
+                if model not in remote_model_counts:
+                    model = "unknown"
+                remote_model_counts[model] += 1
 
-            if reason in rejected_by_reason:
-                rejected_policy_count += 1
-                rejected_by_reason[reason] += 1
+                if reason in rejected_by_reason:
+                    rejected_policy_count += 1
+                    rejected_by_reason[reason] += 1
 
-            upsert_job(job)
-            accepted_count += 1
+                upsert_job(job, conn=conn)
+                accepted_count += 1
+        write_committed = True
 
         actions.append(f"{SOURCE}_ingested:{accepted_count}")
         duration_ms = int((perf_counter() - started) * 1000)
@@ -82,12 +87,13 @@ def run_weworkremotely_ingestion() -> dict:
     except Exception as exc:
         actions.append(f"{SOURCE}_failed")
         duration_ms = int((perf_counter() - started) * 1000)
+        persisted_count = accepted_count if write_committed else 0
 
         log_ingestion(
             source=SOURCE,
             phase="error",
             raw_count=fetched_count,
-            persisted=accepted_count,
+            persisted=persisted_count,
             skipped=skipped,
             normalized=normalized_count,
             rejected_policy=rejected_policy_count,

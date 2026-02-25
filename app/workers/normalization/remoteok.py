@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-import logging
 from typing import Dict, Optional
 
 from app.workers.normalization.common import (
@@ -9,10 +8,6 @@ from app.workers.normalization.common import (
 )
 
 from app.workers.normalization.cleaning import clean_description
-
-
-logger = logging.getLogger("openjobseu.normalization.remoteok")
-
 
 def normalize_remoteok_job(raw: Dict) -> Optional[Dict]:
     """
@@ -32,10 +27,6 @@ def normalize_remoteok_job(raw: Dict) -> Optional[Dict]:
         url = sanitize_url(raw.get("url") or raw.get("apply_url"))
 
         if not job_id or not title or not company or not url:
-            logger.warning(
-                "remoteok job skipped due to missing required fields",
-                extra={"job_id": job_id},
-            )
             return None
 
         # Posted date handling
@@ -83,20 +74,7 @@ def normalize_remoteok_job(raw: Dict) -> Optional[Dict]:
             "first_seen_at": posted_at,
         }
 
-        logger.debug(
-            "remoteok job normalized",
-            extra={
-                "job_id": normalized["job_id"],
-                "remote_scope": remote_scope,
-            },
-        )
-
         return normalized
 
-    except Exception as exc:
-        logger.error(
-            "remoteok normalization failed",
-            extra={"raw_id": raw.get("id")},
-            exc_info=exc,
-        )
+    except Exception:
         return None

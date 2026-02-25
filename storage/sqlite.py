@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from datetime import datetime, timezone
 from sqlalchemy import text
+from sqlalchemy.engine import Connection
 from storage.db import get_engine
 from app.workers.policy.v2.geo_classifier import classify_geo_scope
 
@@ -126,80 +127,110 @@ def init_db():
         """))
 
 
-def upsert_job(job: dict):
+def _upsert_job_in_conn(
+    conn: Connection,
+    *,
+    job: dict,
+    first_seen_at,
+    now,
+    remote_class: str,
+    geo_class: str,
+) -> None:
+    conn.execute(
+        text("""
+            INSERT INTO jobs (
+                job_id,
+                source,
+                source_job_id,
+                source_url,
+                title,
+                company_name,
+                description,
+                remote_source_flag,
+                remote_scope,
+                status,
+                first_seen_at,
+                last_seen_at,
+                remote_class,
+                geo_class
+            )
+            VALUES (
+                :job_id,
+                :source,
+                :source_job_id,
+                :source_url,
+                :title,
+                :company_name,
+                :description,
+                :remote_source_flag,
+                :remote_scope,
+                :status,
+                :first_seen_at,
+                :last_seen_at,
+                :remote_class,
+                :geo_class
+            )
+            ON CONFLICT (job_id) DO UPDATE SET
+                source_url = excluded.source_url,
+                title = excluded.title,
+                company_name = excluded.company_name,
+                description = excluded.description,
+                remote_source_flag = excluded.remote_source_flag,
+                remote_scope = excluded.remote_scope,
+                status = excluded.status,
+                remote_class = excluded.remote_class,
+                geo_class = excluded.geo_class,
+                first_seen_at = CASE
+                    WHEN excluded.first_seen_at < jobs.first_seen_at
+                    THEN excluded.first_seen_at
+                    ELSE jobs.first_seen_at
+                END,
+                last_seen_at = excluded.last_seen_at
+        """),
+        {
+            "job_id": job["job_id"],
+            "source": job["source"],
+            "source_job_id": job["source_job_id"],
+            "source_url": job["source_url"],
+            "title": job["title"],
+            "company_name": job["company_name"],
+            "description": job["description"],
+            "remote_source_flag": bool(job["remote_source_flag"]),
+            "remote_scope": job["remote_scope"],
+            "status": job["status"],
+            "first_seen_at": first_seen_at,
+            "last_seen_at": now,
+            "remote_class": remote_class,
+            "geo_class": geo_class,
+        },
+    )
+
+
+def upsert_job(job: dict, conn: Connection | None = None):
     now = datetime.now(timezone.utc)
     first_seen_at = job.get("first_seen_at") or now
     remote_class = _derive_remote_class(job)
     geo_class = _derive_geo_class(job)
 
-    with engine.begin() as conn:
-        conn.execute(
-            text("""
-                INSERT INTO jobs (
-                    job_id,
-                    source,
-                    source_job_id,
-                    source_url,
-                    title,
-                    company_name,
-                    description,
-                    remote_source_flag,
-                    remote_scope,
-                    status,
-                    first_seen_at,
-                    last_seen_at,
-                    remote_class,
-                    geo_class
-                )
-                VALUES (
-                    :job_id,
-                    :source,
-                    :source_job_id,
-                    :source_url,
-                    :title,
-                    :company_name,
-                    :description,
-                    :remote_source_flag,
-                    :remote_scope,
-                    :status,
-                    :first_seen_at,
-                    :last_seen_at,
-                    :remote_class,
-                    :geo_class
-                )
-                ON CONFLICT (job_id) DO UPDATE SET
-                    source_url = excluded.source_url,
-                    title = excluded.title,
-                    company_name = excluded.company_name,
-                    description = excluded.description,
-                    remote_source_flag = excluded.remote_source_flag,
-                    remote_scope = excluded.remote_scope,
-                    status = excluded.status,
-                    remote_class = excluded.remote_class,
-                    geo_class = excluded.geo_class,
-                    first_seen_at = CASE
-                        WHEN excluded.first_seen_at < jobs.first_seen_at
-                        THEN excluded.first_seen_at
-                        ELSE jobs.first_seen_at
-                    END,
-                    last_seen_at = excluded.last_seen_at
-            """),
-            {
-                "job_id": job["job_id"],
-                "source": job["source"],
-                "source_job_id": job["source_job_id"],
-                "source_url": job["source_url"],
-                "title": job["title"],
-                "company_name": job["company_name"],
-                "description": job["description"],
-                "remote_source_flag": bool(job["remote_source_flag"]),
-                "remote_scope": job["remote_scope"],
-                "status": job["status"],
-                "first_seen_at": first_seen_at,
-                "last_seen_at": now,
-                "remote_class": remote_class,
-                "geo_class": geo_class,
-            },
+    if conn is not None:
+        _upsert_job_in_conn(
+            conn,
+            job=job,
+            first_seen_at=first_seen_at,
+            now=now,
+            remote_class=remote_class,
+            geo_class=geo_class,
+        )
+        return
+
+    with engine.begin() as tx_conn:
+        _upsert_job_in_conn(
+            tx_conn,
+            job=job,
+            first_seen_at=first_seen_at,
+            now=now,
+            remote_class=remote_class,
+            geo_class=geo_class,
         )
 
 def get_jobs_for_verification(limit: int = 20) -> list[dict]:
@@ -228,13 +259,14 @@ def update_job_availability(
     status: str,
     verified_at: datetime | None = None,
     failure: bool = False,
+    conn: Connection | None = None,
 ):
 
     if verified_at is None:
         verified_at = datetime.now(timezone.utc)
 
-    with engine.begin() as conn:
-        conn.execute(
+    def _execute(target_conn: Connection) -> None:
+        target_conn.execute(
             text("""
                 UPDATE jobs
                 SET
@@ -255,6 +287,13 @@ def update_job_availability(
                 "job_id": job_id,
             },
         )
+
+    if conn is not None:
+        _execute(conn)
+        return
+
+    with engine.begin() as tx_conn:
+        _execute(tx_conn)
 
 
 def count_jobs_missing_compliance() -> int:
@@ -359,11 +398,12 @@ def update_job_compliance_resolution(
     job_id: str,
     compliance_status: str,
     compliance_score: int,
+    conn: Connection | None = None,
 ):
     now = datetime.now(timezone.utc)
 
-    with engine.begin() as conn:
-        conn.execute(
+    def _execute(target_conn: Connection) -> None:
+        target_conn.execute(
             text("""
                 UPDATE jobs
                 SET
@@ -379,6 +419,13 @@ def update_job_compliance_resolution(
                 "job_id": job_id,
             },
         )
+
+    if conn is not None:
+        _execute(conn)
+        return
+
+    with engine.begin() as tx_conn:
+        _execute(tx_conn)
 
 
 def _build_jobs_audit_filter_clauses(

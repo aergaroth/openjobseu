@@ -1,14 +1,10 @@
 from datetime import datetime, timezone
 from typing import Dict, Optional
-import logging
 import hashlib
 import re
 from urllib.parse import urlsplit
 
 from app.workers.normalization.common import normalize_source_datetime, sanitize_url
-
-logger = logging.getLogger("openjobseu.normalization.weworkremotely")
-
 
 def _looks_like_url_fragment(value: str) -> bool:
     v = (value or "").strip().lower()
@@ -62,10 +58,6 @@ def normalize_weworkremotely_job(raw: Dict) -> Optional[Dict]:
         source_job_id = _safe_wwr_source_job_id(raw.get("id"), link or "")
 
         if not raw_title or not link or not source_job_id:
-            logger.warning(
-                "weworkremotely job skipped due to missing required fields",
-                extra={"title": raw_title, "link": link},
-            )
             return None
 
         # --- Company name heuristic (preserved behavior) ---
@@ -107,17 +99,7 @@ def normalize_weworkremotely_job(raw: Dict) -> Optional[Dict]:
             "first_seen_at": first_seen_at,
         }
 
-        logger.debug(
-            "weworkremotely job normalized",
-            extra={"job_id": normalized["job_id"]},
-        )
-
         return normalized
 
-    except Exception as exc:
-        logger.error(
-            "weworkremotely normalization failed",
-            extra={"raw_id": raw.get("id")},
-            exc_info=exc,
-        )
+    except Exception:
         return None
