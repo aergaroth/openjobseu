@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
-from storage.sqlite import get_jobs_for_verification, update_job_availability, init_db
+from storage.db import get_engine
+from storage.sqlite import get_jobs_for_verification, update_jobs_availability
 
 STALE_AFTER_DAYS = 7
 EXPIRE_AFTER_DAYS = 30
@@ -71,12 +72,25 @@ def run_lifecycle_pipeline() -> None:
     jobs = get_jobs_for_verification(limit=50)
     now = datetime.now(timezone.utc)
 
+    updates: list[dict] = []
     for job in jobs:
         new_status = apply_lifecycle_rules(job, now)
-        if new_status:
-            update_job_availability(
-                job_id=job["job_id"],
-                status=new_status,
-                verified_at=now,
-                failure=False,
-            )
+        if not new_status:
+            continue
+
+        updates.append(
+            {
+                "job_id": job["job_id"],
+                "status": new_status,
+                "verified_at": now,
+                "failure": False,
+                "updated_at": now,
+            }
+        )
+
+    if not updates:
+        return
+
+    db_engine = get_engine()
+    with db_engine.begin() as conn:
+        update_jobs_availability(updates=updates, conn=conn)

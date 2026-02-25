@@ -29,9 +29,10 @@ def test_bootstrap_runs_for_existing_db_rows():
     review = _make_job("seed:review", "Poland", remote_source_flag=False)
     rejected = _make_job("seed:rejected", "USA only")
 
-    upsert_job(approved)
-    upsert_job(review)
-    upsert_job(rejected)
+    with engine.begin() as conn:
+        upsert_job(approved, conn=conn)
+        upsert_job(review, conn=conn)
+        upsert_job(rejected, conn=conn)
 
     with engine.begin() as conn:
         conn.execute(

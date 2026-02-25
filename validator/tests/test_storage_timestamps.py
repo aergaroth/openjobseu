@@ -27,7 +27,8 @@ def test_upsert_uses_source_first_seen_at():
 
     source_first_seen = "2026-01-05T10:00:00+00:00"
     job = _make_job("remotive:test-first-seen", source_first_seen)
-    upsert_job(job)
+    with engine.begin() as conn:
+        upsert_job(job, conn=conn)
 
     with engine.begin() as conn:
         row = conn.execute(
@@ -51,8 +52,9 @@ def test_upsert_keeps_earliest_first_seen_at_on_conflict():
     older = _make_job(job_id, "2026-01-05T10:00:00+00:00")
     newer = _make_job(job_id, "2026-01-07T10:00:00+00:00")
 
-    upsert_job(older)
-    upsert_job(newer)
+    with engine.begin() as conn:
+        upsert_job(older, conn=conn)
+        upsert_job(newer, conn=conn)
 
     with engine.begin() as conn:
         row = conn.execute(
@@ -79,7 +81,8 @@ def test_upsert_persists_derived_compliance_classes():
         "remote_model": "remote_only",
     }
 
-    upsert_job(job)
+    with engine.begin() as conn:
+        upsert_job(job, conn=conn)
 
     with engine.begin() as conn:
         row = conn.execute(
@@ -102,7 +105,8 @@ def test_upsert_marks_geo_non_eu_when_policy_flags_geo_restriction():
         "remote_model": "remote_but_geo_restricted",
     }
 
-    upsert_job(job)
+    with engine.begin() as conn:
+        upsert_job(job, conn=conn)
 
     with engine.begin() as conn:
         row = conn.execute(

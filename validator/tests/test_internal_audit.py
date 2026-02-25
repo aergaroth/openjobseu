@@ -100,9 +100,10 @@ def test_internal_audit_jobs_filters_and_counts():
         remote_scope="USA only",
     )
 
-    upsert_job(job_1)
-    upsert_job(job_2)
-    upsert_job(job_3)
+    with engine.begin() as conn:
+        upsert_job(job_1, conn=conn)
+        upsert_job(job_2, conn=conn)
+        upsert_job(job_3, conn=conn)
 
     _set_compliance(
         job_1["job_id"],

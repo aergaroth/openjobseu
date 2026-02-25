@@ -1,12 +1,15 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 import logging
 import requests
-from storage.sqlite import get_jobs_for_verification, update_job_availability
+from storage.db import get_engine
+from storage.sqlite import get_jobs_for_verification, update_jobs_availability
 
 logger = logging.getLogger("openjobseu.worker.availability")
 
 
 DEFAULT_TIMEOUT = 5
+MAX_AVAILABILITY_WORKERS = 8
 
 
 def check_job_availability(job: dict, timeout: int = DEFAULT_TIMEOUT) -> str:
@@ -18,7 +21,6 @@ def check_job_availability(job: dict, timeout: int = DEFAULT_TIMEOUT) -> str:
     url = job.get("source_url")
 
     if not url:
-        logger.warning("job missing source_url", extra={"job_id": job.get("job_id")})
         return "unreachable"
 
     try:
@@ -38,15 +40,30 @@ def check_job_availability(job: dict, timeout: int = DEFAULT_TIMEOUT) -> str:
 
         return "active"
 
-    except requests.RequestException as exc:
-        logger.warning(
-            "availability check failed",
-            extra={
-                "job_id": job.get("job_id"),
-                "error": str(exc),
-            },
-        )
+    except requests.RequestException:
         return "unreachable"
+
+
+def _check_availability_for_jobs(
+    jobs: list[dict],
+) -> list[str]:
+    if not jobs:
+        return []
+
+    if len(jobs) == 1:
+        return [check_job_availability(jobs[0])]
+
+    statuses: list[str] = ["unreachable"] * len(jobs)
+    workers = min(MAX_AVAILABILITY_WORKERS, len(jobs))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        future_to_index = {
+            pool.submit(check_job_availability, job): index
+            for index, job in enumerate(jobs)
+        }
+        for future in as_completed(future_to_index):
+            statuses[future_to_index[future]] = future.result()
+
+    return statuses
 
 
 def run_availability_checks(jobs: list[dict]) -> dict:
@@ -62,8 +79,8 @@ def run_availability_checks(jobs: list[dict]) -> dict:
         "checked_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    for job in jobs:
-        status = check_job_availability(job)
+    statuses = _check_availability_for_jobs(jobs)
+    for job, status in zip(jobs, statuses):
 
         summary["checked"] += 1
         summary[status] += 1
@@ -89,17 +106,25 @@ def run_availability_pipeline() -> dict:
         "expired": 0,
         "unreachable": 0,
     }
-
-    for job in jobs:
-        status = check_job_availability(job)
+    statuses = _check_availability_for_jobs(jobs)
+    updates: list[dict] = []
+    for job, status in zip(jobs, statuses):
         summary["checked"] += 1
         summary[status] += 1
 
-        update_job_availability(
-            job_id=job["job_id"],
-            status=status,
-            verified_at=now,
-            failure=(status == "unreachable"),
+        updates.append(
+            {
+                "job_id": job["job_id"],
+                "status": status,
+                "verified_at": now,
+                "failure": status == "unreachable",
+                "updated_at": now,
+            }
         )
+
+    if updates:
+        db_engine = get_engine()
+        with db_engine.begin() as conn:
+            update_jobs_availability(updates=updates, conn=conn)
 
     return summary

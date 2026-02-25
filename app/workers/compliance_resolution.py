@@ -2,11 +2,12 @@ import logging
 from time import perf_counter
 
 from app.workers.compliance_resolver import resolve_compliance
+from storage.db import get_engine
 from storage.sqlite import (
     backfill_missing_compliance_classes,
     count_jobs_missing_compliance,
     get_jobs_for_compliance_resolution,
-    update_job_compliance_resolution,
+    update_jobs_compliance_resolution,
 )
 
 logger = logging.getLogger("openjobseu.compliance")
@@ -29,17 +30,23 @@ def run_compliance_resolution(limit: int = 500, *, only_missing: bool = False) -
         )
         checked = len(jobs)
 
-        for job in jobs:
-            result = resolve_compliance(
-                job.get("remote_class"),
-                job.get("geo_class"),
-            )
-            update_job_compliance_resolution(
-                job_id=job["job_id"],
-                compliance_status=result["compliance_status"],
-                compliance_score=int(result["compliance_score"]),
-            )
-            updated += 1
+        db_engine = get_engine()
+        updates: list[dict] = []
+        with db_engine.begin() as conn:
+            for job in jobs:
+                result = resolve_compliance(
+                    job.get("remote_class"),
+                    job.get("geo_class"),
+                )
+                updates.append(
+                    {
+                        "job_id": job["job_id"],
+                        "compliance_status": result["compliance_status"],
+                        "compliance_score": int(result["compliance_score"]),
+                    }
+                )
+            update_jobs_compliance_resolution(updates=updates, conn=conn)
+        updated = len(updates)
     except Exception:
         logger.exception("compliance resolution step failed")
 
