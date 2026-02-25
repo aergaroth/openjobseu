@@ -127,6 +127,12 @@ def init_db():
         """))
 
 
+def _require_open_conn(conn: Connection | None, *, op_name: str) -> Connection:
+    if conn is None:
+        raise ValueError(f"{op_name} requires an explicit open transaction connection (conn).")
+    return conn
+
+
 def _upsert_job_in_conn(
     conn: Connection,
     *,
@@ -211,27 +217,15 @@ def upsert_job(job: dict, conn: Connection | None = None):
     first_seen_at = job.get("first_seen_at") or now
     remote_class = _derive_remote_class(job)
     geo_class = _derive_geo_class(job)
-
-    if conn is not None:
-        _upsert_job_in_conn(
-            conn,
-            job=job,
-            first_seen_at=first_seen_at,
-            now=now,
-            remote_class=remote_class,
-            geo_class=geo_class,
-        )
-        return
-
-    with engine.begin() as tx_conn:
-        _upsert_job_in_conn(
-            tx_conn,
-            job=job,
-            first_seen_at=first_seen_at,
-            now=now,
-            remote_class=remote_class,
-            geo_class=geo_class,
-        )
+    target_conn = _require_open_conn(conn, op_name="upsert_job")
+    _upsert_job_in_conn(
+        target_conn,
+        job=job,
+        first_seen_at=first_seen_at,
+        now=now,
+        remote_class=remote_class,
+        geo_class=geo_class,
+    )
 
 def get_jobs_for_verification(limit: int = 20) -> list[dict]:
     with engine.connect() as conn:
@@ -261,39 +255,58 @@ def update_job_availability(
     failure: bool = False,
     conn: Connection | None = None,
 ):
-
     if verified_at is None:
         verified_at = datetime.now(timezone.utc)
-
-    def _execute(target_conn: Connection) -> None:
-        target_conn.execute(
-            text("""
-                UPDATE jobs
-                SET
-                    status = :status,
-                    last_verified_at = :verified_at,
-                    verification_failures = CASE
-                        WHEN :failure THEN verification_failures + 1
-                        ELSE 0
-                    END,
-                    updated_at = :updated_at
-                WHERE job_id = :job_id
-            """),
+    update_jobs_availability(
+        updates=[
             {
+                "job_id": job_id,
                 "status": status,
                 "verified_at": verified_at,
-                "failure": failure,
+                "failure": bool(failure),
                 "updated_at": verified_at,
-                "job_id": job_id,
-            },
-        )
+            }
+        ],
+        conn=conn,
+    )
 
-    if conn is not None:
-        _execute(conn)
+
+def update_jobs_availability(
+    updates: list[dict],
+    conn: Connection | None = None,
+) -> None:
+    if not updates:
         return
 
-    with engine.begin() as tx_conn:
-        _execute(tx_conn)
+    normalized_updates = []
+    for item in updates:
+        verified_at = item.get("verified_at") or datetime.now(timezone.utc)
+        normalized_updates.append(
+            {
+                "job_id": item["job_id"],
+                "status": item["status"],
+                "verified_at": verified_at,
+                "failure": bool(item.get("failure", False)),
+                "updated_at": item.get("updated_at") or verified_at,
+            }
+        )
+
+    target_conn = _require_open_conn(conn, op_name="update_jobs_availability")
+    target_conn.execute(
+        text("""
+            UPDATE jobs
+            SET
+                status = :status,
+                last_verified_at = :verified_at,
+                verification_failures = CASE
+                    WHEN :failure THEN verification_failures + 1
+                    ELSE 0
+                END,
+                updated_at = :updated_at
+            WHERE job_id = :job_id
+        """),
+        normalized_updates,
+    )
 
 
 def count_jobs_missing_compliance() -> int:
@@ -334,34 +347,38 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
 
     now = datetime.now(timezone.utc)
 
+    payloads: list[dict] = []
+    for row in rows:
+        payload = dict(row)
+        if payload.get("policy_v1_reason"):
+            payload["_compliance"] = {
+                "policy_reason": payload["policy_v1_reason"],
+                "remote_model": "unknown",
+            }
+
+        remote_class = payload.get("remote_class") or _derive_remote_class(payload)
+        geo_class = payload.get("geo_class") or _derive_geo_class(payload)
+        payloads.append(
+            {
+                "remote_class": remote_class,
+                "geo_class": geo_class,
+                "updated_at": now,
+                "job_id": payload["job_id"],
+            }
+        )
+
     with engine.begin() as conn:
-        for row in rows:
-            payload = dict(row)
-            if payload.get("policy_v1_reason"):
-                payload["_compliance"] = {
-                    "policy_reason": payload["policy_v1_reason"],
-                    "remote_model": "unknown",
-                }
-
-            remote_class = payload.get("remote_class") or _derive_remote_class(payload)
-            geo_class = payload.get("geo_class") or _derive_geo_class(payload)
-
-            conn.execute(
-                text("""
-                    UPDATE jobs
-                    SET
-                        remote_class = :remote_class,
-                        geo_class = :geo_class,
-                        updated_at = :updated_at
-                    WHERE job_id = :job_id
-                """),
-                {
-                    "remote_class": remote_class,
-                    "geo_class": geo_class,
-                    "updated_at": now,
-                    "job_id": payload["job_id"],
-                },
-            )
+        conn.execute(
+            text("""
+                UPDATE jobs
+                SET
+                    remote_class = :remote_class,
+                    geo_class = :geo_class,
+                    updated_at = :updated_at
+                WHERE job_id = :job_id
+            """),
+            payloads,
+        )
 
     return len(rows)
 
@@ -401,31 +418,49 @@ def update_job_compliance_resolution(
     conn: Connection | None = None,
 ):
     now = datetime.now(timezone.utc)
-
-    def _execute(target_conn: Connection) -> None:
-        target_conn.execute(
-            text("""
-                UPDATE jobs
-                SET
-                    compliance_status = :compliance_status,
-                    compliance_score = :compliance_score,
-                    updated_at = :updated_at
-                WHERE job_id = :job_id
-            """),
+    update_jobs_compliance_resolution(
+        updates=[
             {
-                "compliance_status": compliance_status,
-                "compliance_score": compliance_score,
-                "updated_at": now,
                 "job_id": job_id,
-            },
-        )
+                "compliance_status": compliance_status,
+                "compliance_score": int(compliance_score),
+                "updated_at": now,
+            }
+        ],
+        conn=conn,
+    )
 
-    if conn is not None:
-        _execute(conn)
+
+def update_jobs_compliance_resolution(
+    updates: list[dict],
+    conn: Connection | None = None,
+) -> None:
+    if not updates:
         return
 
-    with engine.begin() as tx_conn:
-        _execute(tx_conn)
+    now = datetime.now(timezone.utc)
+    normalized_updates = [
+        {
+            "job_id": item["job_id"],
+            "compliance_status": item["compliance_status"],
+            "compliance_score": int(item["compliance_score"]),
+            "updated_at": item.get("updated_at") or now,
+        }
+        for item in updates
+    ]
+
+    target_conn = _require_open_conn(conn, op_name="update_jobs_compliance_resolution")
+    target_conn.execute(
+        text("""
+            UPDATE jobs
+            SET
+                compliance_status = :compliance_status,
+                compliance_score = :compliance_score,
+                updated_at = :updated_at
+            WHERE job_id = :job_id
+        """),
+        normalized_updates,
+    )
 
 
 def _build_jobs_audit_filter_clauses(

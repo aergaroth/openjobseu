@@ -7,7 +7,7 @@ from storage.sqlite import (
     backfill_missing_compliance_classes,
     count_jobs_missing_compliance,
     get_jobs_for_compliance_resolution,
-    update_job_compliance_resolution,
+    update_jobs_compliance_resolution,
 )
 
 logger = logging.getLogger("openjobseu.compliance")
@@ -31,21 +31,22 @@ def run_compliance_resolution(limit: int = 500, *, only_missing: bool = False) -
         checked = len(jobs)
 
         db_engine = get_engine()
-        batch_updated = 0
+        updates: list[dict] = []
         with db_engine.begin() as conn:
             for job in jobs:
                 result = resolve_compliance(
                     job.get("remote_class"),
                     job.get("geo_class"),
                 )
-                update_job_compliance_resolution(
-                    job_id=job["job_id"],
-                    compliance_status=result["compliance_status"],
-                    compliance_score=int(result["compliance_score"]),
-                    conn=conn,
+                updates.append(
+                    {
+                        "job_id": job["job_id"],
+                        "compliance_status": result["compliance_status"],
+                        "compliance_score": int(result["compliance_score"]),
+                    }
                 )
-                batch_updated += 1
-        updated = batch_updated
+            update_jobs_compliance_resolution(updates=updates, conn=conn)
+        updated = len(updates)
     except Exception:
         logger.exception("compliance resolution step failed")
 

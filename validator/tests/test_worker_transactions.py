@@ -20,7 +20,9 @@ class _NoopEngine:
 _WRITE_HELPERS_REQUIRING_CONN = {
     "upsert_job",
     "update_job_availability",
+    "update_jobs_availability",
     "update_job_compliance_resolution",
+    "update_jobs_compliance_resolution",
 }
 
 
@@ -53,10 +55,11 @@ def test_availability_pipeline_uses_single_transaction_conn(monkeypatch):
     )
     monkeypatch.setattr(availability, "get_engine", lambda: _NoopEngine())
 
-    def _fake_update(*, job_id, status, verified_at, failure, conn=None):
-        seen.append((job_id, status, bool(failure), conn))
+    def _fake_update(*, updates, conn=None):
+        for item in updates:
+            seen.append((item["job_id"], item["status"], bool(item["failure"]), conn))
 
-    monkeypatch.setattr(availability, "update_job_availability", _fake_update)
+    monkeypatch.setattr(availability, "update_jobs_availability", _fake_update)
 
     summary = availability.run_availability_pipeline()
 
@@ -93,14 +96,15 @@ def test_compliance_resolution_uses_single_transaction_conn(monkeypatch):
     )
     monkeypatch.setattr(compliance_resolution, "get_engine", lambda: _NoopEngine())
 
-    def _fake_update(*, job_id, compliance_status, compliance_score, conn=None):
-        assert compliance_status == "review"
-        assert compliance_score == 65
-        seen_conn_ids.append(id(conn))
+    def _fake_update(*, updates, conn=None):
+        assert len(updates) == 2
+        assert all(item["compliance_status"] == "review" for item in updates)
+        assert all(item["compliance_score"] == 65 for item in updates)
+        seen_conn_ids.extend([id(conn)] * len(updates))
 
     monkeypatch.setattr(
         compliance_resolution,
-        "update_job_compliance_resolution",
+        "update_jobs_compliance_resolution",
         _fake_update,
     )
 
@@ -129,10 +133,11 @@ def test_lifecycle_pipeline_uses_single_transaction_conn(monkeypatch):
     )
     monkeypatch.setattr(lifecycle, "get_engine", lambda: _NoopEngine())
 
-    def _fake_update(*, job_id, status, verified_at, failure, conn=None):
-        seen.append((job_id, status, failure, conn))
+    def _fake_update(*, updates, conn=None):
+        for item in updates:
+            seen.append((item["job_id"], item["status"], item["failure"], conn))
 
-    monkeypatch.setattr(lifecycle, "update_job_availability", _fake_update)
+    monkeypatch.setattr(lifecycle, "update_jobs_availability", _fake_update)
 
     lifecycle.run_lifecycle_pipeline()
 
