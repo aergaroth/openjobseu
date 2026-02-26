@@ -2,7 +2,7 @@
 
 ## Overview
 
-OpenJobsEU is an open-source, compliance-first platform for aggregating legally accessible remote job offers within the European Union.
+OpenJobsEU is an open-source, compliance-first platform for aggregating legally accessible, EU-focused remote job offers.
 
 The system is designed as a backend-oriented, production-grade pipeline with a strong emphasis on:
 - clear separation of concerns
@@ -21,7 +21,7 @@ User-facing functionality is intentionally minimal and strictly read-only.
 
 The system operates as a periodic **tick-based pipeline**:
 
-External Sources -> Ingestion -> Normalization -> Storage -> Post-ingestion -> Read API -> Consumers
+External Sources -> Ingestion -> Normalization -> Storage -> Compliance Resolution -> Post-ingestion -> Read API -> Consumers
 
 This model ensures predictable behavior, resilience to partial failures, and clear operational boundaries.
 
@@ -30,6 +30,10 @@ This model ensures predictable behavior, resilience to partial failures, and cle
 
 > Logging format is determined by runtime mode. Local development uses text logs, while containerized deployments emit 
 > structured JSON logs.
+
+> Database backend is selected via `DB_MODE`:
+> - `standard` -> PostgreSQL via `DATABASE_URL` (`postgresql+psycopg://...`)
+> - `cloudsql` -> Cloud SQL Python Connector (`pg8000`, IAM auth)
 
 ---
 
@@ -63,10 +67,10 @@ The normalization layer converts raw job entries into a single **canonical job m
 Responsibilities:
 - enforce required fields
 - apply source-specific heuristics safely
-- reject non-compliant or out-of-scope jobs
+- reject malformed or out-of-scope source entries
 - produce source-agnostic job records
 
-Normalization is the primary policy boundary of the system.
+Normalization does not compute final compliance score/status.
 
 ---
 
@@ -79,7 +83,20 @@ Responsibilities:
 - track lifecycle-related timestamps
 - support idempotent upserts
 
-The current implementation uses SQLite, with the design allowing replacement by a higher-level database engine in the future.
+Current runtime uses SQLAlchemy Core with PostgreSQL-compatible SQL.
+It supports standard PostgreSQL URLs and Cloud SQL connector mode.
+
+---
+
+### Compliance Resolution Layer
+
+After ingestion, the pipeline runs deterministic compliance resolution:
+- derive/normalize `remote_class`
+- derive/normalize `geo_class`
+- compute `compliance_status` (`approved` / `review` / `rejected`)
+- compute `compliance_score` (0-100)
+
+On app startup, existing rows missing compliance metadata are batch-backfilled.
 
 ---
 
@@ -106,7 +123,15 @@ Endpoints:
 - GET /jobs
 - GET /jobs/feed
 
+`/jobs/feed` is additionally filtered by `min_compliance_score=80`.
+
 Only visible jobs (NEW and ACTIVE) are exposed to consumers.
+
+Internal operational endpoints:
+- POST /internal/tick
+- GET /internal/audit
+- GET /internal/audit/jobs
+- POST /internal/audit/tick-dev
 
 ---
 
@@ -126,9 +151,10 @@ All consumers interact exclusively via the Read API or public feed.
 The entire system is executed via a periodic **scheduler-triggered tick**:
 
 1. Ingestion phase
-2. Post-ingestion processing
-3. Availability checks (inside post-ingestion)
-4. Lifecycle transitions (inside post-ingestion)
+2. Compliance resolution phase
+3. Post-ingestion processing
+4. Availability checks (inside post-ingestion)
+5. Lifecycle transitions (inside post-ingestion)
 
 This design avoids long-running workers and ensures deterministic execution.
 
@@ -139,13 +165,13 @@ This design avoids long-running workers and ensures deterministic execution.
 Observability is provided via:
 - structured application logs
 - explicit ingestion phase logging
-- runtime tick metrics (duration and per-source ingestion counts)
+- runtime tick metrics (duration, per-source ingestion counts, policy counters, remote-model counters)
+- compliance resolution summaries
 - health and readiness endpoints
 
 More advanced metrics and alerting are planned.
 
-As part of operational verification, a lightweight DB smoke check script
-is executed after each deployment.
+The repository also includes a DB/runtime smoke script: `scripts/db_smoke_check.py`.
 
 The smoke check validates:
 - application health endpoint
@@ -154,7 +180,7 @@ The smoke check validates:
 - job_id uniqueness
 - basic feed consistency
 
-Any failure blocks the deployment and requires investigation.
+When integrated in CI/CD, any failure should block deployment and require investigation.
 
 
 ---
@@ -167,4 +193,3 @@ OpenJobsEU explicitly avoids:
 - automated redistribution to third parties
 
 All processing is limited to legally accessible data sources.
-

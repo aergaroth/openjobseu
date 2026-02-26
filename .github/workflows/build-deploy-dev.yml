@@ -4,6 +4,13 @@ on:
   push:
     branches: [develop]
 
+    paths-ignore:
+      - "README.md"
+      - "docs/**"
+  pull_request:
+    paths-ignore:
+      - "README.m
+
 permissions:
   contents: read
   id-token: write

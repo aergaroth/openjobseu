@@ -2,7 +2,7 @@
 
 ## Project scope
 
-OpenJobsEU is an open-source, compliance-first platform for aggregating remote job offers within the EU.
+OpenJobsEU is an open-source, compliance-first platform for aggregating EU-focused remote job offers.
 
 The project is developed incrementally, with a strong focus on:
 - clean domain modeling
@@ -31,7 +31,8 @@ It is not a demo or mock system — all components are designed to run in produc
 - [x] Source-specific normalization with tests
 
 ### A2 – Persistence
-- [x] SQLite storage
+- [x] SQLAlchemy Core storage layer
+- [x] PostgreSQL runtime backend (`DB_MODE=standard`)
 - [x] Idempotent job upsert
 - [x] First-seen and last-seen tracking
 
@@ -61,7 +62,7 @@ It is not a demo or mock system — all components are designed to run in produc
 - [x] Cloud Scheduler triggering `/internal/tick`
 - [x] CI pipeline with tests, image build and deploy
 - [x] Deterministic runtime initialization (fresh DB support)
-- [x] Post-deploy DB smoke check for runtime and data integrity verification
+- [x] Startup DB health check
 - [x] Runtime-aware structured logging (JSON in container, text locally)
 
 Status: **live**
@@ -73,9 +74,9 @@ Status: **live**
 ### A7 – Content quality & policy layer (v1) — DONE
 - [x] Source-aware HTML cleaning layer
 - [x] Spam marker removal (RemoteOK-specific artifacts)
-- [x] Remote purity policy (hard non-remote signals)
-- [x] Geo restriction filter (US-only / NA-only hard reject)
-- [x] Global policy enforcement across all ingestion sources
+- [x] Remote purity policy signals (soft tagging)
+- [x] Geo restriction signals (soft tagging)
+- [x] Global policy signal capture across all ingestion sources
 - [x] Cleaning and policy test coverage
 - [x] Audit scripts for source quality analysis (geo + remote purity)
 
@@ -84,14 +85,25 @@ Status: **live**
 - [x] Runtime metrics (tick duration, ingestion counts)
 - [x] Tick summary metrics (per source: fetched / accepted / rejected)
 - [x] Policy rejection metrics and reason tracking
+- [x] Internal audit panel + filtered audit API (`/internal/audit`, `/internal/audit/jobs`)
 - [ ] Rejection audit log (policy v1, persistent file-based)
 - [ ] Scheduler and tick failure alerting
 
+### A9 – Compliance resolution (v2) — DONE
+- [x] Deterministic remote model classifier (`remote_only`, `non_remote`, etc.)
+- [x] Deterministic geo classifier (`eu_member_state`, `non_eu`, etc.)
+- [x] Compliance resolver (`approved` / `review` / `rejected`) with score `0..100`
+- [x] Compliance resolution phase inside tick pipeline
+- [x] Startup bootstrap for existing rows missing compliance fields
+- [x] Feed quality threshold (`/jobs/feed` uses `min_compliance_score=80`)
 
-### A9 – Storage upgrade
-- Higher-level database engine backend
-- Explicit schema and migrations
-- Indexing aligned with read and lifecycle patterns
+### A10 – Database platform hardening
+- [x] Connection backend split by runtime mode (`DB_MODE`)
+- [x] Standard PostgreSQL mode via `DATABASE_URL`
+- [x] CloudQL ready mode (`DB_MODE=cloudsql`, Cloud SQL connector + IAM auth)
+- [ ] Explicit migration tooling (Alembic or equivalent)
+- [ ] Index tuning aligned with lifecycle + feed query patterns
+- [ ] Automated post-deploy smoke check wired into CI/CD
 
 ---
 
@@ -100,8 +112,8 @@ Status: **live**
 - Company self-publishing workflow (manual, compliance-first)
 - Metadata enrichment (source-provided fields such as posted_at; heuristic-based, no AI by default)
 - Managed deployment options
-- Policy v2:
-  - EU explicit logic (EU + EOG + UK)
-  - Soft-flag mode instead of hard reject
-  - Policy reason codes instead of boolean decision
-  - Drift detection per source (quality regression monitoring)
+- Compliance/policy evolution:
+  - richer reason-code taxonomy persisted in DB
+  - confidence-aware scoring calibration
+  - drift detection per source (quality regression monitoring)
+  - review workflow for borderline (`review`) offers

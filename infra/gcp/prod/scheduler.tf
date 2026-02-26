@@ -1,7 +1,7 @@
 resource "google_cloud_scheduler_job" "tick" {
   name      = "openjobseu-tick"
   region    = var.scheduler_region
-  schedule  = "*/5 * * * *" # every 5 minutes
+  schedule  = "*/15 * * * *" # every 15 minutes
   time_zone = "UTC"
 
   http_target {

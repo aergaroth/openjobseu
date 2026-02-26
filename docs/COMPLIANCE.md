@@ -22,6 +22,23 @@ Each source is evaluated individually before integration.
 
 ---
 
+## Runtime compliance model (implemented)
+
+OpenJobsEU uses deterministic, code-defined compliance stages:
+
+1. Ingestion + normalization produce canonical job records
+2. Policy signals/classifiers derive remote and geo classes
+3. Compliance resolver assigns:
+   - `compliance_status`: `approved | review | rejected`
+   - `compliance_score`: `0..100`
+
+Public distribution uses this score conservatively:
+- `/jobs/feed` exposes only visible jobs with `compliance_score >= 80`
+
+This approach keeps ingestion broad enough for auditability while keeping the public feed conservative.
+
+---
+
 ## Explicit non-actions
 
 OpenJobsEU does **not** engage in any of the following:
@@ -30,6 +47,9 @@ OpenJobsEU does **not** engage in any of the following:
 - bypassing technical or legal access restrictions
 - automating interactions with third-party systems
 - storing or redistributing proprietary or copyrighted content
+
+It also does not perform AI-generated policy decisions for inclusion.
+Compliance logic is deterministic and test-covered.
 
 ---
 

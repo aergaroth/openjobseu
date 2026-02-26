@@ -5,7 +5,7 @@
 Project website: https://openjobseu.org
 (Simple static frontend consuming the public job feed)
 
-OpenJobsEU is an open-source, compliance-first platform for aggregating **EU-wide, fully remote job offers**.
+OpenJobsEU is an open-source, compliance-first platform for aggregating **EU-focused, fully remote job offers**.
 
 The project is built as a **backend-first, production-oriented system**, with a strong focus on:
 - clean domain modeling
@@ -29,7 +29,7 @@ OpenJobsEU exposes a stable, read-only JSON feed of visible job offers:
 
 https://openjobseu-anobnjle6q-lz.a.run.app/jobs/feed
 
-The feed contains **EU-wide, fully remote roles only** and is intended for:
+The feed contains **EU-focused, fully remote roles** that pass compliance-score filtering and is intended for:
 - minimal frontends
 - external aggregators
 - automated consumers
@@ -48,7 +48,8 @@ At runtime, OpenJobsEU operates as a **tick-based ingestion system**:
    - fetch-only adapter (external API / RSS)
    - source-specific normalization
    - idempotent persistence
-4. Post-ingestion workers handle:
+4. **Compliance resolution** computes `compliance_status` + `compliance_score`
+5. Post-ingestion workers handle:
    - availability checks
    - lifecycle transitions
 
@@ -58,7 +59,7 @@ The system is designed so that **adding a new data source does not affect existi
 
 ## Goals
 - Aggregate only **legally accessible** job data
-- Focus exclusively on **EU-wide remote roles**
+- Focus on **EU-focused remote roles** (EU/EEA/UK signals)
 - Verify job availability and data freshness over time
 - Provide a transparent, inspectable alternative to closed job platforms
 
@@ -77,8 +78,11 @@ The system is designed so that **adding a new data source does not affect existi
 - Fetch-only adapters and explicit normalization layer
 - Canonical job data model
 - Idempotent storage and lifecycle tracking
+- SQLAlchemy-based PostgreSQL storage backend (`DB_MODE=standard` / `DB_MODE=cloudsql`)
+- Deterministic compliance classification and scoring (`approved` / `review` / `rejected`)
 - Availability verification via HTTP checks
 - Read-only Jobs API and public feed
+- Internal audit API and HTML audit panel (`/internal/audit`)
 - Structured ingestion logging
 - Infrastructure as Code (Terraform)
 - CI pipeline with automated tests
@@ -97,10 +101,14 @@ OpenJobsEU is a **working early-stage system**, running in real cloud infrastruc
 ### Implemented runtime components
 - Tick dispatcher with pluggable sources
 - Source-specific normalization
-- SQLite persistence (dev / early prod)
+- PostgreSQL persistence via SQLAlchemy engine abstraction
 - Availability checking
 - Lifecycle management (NEW → ACTIVE → STALE → EXPIRED)
-- Public `/jobs/feed` endpoint
+- Compliance bootstrap for existing DB rows at startup
+- Compliance resolution stage inside tick pipeline
+- Public `/jobs` and `/jobs/feed` endpoints
+- Feed filtering by compliance score threshold (`min_compliance_score=80`)
+- Internal audit endpoints (`/internal/audit`, `/internal/audit/jobs`)
 - Cloud Run + Cloud Scheduler runtime
 - CI with validation and normalization tests
 
@@ -113,6 +121,7 @@ The system is intentionally conservative and correctness-oriented.
 - `docs/DATA_SOURCES.md` – details of supported sources
 - `docs/CANONICAL_MODEL.md` – canonical job schema
 - `docs/COMPLIANCE.md` – data access and legal considerations
+- `docs/JOB_LIFECYCLE.md` – lifecycle state transitions
 - `docs/ROADMAP.md` – planned evolution
 
 ---
@@ -125,7 +134,21 @@ cp infra/gcp/terraform.tfvars.example infra/gcp/terraform.tfvars
 
 ---
 
+## Runtime configuration (current)
+
+Required database mode:
+
+- `DB_MODE=standard` with `DATABASE_URL=postgresql+psycopg://...`
+- or `DB_MODE=cloudsql` with `INSTANCE_CONNECTION_NAME`, `DB_NAME`, `DB_USER`
+
+Ingestion runtime:
+
+- `INGESTION_MODE=prod` (default pipeline with external sources)
+- `INGESTION_MODE=local` (dev-only local JSON source)
+- optional: `INGESTION_SOURCES=remotive,remoteok,weworkremotely`
+
+---
+
 ## License
 
 Apache License 2.0
-

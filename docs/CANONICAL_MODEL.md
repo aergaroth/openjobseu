@@ -34,8 +34,27 @@ storage, and querying across different sources.
   - `Europe`
   - `Europe, Canada, South Africa`
 
-Normalization logic may reject jobs that do not match OpenJobsEU policy
-(e.g. non-EU–restricted roles).
+Normalization may reject malformed/out-of-scope source records.
+Final compliance decision is resolved in a dedicated post-ingestion stage.
+
+---
+
+## Compliance Classification (implemented)
+
+- **remote_class**:
+  `remote_only | remote_but_geo_restricted | non_remote | unknown`
+
+- **geo_class**:
+  `eu_member_state | eu_region | eu_explicit | uk | non_eu | unknown`
+
+- **compliance_status**:
+  `approved | review | rejected`
+
+- **compliance_score**:
+  integer `0..100`
+
+These fields are used by the public feed contract:
+- `/jobs/feed` returns only visible jobs with `compliance_score >= 80`
 
 ---
 
@@ -68,6 +87,8 @@ From an API consumer perspective, **NEW and ACTIVE jobs are treated as visible**
 - on repeated upserts of the same `job_id`, the earliest `first_seen_at` is preserved
 - `last_seen_at` is updated on each successful ingestion of the same job
 - `last_verified_at` is updated only by the availability checker
+- `remote_class` and `geo_class` are derived at write time and backfilled when missing
+- `compliance_status` and `compliance_score` are updated by the compliance resolution worker
 - ingestion and normalization do not modify lifecycle state beyond initial creation
 
 ---
@@ -126,9 +147,9 @@ Adapters **must not**:
 ### Normalization
 Normalization is responsible for:
 - validating required fields
-- enforcing OpenJobsEU inclusion policy
+- enforcing source-specific structural and scope constraints
 - mapping raw payloads to the canonical job model
 - sanitizing source URL and location fields
-- rejecting non-compliant job offers
+- preparing data for downstream compliance resolution
 
 Normalization is source-specific, deterministic, and covered by automated tests.
