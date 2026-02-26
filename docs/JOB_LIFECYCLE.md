@@ -25,7 +25,9 @@ Jobs move through the following lifecycle states:
 - **EXPIRED** 
   Job confirmed unavailable or outdated after repeated failed verifications.
 
-From an API consumer perspective, **NEW and ACTIVE jobs are treated as visible**.
+From an API perspective:
+- `/jobs` with `status=visible` maps to **NEW + ACTIVE**
+- `/jobs/feed` uses visible jobs and additionally applies compliance-score filtering
 
 ---
 
@@ -55,6 +57,16 @@ Expired jobs are not deleted immediately and may be retained for audit or analyt
 - After multiple consecutive verification failures, a job transitions to **EXPIRED**.
 
 Lifecycle transitions are handled asynchronously by the availability worker and do not block ingestion or API access.
+
+---
+
+## Lifecycle vs compliance
+
+Lifecycle freshness and compliance quality are independent dimensions:
+- lifecycle controls recency/availability (`new`, `active`, `stale`, `expired`, `unreachable`)
+- compliance controls policy confidence (`approved`, `review`, `rejected`) with numeric score
+
+Public feed distribution combines both dimensions conservatively.
 
 ---
 

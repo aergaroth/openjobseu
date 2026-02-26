@@ -5,6 +5,7 @@ OpenJobsEU integrates **only legally accessible, public job data sources**.
 All sources are accessed in a **read-only** manner and processed through dedicated
 ingestion adapters. Raw data is never exposed directly — every job offer must pass
 through explicit normalization and validation before being persisted.
+Final compliance status is assigned in a dedicated compliance-resolution stage.
 
 ---
 
@@ -39,9 +40,9 @@ Notes:
 
 Notes:
 - Raw API payloads are fetched without modification
-- Normalization enforces OpenJobsEU policy:
+- Normalization enforces source-level scope constraints:
   - EU-wide or Worldwide only
-  - non-EU–restricted jobs are skipped
+  - non-Europe / non-worldwide location labels are skipped
 - `publication_date` is used as `first_seen_at` when available
 - URL and location fields are sanitized during normalization
 
@@ -54,12 +55,12 @@ Notes:
   https://remoteok.com/api
 - **Access:** Public, unauthenticated
 - **Legal basis:** Public API with explicit reuse allowance
-- **Scope:** Remote-first roles with EU / Worldwide filtering
+- **Scope:** Remote-first roles, normalized into `EU-wide` or `worldwide`
 
 Notes:
 - The first API element (metadata/legal notice) is ignored
 - Remaining entries are treated as job offers
-- Normalization filters and validates jobs explicitly
+- Normalization validates required fields and remote metadata
 - Source date (`date` / `epoch`) is used for `first_seen_at` when available
 - Source URL is sanitized before persistence
 
@@ -109,9 +110,14 @@ Adapters must not:
 Normalization is handled separately and is responsible for:
 
 - validating required fields
-- enforcing OpenJobsEU inclusion policy
+- enforcing source-specific structural and scope constraints
 - mapping raw payloads to the canonical job model
-- rejecting non-compliant job offers
+- preparing records for downstream compliance scoring
+
+Compliance resolution (separate worker stage) is responsible for:
+- deriving `remote_class` and `geo_class`
+- computing `compliance_status` and `compliance_score`
+- enabling feed-quality filtering (`/jobs/feed` uses score threshold)
 
 Normalization logic is:
 - source-specific
