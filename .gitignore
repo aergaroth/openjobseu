@@ -65,7 +65,7 @@ htmlcov/
 # Local data / scratch files
 data/
 *.log
-
+*.bak
 
 ################################
 # IDEs / Editors

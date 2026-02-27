@@ -1,7 +1,7 @@
 import re
 from collections import Counter, defaultdict
 from sqlalchemy import text
-from storage.db import get_engine
+from storage.db_engine import get_engine
 
 engine = get_engine()
 

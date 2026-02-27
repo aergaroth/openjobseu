@@ -9,7 +9,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
-from storage.db import get_engine
+from storage.db_engine import get_engine
 from app.workers.policy.v2.geo_classifier import classify_geo_scope
 
 engine = get_engine()
@@ -124,6 +124,44 @@ def init_db():
                 compliance_status TEXT,
                 compliance_score INTEGER
             );
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS companies (
+                company_id UUID PRIMARY KEY,
+                legal_name TEXT NOT NULL,
+                brand_name TEXT,
+                hq_country CHAR(2) NOT NULL,
+                hq_city TEXT,
+                eu_entity_verified BOOLEAN NOT NULL DEFAULT FALSE,
+                remote_posture TEXT NOT NULL,
+                CONSTRAINT remote_posture_check
+                    CHECK (remote_posture IN (
+                        'REMOTE_ONLY',
+                        'REMOTE_FRIENDLY',
+                        'UNKNOWN'
+                    )),
+                ats_provider TEXT,
+                ats_slug TEXT,
+                ats_api_url TEXT,
+                careers_url TEXT,
+                signal_score INTEGER NOT NULL DEFAULT 0,
+                signal_last_computed_at TIMESTAMPTZ,
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMPTZ NOT NULL,
+                updated_at TIMESTAMPTZ NOT NULL
+            );
+        """))
+        conn.execute(text("""
+            ALTER TABLE jobs
+            ADD COLUMN IF NOT EXISTS company_id UUID;
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_jobs_company_id
+            ON jobs(company_id);
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_companies_active
+            ON companies(is_active);
         """))
 
 

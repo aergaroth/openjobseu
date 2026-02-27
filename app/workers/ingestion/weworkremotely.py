@@ -7,8 +7,8 @@ from app.workers.normalization.weworkremotely import (
 )
 from app.workers.ingestion.log_helpers import log_ingestion
 from app.workers.policy.v1 import apply_policy_v1
-from storage.db import get_engine
-from storage.sqlite import upsert_job
+from storage.db_engine import get_engine
+from storage.db_logic import upsert_job
 
 SOURCE = "weworkremotely"
 

@@ -12,7 +12,7 @@ from app.utils.tick_formatting import format_tick_summary
 from app.workers.ingestion.registry import INGESTION_HANDLERS
 from app.workers.tick import run_tick
 from app.workers.tick_pipeline import run_tick_pipeline
-from storage.sqlite import get_jobs_audit
+from storage.db_logic import get_jobs_audit
 
 logger = logging.getLogger("openjobseu.runtime")
 

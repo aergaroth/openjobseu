@@ -2,8 +2,8 @@ from fastapi.testclient import TestClient
 
 import app.internal as internal_api
 from app.main import app
-from storage.sqlite import init_db, upsert_job
-from storage.db import get_engine
+from storage.db_logic import init_db, upsert_job
+from storage.db_engine import get_engine
 from sqlalchemy import text
 
 client = TestClient(app)
