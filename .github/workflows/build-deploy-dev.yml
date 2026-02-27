@@ -9,7 +9,8 @@ on:
       - "docs/**"
   pull_request:
     paths-ignore:
-      - "README.m
+      - "README.md"
+      - "docs/**"
 
 permissions:
   contents: read
