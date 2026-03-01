@@ -27,12 +27,13 @@ def test_apply_policy_v1_flags_job_without_rejecting():
     job = {
         "job_id": "remoteok:1",
         "title": "Senior PM",
-        "description": "100% remote but must be based in the US",
+        "description": "100% remote role",
+        "remote_scope": "US only, remote",
     }
 
-    assert apply_policy_v1(job, source="remoteok") == (job, "geo_restriction")
+    assert apply_policy_v1(job, source="remoteok") == (job, None)
     assert job["_compliance"]["policy_version"] == "v1"
-    assert job["_compliance"]["policy_reason"] == "geo_restriction"
+    assert job["_compliance"]["policy_reason"] is None
     assert job["_compliance"]["remote_model"] == "remote_but_geo_restricted"
 
 
@@ -55,7 +56,7 @@ def test_apply_policy_v1_calls_classifier_safely_when_fields_missing(monkeypatch
     monkeypatch.setattr(
         v1,
         "classify_remote_model",
-        lambda title, description: calls.append((title, description))
+        lambda title, description, remote_scope="": calls.append((title, description, remote_scope))
         or {"remote_model": "unknown"},
     )
 
@@ -64,7 +65,7 @@ def test_apply_policy_v1_calls_classifier_safely_when_fields_missing(monkeypatch
     }
 
     assert apply_policy_v1(job, source="remoteok") == (job, None)
-    assert calls == [("", "")]
+    assert calls == [("", "", "")]
     assert job["_compliance"] == {
         "policy_version": "v1",
         "policy_reason": None,
@@ -99,7 +100,8 @@ def test_ingestion_persists_policy_flagged_jobs(
     rejected_job = {
         "job_id": "x:1",
         "title": "Senior PM",
-        "description": "100% remote but must be based in the US",
+        "description": "100% remote role",
+        "remote_scope": "US only, remote",
     }
 
     persisted = []
@@ -123,10 +125,10 @@ def test_ingestion_persists_policy_flagged_jobs(
     assert result["metrics"]["fetched_count"] == 1
     assert result["metrics"]["normalized_count"] == 1
     assert result["metrics"]["accepted_count"] == 1
-    assert result["metrics"]["rejected_policy_count"] == 1
-    assert result["metrics"]["policy_rejected_total"] == 1
+    assert result["metrics"]["rejected_policy_count"] == 0
+    assert result["metrics"]["policy_rejected_total"] == 0
     assert result["metrics"]["policy_rejected_by_reason"]["non_remote"] == 0
-    assert result["metrics"]["policy_rejected_by_reason"]["geo_restriction"] == 1
+    assert result["metrics"]["policy_rejected_by_reason"]["geo_restriction"] == 0
     assert result["metrics"]["raw_count"] == 1
     assert result["metrics"]["persisted_count"] == 1
     assert result["metrics"]["skipped_count"] == 0
@@ -142,7 +144,8 @@ def test_ingestion_emits_single_summary_log(monkeypatch):
         "raw-2": {
             "job_id": "remoteok:2",
             "title": "Senior PM",
-            "description": "Remote but must be based in the US",
+            "description": "Remote role",
+            "remote_scope": "US only, remote",
         },
         "raw-3": {
             "job_id": "remoteok:3",
@@ -181,9 +184,9 @@ def test_ingestion_emits_single_summary_log(monkeypatch):
     assert summary["fetched"] == 3
     assert summary["normalized"] == 2
     assert summary["accepted"] == 2
-    assert summary["rejected_policy"] == 1
+    assert summary["rejected_policy"] == 0
     assert summary["rejected_non_remote"] == 0
-    assert summary["rejected_geo_restriction"] == 1
+    assert summary["rejected_geo_restriction"] == 0
     assert summary["duration_ms"] >= 0
 
     assert len(persisted) == 2
@@ -193,7 +196,7 @@ def test_ingestion_emits_single_summary_log(monkeypatch):
     assert result["metrics"]["fetched_count"] == 3
     assert result["metrics"]["normalized_count"] == 2
     assert result["metrics"]["accepted_count"] == 2
-    assert result["metrics"]["rejected_policy_count"] == 1
-    assert result["metrics"]["policy_rejected_total"] == 1
+    assert result["metrics"]["rejected_policy_count"] == 0
+    assert result["metrics"]["policy_rejected_total"] == 0
     assert result["metrics"]["policy_rejected_by_reason"]["non_remote"] == 0
-    assert result["metrics"]["policy_rejected_by_reason"]["geo_restriction"] == 1
+    assert result["metrics"]["policy_rejected_by_reason"]["geo_restriction"] == 0
