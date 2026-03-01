@@ -10,10 +10,32 @@ from sqlalchemy import text
 # environments.
 
 os.environ.setdefault("DB_MODE", "standard")
-os.environ.setdefault(
-    "DATABASE_URL",
-    "postgresql+psycopg://postgres:postgres@localhost:5432/testdb",
-)
+
+# SAFETY: be explicit about which database we're connecting to.  using
+# setdefault() is too permissive—if DATABASE_URL is already in the environment
+# pointing at production, we *must* detect that and refuse to run tests.
+# setdefault only sets the value if unset, so production URLs would slip through
+# and get truncated when tests run.
+_default_test_url = "postgresql+psycopg://postgres:postgres@localhost:5432/testdb"
+if "DATABASE_URL" not in os.environ:
+    os.environ["DATABASE_URL"] = _default_test_url
+else:
+    # DATABASE_URL is already set; verify it looks like a test database
+    # to prevent accidentally wiping production data.
+    db_url = os.environ["DATABASE_URL"]
+    safe_indicators = {
+        "localhost",
+        "127.0.0.1",
+        "testdb",
+        "test",
+        ":5432",  # default postgres port is unusual in prod, usually firewalled
+    }
+    if not any(ind in db_url for ind in safe_indicators):
+        raise RuntimeError(
+            f"DATABASE_URL does not appear to be a test database: {db_url}. "
+            "Refusing to run tests to avoid data loss. "
+            "Unset DATABASE_URL or point it at a test instance."
+        )
 
 # if any modules create an engine at import time we want it pointed at the
 # right database; grab it now so the fixture below can reset state easily.
