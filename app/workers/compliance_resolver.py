@@ -6,9 +6,12 @@ def _normalize_remote_class(remote_class: str | None) -> str:
     if value in {
         "remote_only",
         "remote_but_geo_restricted",
+        "remote_region_locked",
         "unknown",
         "non_remote",
     }:
+        if value == "remote_region_locked":
+            return "remote_but_geo_restricted"
         return value
     if value in {"office_first", "hybrid"}:
         return "non_remote"

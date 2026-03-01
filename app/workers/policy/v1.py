@@ -69,8 +69,9 @@ def apply_policy_v1(job: Optional[Dict], *, source: str) -> Tuple[Optional[Dict]
 
     try:
         classification = classify_remote_model(
-            str(job.get("title") or ""),
-            str(job.get("description") or ""),
+            title=str(job.get("title") or ""),
+            description=str(job.get("description") or ""),
+            remote_scope=str(job.get("remote_scope") or ""),
         )
         remote_model = classification.get("remote_model")
     except Exception:

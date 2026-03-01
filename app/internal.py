@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse
 
+from app.audit_filter_registry import get_audit_filter_registry
 from app.logging import should_use_text_logs
 from app.utils.tick_formatting import format_tick_summary
 from app.workers.ingestion.registry import INGESTION_HANDLERS
@@ -74,6 +75,11 @@ def audit_jobs(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/audit/filters")
+def audit_filter_registry():
+    return get_audit_filter_registry()
 
 
 @router.post("/audit/tick-dev")

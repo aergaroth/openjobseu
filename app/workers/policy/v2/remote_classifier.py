@@ -2,12 +2,13 @@ from typing import Dict, List
 
 
 NEGATIVE_STRONG = [
-    "we do not offer remote-only roles",
-    "office-first company",
-    "this role is based in",
-    "based in our",
-    "in-person collaboration",
     "relocation required",
+    "on-site",
+    "onsite",
+    "in-office",
+    "in office",
+    "this role is based in",
+    "full-time position in",
 ]
 
 HYBRID_SIGNALS = [
@@ -25,31 +26,38 @@ REMOTE_STRONG = [
     "work from anywhere",
 ]
 
-GEO_RESTRICT_REMOTE = [
-    "must be based in",
-    "must be located in",
-    "usa only",
-    "united states only",
+REMOTE_OPTIONAL_SIGNALS = [
+    "remote work options",
+    "flexible remote",
+    "possibility to work remotely",
+    "flexible working hours and remote",
 ]
-
 
 def _contains_any(text: str, keywords: List[str]) -> bool:
     return any(k in text for k in keywords)
 
+def is_region_locked(remote_scope: str | None) -> bool:
+    if not remote_scope:
+        return False
 
-def classify_remote_model(title: str, description: str) -> Dict:
-    """
-    Deterministic remote model classifier (Policy v2 - stage 1).
+    text = remote_scope.lower()
 
-    Does NOT enforce rejection.
-    Only classifies work model.
-    """
+    if "remote" not in text:
+        return False
 
+    cleaned = text.replace("remote", "").replace(",", "").strip()
+
+    return len(cleaned) > 0
+
+
+def classify_remote_model(title: str, description: str, remote_scope: str = "") -> Dict:
     title = (title or "").lower()
     description = (description or "").lower()
-    text = f"{title} {description}"
+    remote_scope = (remote_scope or "").lower()
+    text = f"{title} {description} {remote_scope}"
+    
 
-    # 1Hard negative first
+    # 1 Office first
     if _contains_any(text, NEGATIVE_STRONG):
         return {
             "remote_model": "office_first",
@@ -61,24 +69,32 @@ def classify_remote_model(title: str, description: str) -> Dict:
     if _contains_any(text, HYBRID_SIGNALS):
         return {
             "remote_model": "hybrid",
-            "confidence": 0.8,
+            "confidence": 0.85,
             "signals": ["hybrid_signal"],
         }
 
-    # 3 Remote but geo restricted
-    if _contains_any(text, REMOTE_STRONG) and _contains_any(text, GEO_RESTRICT_REMOTE):
+    # 3 Region-locked remote based on remote_scope
+    if is_region_locked(remote_scope):
         return {
             "remote_model": "remote_but_geo_restricted",
-            "confidence": 0.85,
-            "signals": ["remote_strong", "geo_restrict"],
+            "confidence": 0.8,
+            "signals": ["remote_scope_region_locked"],
         }
 
-    # 4 Strong remote
+    # 4 Fully remote
     if _contains_any(text, REMOTE_STRONG):
         return {
             "remote_model": "remote_only",
             "confidence": 0.9,
             "signals": ["remote_strong"],
+        }
+
+    # 5 Optional remote (benefit, not model)
+    if _contains_any(text, REMOTE_OPTIONAL_SIGNALS):
+        return {
+            "remote_model": "remote_optional",
+            "confidence": 0.7,
+            "signals": ["remote_optional"],
         }
 
     return {

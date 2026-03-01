@@ -53,6 +53,8 @@ def run_remoteok_ingestion() -> dict:
 
                 job, reason = apply_policy_v1(normalized_job, source=SOURCE)
                 model = normalized_job.get("_compliance", {}).get("remote_model", "unknown")
+                if model == "remote_region_locked":
+                    model = "remote_but_geo_restricted"
                 if model not in remote_model_counts:
                     model = "unknown"
                 remote_model_counts[model] += 1

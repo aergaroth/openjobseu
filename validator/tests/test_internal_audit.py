@@ -71,6 +71,18 @@ def test_internal_audit_page_renders_html():
     assert "Offer Audit Panel" in response.text
 
 
+def test_internal_audit_filter_registry():
+    response = client.get("/internal/audit/filters")
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["status"] == ["new", "active", "stale", "expired", "unreachable"]
+    assert "remote_but_geo_restricted" in payload["remote_class"]
+    assert "remote_region_locked" in payload["remote_class"]
+    assert "eu_explicit" in payload["geo_class"]
+    assert payload["compliance_status"] == ["approved", "review", "rejected"]
+
+
 def test_internal_audit_jobs_filters_and_counts():
     init_db()
     marker = "audit-panel-20260221"
