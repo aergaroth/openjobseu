@@ -1,3 +1,8 @@
+import os
+
+# guarantee that the database mode is configured even during module import.
+os.environ.setdefault("DB_MODE", "standard")
+
 from fastapi.testclient import TestClient
 
 import app.internal as internal_api

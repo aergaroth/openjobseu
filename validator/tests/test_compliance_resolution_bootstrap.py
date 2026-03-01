@@ -1,9 +1,28 @@
+import os
+
+# the test suite now runs against a real PostgreSQL instance.  a
+# `DATABASE_URL` should be configured either in the environment or by the
+# session fixture in `conftest.py`.  conftest also guarantees that the
+# database is cleared between tests so everything here can assume a clean
+# slate.
+#
+# note: we still ensure DB_MODE is defined early on; conftest sets a default
+# but importing here guards against other modules that might access the
+# engine during import time.
+os.environ.setdefault("DB_MODE", "standard")
+
 from app.workers.compliance_resolution import run_compliance_resolution_for_existing_db
-from storage.db_logic import init_db, upsert_job
+from storage import db_logic
+from storage.db_logic import upsert_job
 from storage.db_engine import get_engine
 from sqlalchemy import text
 
 engine = get_engine()
+
+# use the real initialization logic provided by the application; the
+# migrations are designed for PostgreSQL and will create the jobs table along
+# with any others the test needs.
+init_db = db_logic.init_db
 
 
 def _make_job(job_id: str, remote_scope: str, *, remote_source_flag: bool = True) -> dict:

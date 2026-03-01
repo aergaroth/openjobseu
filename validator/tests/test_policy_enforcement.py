@@ -3,6 +3,19 @@ from types import SimpleNamespace
 
 import pytest
 
+# most of the policy-enforcement helpers don't actually touch the database
+# when they're used within this module.  however some of the worker modules
+# they import do access `get_engine()` during import time, which in turn
+# requires `DB_MODE`/`DATABASE_URL` to be set.  the session-wide fixture in
+# `conftest.py` already makes sure those environment variables are present
+# and points at a testing PostgreSQL instance, so we don't have to do any
+# special stubbing here.
+import os
+os.environ.setdefault("DB_MODE", "standard")
+
+# ensure the engine can be constructed now that DB_MODE is known
+import storage.db_engine as _db_engine  # noqa: F401
+
 sys.modules.setdefault("feedparser", SimpleNamespace(parse=lambda *_args, **_kwargs: None))
 
 from app.workers.ingestion import remoteok, remotive, weworkremotely
@@ -71,6 +84,59 @@ def test_apply_policy_v1_calls_classifier_safely_when_fields_missing(monkeypatch
         "policy_reason": None,
         "remote_model": "unknown",
     }
+
+
+def test_apply_policy_v3_short_circuits_on_hard_geo(monkeypatch):
+    # ensure that hard geo detection takes priority over the v1 logic
+    # by patching apply_policy_v1 so it would raise if called
+    from app.workers.policy.v3 import apply_policy_v3 as v3module
+
+    def fake_v1(job, source):
+        raise RuntimeError("v1 should not be invoked when hard geo is detected")
+
+    monkeypatch.setattr(v3module, "apply_policy_v1", fake_v1)
+
+    # the remote classifier runs before the geo check; patch it to return a known value
+    monkeypatch.setattr(v3module, "classify_remote_model", lambda **_: {"remote_model": "remote_only"})
+
+    job = {
+        "title": "Backend Engineer",
+        "description": "This role is for US only candidates",
+        "remote_scope": "100% remote",
+    }
+
+    result_job, reason = v3module.apply_policy_v3(job.copy(), source="test")
+
+    # hard geo restriction should be detected and reason returned accordingly
+    assert reason == "geo_restriction_hard"
+    assert result_job is not None
+    assert result_job["_compliance"]["policy_version"] == "v3"
+    assert result_job["_compliance"]["policy_reason"] == "geo_restriction_hard"
+    # remote model was filled from the patched classifier
+    assert result_job["_compliance"]["remote_model"] == "remote_only"
+
+
+def test_apply_policy_v3_falls_back_to_v1(monkeypatch):
+    # when no hard geo restriction is present, apply_policy_v3 should delegate to v1
+    from app.workers.policy.v3 import apply_policy_v3 as v3module
+    calls = []
+
+    def fake_v1(job, source):
+        calls.append((job.copy(), source))
+        # return the job unmodified with no reason
+        return job, None
+
+    monkeypatch.setattr(v3module, "apply_policy_v1", fake_v1)
+
+    job = {"title": "Engineer", "description": "Fully remote role"}
+    result_job, reason = v3module.apply_policy_v3(job.copy(), source="test")
+
+    assert calls, "v1 should have been called when no hard geo restriction"
+    assert reason is None
+    # apply_policy_v3 tags the job with a v3 policy marker even when delegating
+    # to v1; ensure the returned job carries the v3 policy_version annotation.
+    assert result_job is not None
+    assert result_job.get("_compliance", {}).get("policy_version") == "v3"
 
 
 @pytest.mark.parametrize(
