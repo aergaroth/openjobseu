@@ -72,10 +72,7 @@ def _derive_geo_class(job: dict) -> str:
         if normalized != "unknown":
             return normalized
 
-    if policy_reason == "geo_restriction" or remote_model in {
-        "remote_but_geo_restricted",
-        "remote_region_locked",
-    }:
+    if policy_reason in {"geo_restriction", "geo_restriction_hard"}:
         return "non_eu"
 
     classifier_result = classify_geo_scope(
