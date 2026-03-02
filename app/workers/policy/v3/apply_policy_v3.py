@@ -1,67 +1,49 @@
 from typing import Tuple
 
-from app.workers.policy.v1 import apply_policy_v1
-from app.workers.policy.v2.remote_classifier import classify_remote_model
+from app.workers.policy.v3.remote_v3 import classify_remote_v3
+from app.workers.policy.v3.geo_v3 import classify_geo_v3
 from app.workers.policy.v3.hard_geo_detector import detect_hard_geo_restriction
-from app.workers.policy.v3.geo_classifier_v3 import classify_geo_from_remote_scope
 
 
 def apply_policy_v3(job: dict, source: str) -> Tuple[dict | None, str | None]:
-    """
-    V3 policy for employer ingestion only.
-
-    1. Hard geo restriction detection (title + description + remote_scope + metadata)
-    2. Immediate hard reject if detected
-    3. Fallback to V1 logic otherwise
-    """
 
     title = str(job.get("title") or "")
     description = str(job.get("description") or "")
     remote_scope = str(job.get("remote_scope") or "")
-    source_field = str(job.get("source") or "")
-    source_url = str(job.get("source_url") or "")
-    remote_model = "unknown"
 
-    try:
-        remote_model = str(
-            classify_remote_model(
-                title=title,
-                description=description,
-                remote_scope=remote_scope,
-            ).get("remote_model")
-            or "unknown"
-        )
-    except Exception:
-        remote_model = "unknown"
+    combined = f"{title} {description} {remote_scope}"
 
-    combined_text = " ".join(
-        [title, description, remote_scope, source_field, source_url]
-    )
-
-    # STEP 1 — Hard geo restriction
-    if detect_hard_geo_restriction(combined_text):
-        rejected_job = job.copy()
-        rejected_job["compliance_status"] = "rejected"
-        rejected_job["compliance_score"] = 0
-        rejected_job["_compliance"] = {
+    # 1 HARD GEO
+    if detect_hard_geo_restriction(combined):
+        job["_compliance"] = {
             "policy_version": "v3",
             "policy_reason": "geo_restriction_hard",
-            "remote_model": remote_model,
+            "remote_model": "unknown",
+            "geo_class": "non_eu",
         }
-        return rejected_job, "geo_restriction_hard"
+        return job, "geo_restriction_hard"
 
-    # STEP 2 — Fallback to existing logic
-    geo_result = classify_geo_from_remote_scope(remote_scope)
+    # 2 Remote classification
+    remote_result = classify_remote_v3(
+        title=title,
+        description=description,
+        remote_scope=remote_scope,
+    )
 
-    job["_geo_v3"] = geo_result  # debug/info only
-    job["geo_class"] = geo_result["classification"]
-    
-    job_after_v1, reason = apply_policy_v1(job, source=source)
+    # 3 Geo classification
+    geo_result = classify_geo_v3(
+        title=title,
+        description=description,
+        remote_scope=remote_scope,
+    )
 
-    if job_after_v1 is None:
-        return None, reason
+    job["_compliance"] = {
+        "policy_version": "v3",
+        "policy_reason": None,
+        "remote_model": remote_result["remote_model"],
+        "geo_class": geo_result["geo_class"],
+        "remote_reason": remote_result["reason"],
+        "geo_reason": geo_result["reason"],
+    }
 
-    job_after_v1["_compliance"] = job_after_v1.get("_compliance", {})
-    job_after_v1["_compliance"]["policy_version"] = "v3"
-
-    return job_after_v1, reason
+    return job, None
