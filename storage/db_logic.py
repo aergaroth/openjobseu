@@ -29,7 +29,7 @@ def _derive_remote_class(job: dict) -> str:
     mapping = {
         "remote_only": "remote_only",
         "remote_but_geo_restricted": "remote_but_geo_restricted",
-        "remote_region_locked": "remote_but_geo_restricted",
+        "remote_region_locked": "remote_region_locked",
         "hybrid": "non_remote",
         "office_first": "non_remote",
         "non_remote": "non_remote",
