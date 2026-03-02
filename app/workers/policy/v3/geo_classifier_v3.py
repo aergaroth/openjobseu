@@ -20,6 +20,37 @@ def classify_geo_from_remote_scope(remote_scope: str) -> Dict:
       - isos: list of discovered ISO codes (lowercase)
       - eu_isos: list of ISO codes identified as EU members
     """
+    REGION_KEYWORDS = [
+    "western europe",
+    "europe",
+    "eu",
+    "european union",
+    "eea",
+    "european economic area",
+    "eu/eea",
+    "eu and eea",
+    "eu/eea region",
+    "eu/eea countries",
+    "eu/eea member states",
+    "eu/eea region",
+    "eu/eea area",
+    "eu/eea zone",
+    "eu/eea territory",
+    "eu/eea jurisdiction",
+    "eu/eea market",]
+
+    lower_scope = remote_scope.lower()
+
+    for kw in REGION_KEYWORDS:
+        if kw in lower_scope:
+            return {
+                "classification": "eu_region",
+                "isos": [],
+                "eu_isos": [],
+            }
+
+
+
     if not remote_scope:
         return {"classification": "unknown", "isos": [], "eu_isos": []}
 
