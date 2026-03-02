@@ -57,6 +57,11 @@ def _normalize_geo_class_value(value: str | None) -> str:
 
 
 def _derive_geo_class(job: dict) -> str:
+    
+    explicit_geo = job.get("geo_class")
+    if explicit_geo:
+        return explicit_geo
+
     compliance = job.get("_compliance")
     policy_reason = ""
     remote_model = ""
@@ -248,6 +253,7 @@ def upsert_job(job: dict, conn: Connection | None = None, *, company_id: str | N
     first_seen_at = job.get("first_seen_at") or now
     remote_class = _derive_remote_class(job)
     geo_class = _derive_geo_class(job)
+    
     target_conn = _require_open_conn(conn, op_name="upsert_job")
     _upsert_job_in_conn(
         target_conn,
