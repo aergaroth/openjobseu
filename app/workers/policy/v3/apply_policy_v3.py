@@ -3,6 +3,7 @@ from typing import Tuple
 from app.workers.policy.v1 import apply_policy_v1
 from app.workers.policy.v2.remote_classifier import classify_remote_model
 from app.workers.policy.v3.hard_geo_detector import detect_hard_geo_restriction
+from app.workers.policy.v3.geo_classifier_v3 import classify_geo_from_remote_scope
 
 
 def apply_policy_v3(job: dict, source: str) -> Tuple[dict | None, str | None]:
@@ -50,6 +51,11 @@ def apply_policy_v3(job: dict, source: str) -> Tuple[dict | None, str | None]:
         return rejected_job, "geo_restriction_hard"
 
     # STEP 2 — Fallback to existing logic
+    geo_result = classify_geo_from_remote_scope(remote_scope)
+
+    job["_geo_v3"] = geo_result  # debug/info only
+    job["geo_class"] = geo_result["classification"]
+    
     job_after_v1, reason = apply_policy_v1(job, source=source)
 
     if job_after_v1 is None:
