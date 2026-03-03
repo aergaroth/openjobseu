@@ -60,5 +60,9 @@ jobs:
             sleep 1
           done
 
+      - name: Initialize schema
+        run: |
+          python -c "from storage.db_logic import init_db; init_db()"
+
       - name: Run tests
         run: pytest -q
