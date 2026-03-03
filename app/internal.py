@@ -113,11 +113,17 @@ def run_tick_dev_script():
 
 
 @router.post("/tick")
-def manual_tick():
-    return tick()
+def manual_tick(
+    response_format: str = Query(
+        "auto",
+        alias="format",
+        pattern="^(auto|text|json)$",
+    ),
+):
+    return tick(response_format=response_format)
 
 
-def tick():
+def tick(*, response_format: str = "auto"):
     ingestion_mode = os.getenv("INGESTION_MODE", "prod")
 
     raw_sources = os.getenv("INGESTION_SOURCES")
@@ -153,7 +159,8 @@ def tick():
         **result,
     }
 
-    if should_use_text_logs():
+    render_mode = (response_format or "auto").strip().lower()
+    if render_mode == "text" or (render_mode == "auto" and should_use_text_logs()):
         return Response(
             content=format_tick_summary(payload),
             media_type="text/plain",

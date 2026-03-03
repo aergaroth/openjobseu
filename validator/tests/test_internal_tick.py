@@ -149,3 +149,33 @@ def test_tick_passes_unknown_source_to_pipeline(monkeypatch, pipeline_spy, local
         data = response.json()
         assert data["sources"] == ["weworkremotely", "unknown"]
         assert "metrics" in data
+
+
+def test_tick_forces_text_output_with_query_param(monkeypatch, pipeline_spy, local_spy):
+    monkeypatch.setenv("INGESTION_MODE", "prod")
+    monkeypatch.setenv("INGESTION_SOURCES", "remotive")
+    monkeypatch.setattr(internal, "should_use_text_logs", lambda: False)
+
+    response = client.post("/internal/tick?format=text")
+
+    assert response.status_code == 200
+    assert len(pipeline_spy) == 1
+    assert len(local_spy) == 0
+    assert _is_text_response(response)
+    assert "Tick finished (prod)" in response.text
+
+
+def test_tick_forces_json_output_with_query_param(monkeypatch, pipeline_spy, local_spy):
+    monkeypatch.setenv("INGESTION_MODE", "prod")
+    monkeypatch.setenv("INGESTION_SOURCES", "remotive")
+    monkeypatch.setattr(internal, "should_use_text_logs", lambda: True)
+
+    response = client.post("/internal/tick?format=json")
+
+    assert response.status_code == 200
+    assert len(pipeline_spy) == 1
+    assert len(local_spy) == 0
+    assert not _is_text_response(response)
+    data = response.json()
+    assert data["mode"] == "prod"
+    assert data["sources"] == ["remotive"]

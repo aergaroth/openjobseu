@@ -37,7 +37,7 @@ append_candidate "$FIXED_CLOUD_RUN_URL"
 append_candidate "$LOCAL_URL"
 
 for base_url in $CANDIDATES; do
-  if curl -fsS -X POST "${base_url}/internal/tick"; then
+  if curl -fsS -X POST "${base_url}/internal/tick?format=text"; then
     exit 0
   fi
 done

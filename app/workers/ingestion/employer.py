@@ -59,6 +59,7 @@ def ingest_company(company: dict):
         )
         return {
             "fetched": 0,
+            "normalized_count": 0,
             "accepted": 0,
             "skipped": 0,
             "error": "unsupported_ats_provider",
@@ -80,6 +81,7 @@ def ingest_company(company: dict):
         )
         return {
             "fetched": 0,
+            "normalized_count": 0,
             "accepted": 0,
             "skipped": 0,
             "error": "invalid_ats_slug" if status_code == 404 else "fetch_failed",
@@ -96,6 +98,7 @@ def ingest_company(company: dict):
         )
         return {
             "fetched": 0,
+            "normalized_count": 0,
             "accepted": 0,
             "skipped": 0,
             "error": "fetch_network_failed",
@@ -112,6 +115,7 @@ def ingest_company(company: dict):
         )
         return {
             "fetched": 0,
+            "normalized_count": 0,
             "accepted": 0,
             "skipped": 0,
             "error": "fetch_failed",
@@ -119,12 +123,14 @@ def ingest_company(company: dict):
     except Exception:
         return {
             "fetched": 0,
+            "normalized_count": 0,
             "accepted": 0,
             "skipped": 0,
             "error": "fetch_failed",
         }
 
     engine = get_engine()
+    normalized_count = 0
     accepted = 0
     skipped = 0
     rejected_policy_count = 0
@@ -150,6 +156,7 @@ def ingest_company(company: dict):
                     if not normalized:
                         skipped += 1
                         continue
+                    normalized_count += 1
 
                     job, reason = apply_policy_v3(
                         normalized,
@@ -196,6 +203,7 @@ def ingest_company(company: dict):
     except Exception:
         return {
             "fetched": len(raw_jobs),
+            "normalized_count": normalized_count,
             "accepted": 0,
             "skipped": 0,
             "error": "transaction_failed",
@@ -203,6 +211,7 @@ def ingest_company(company: dict):
 
     return {
         "fetched": len(raw_jobs),
+        "normalized_count": normalized_count,
         "accepted": accepted,
         "skipped": skipped,
         "rejected_policy_count": rejected_policy_count,
@@ -221,6 +230,7 @@ def run_employer_ingestion() -> dict:
     companies_failed = 0
     companies_invalid_slug = 0
     total_fetched = 0
+    total_normalized = 0
     total_skipped = 0
     total_accepted = 0
     total_rejected_policy = 0
@@ -252,6 +262,7 @@ def run_employer_ingestion() -> dict:
                 continue
 
             total_fetched += int(result.get("fetched", 0) or 0)
+            total_normalized += int(result.get("normalized_count", 0) or 0)
             total_accepted += result["accepted"]
             total_skipped += int(result.get("skipped", 0) or 0)
             total_rejected_policy += int(result.get("rejected_policy_count", 0) or 0)
@@ -272,7 +283,11 @@ def run_employer_ingestion() -> dict:
     return {
         "actions": ["employer_ingestion_completed"],
         "metrics": {
+            "source": "employer_ing",
             "status": "ok",
+            "fetched_count": total_fetched,
+            "normalized_count": total_normalized,
+            "accepted_count": total_accepted,
             "raw_count": total_fetched,
             "persisted_count": total_accepted,
             "skipped_count": total_skipped,

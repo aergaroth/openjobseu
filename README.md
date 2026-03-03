@@ -171,6 +171,29 @@ Ingestion runtime:
 - `INGESTION_MODE=local` (dev-only local JSON source)
 - optional: `INGESTION_SOURCES=remotive,remoteok,weworkremotely`
 
+### Internal tick endpoint
+
+Manual tick trigger:
+
+- `POST /internal/tick`
+- optional query param: `format=auto|text|json` (default: `auto`)
+
+Formatting behavior:
+
+- `format=auto`: text in local runtime, JSON in container/cloud runtime
+- `format=text`: forces the tabular text summary (same layout on localhost and Cloud Run)
+- `format=json`: forces JSON payload
+
+Examples:
+
+```bash
+# same human-readable tick summary everywhere (Cloud Run/local)
+curl -X POST "http://127.0.0.1:8000/internal/tick?format=text"
+
+# force JSON response
+curl -X POST "http://127.0.0.1:8000/internal/tick?format=json"
+```
+
 ---
 
 ## License

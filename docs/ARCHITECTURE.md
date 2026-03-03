@@ -128,7 +128,7 @@ Endpoints:
 Only visible jobs (NEW and ACTIVE) are exposed to consumers.
 
 Internal operational endpoints:
-- POST /internal/tick
+- POST /internal/tick (`format=auto|text|json`, default `auto`)
 - GET /internal/audit
 - GET /internal/audit/jobs
 - POST /internal/audit/tick-dev
@@ -179,6 +179,9 @@ The smoke check validates:
 - database accessibility and integrity
 - job_id uniqueness
 - basic feed consistency
+
+For manual runtime checks, `/internal/tick?format=text` can be used to force
+the same tabular summary format in both localhost and Cloud Run environments.
 
 When integrated in CI/CD, any failure should block deployment and require investigation.
 
