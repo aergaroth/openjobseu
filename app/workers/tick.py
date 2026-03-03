@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import logging
 from time import perf_counter
 
+from app.domain.classification.enums import RemoteClass
 from ingestion.loaders.local_json import load_local_jobs
 from app.workers.post_ingestion import run_post_ingestion
 
@@ -54,10 +55,10 @@ def run_tick():
                 "persisted_count": 0,
                 "skipped_count": 0,
                 "remote_model_totals": {
-                    "remote_only": 0,
+                    RemoteClass.REMOTE_ONLY.value: 0,
                     "remote_but_geo_restricted": 0,
-                    "non_remote": 0,
-                    "unknown": 0,
+                    RemoteClass.NON_REMOTE.value: 0,
+                    RemoteClass.UNKNOWN.value: 0,
                 },
                 "per_source": {
                     "local": {
@@ -68,21 +69,21 @@ def run_tick():
                         "policy": {
                             "rejected_total": 0,
                             "by_reason": {
-                                "non_remote": 0,
+                                RemoteClass.NON_REMOTE.value: 0,
                                 "geo_restriction": 0,
                             },
                         },
                         "remote_model": {
-                            "remote_only": 0,
+                            RemoteClass.REMOTE_ONLY.value: 0,
                             "remote_but_geo_restricted": 0,
-                            "non_remote": 0,
-                            "unknown": 0,
+                            RemoteClass.NON_REMOTE.value: 0,
+                            RemoteClass.UNKNOWN.value: 0,
                         },
                         "remote_model_counts": {
-                            "remote_only": 0,
+                            RemoteClass.REMOTE_ONLY.value: 0,
                             "remote_but_geo_restricted": 0,
-                            "non_remote": 0,
-                            "unknown": 0,
+                            RemoteClass.NON_REMOTE.value: 0,
+                            RemoteClass.UNKNOWN.value: 0,
                         },
                         "duration_ms": source_duration_ms,
                     }

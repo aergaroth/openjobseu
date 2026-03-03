@@ -1,5 +1,6 @@
 from typing import Dict, Optional, Tuple
 
+from app.domain.classification.enums import RemoteClass
 from app.workers.policy.v2.remote_classifier import classify_remote_model
 
 
@@ -47,7 +48,7 @@ def evaluate_policy(job: Dict) -> Tuple[bool, Optional[str]]:
 
     # Remote purity check
     if contains_any(full_text, NON_REMOTE_KEYWORDS):
-        return False, "non_remote"
+        return False, RemoteClass.NON_REMOTE.value
 
     # Geo restriction check
     if contains_any(full_text, GEO_RESTRICT_KEYWORDS):
@@ -75,7 +76,7 @@ def apply_policy_v1(job: Optional[Dict], *, source: str) -> Tuple[Optional[Dict]
         )
         remote_model = classification.get("remote_model")
     except Exception:
-        remote_model = "unknown"
+        remote_model = RemoteClass.UNKNOWN.value
 
     job["_compliance"] = {
         "policy_version": "v1",

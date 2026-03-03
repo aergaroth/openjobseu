@@ -1,4 +1,5 @@
 from app.workers.ingestion import employer
+from app.domain.classification.enums import RemoteClass
 
 
 class _NoopConnectCtx:
@@ -31,14 +32,14 @@ def test_run_employer_ingestion_reports_standardized_metrics(monkeypatch):
                 "skipped": 1,
                 "rejected_policy_count": 1,
                 "rejected_by_reason": {
-                    "non_remote": 1,
+                    RemoteClass.NON_REMOTE.value: 1,
                     "geo_restriction": 0,
                 },
                 "remote_model_counts": {
-                    "remote_only": 2,
+                    RemoteClass.REMOTE_ONLY.value: 2,
                     "remote_but_geo_restricted": 1,
-                    "non_remote": 1,
-                    "unknown": 0,
+                    RemoteClass.NON_REMOTE.value: 1,
+                    RemoteClass.UNKNOWN.value: 0,
                 },
                 "hard_geo_rejected_count": 0,
             },
@@ -68,13 +69,13 @@ def test_run_employer_ingestion_reports_standardized_metrics(monkeypatch):
     assert metrics["persisted_count"] == 3
     assert metrics["skipped_count"] == 1
     assert metrics["policy_rejected_total"] == 1
-    assert metrics["policy_rejected_by_reason"]["non_remote"] == 1
+    assert metrics["policy_rejected_by_reason"][RemoteClass.NON_REMOTE.value] == 1
     assert metrics["policy_rejected_by_reason"]["geo_restriction"] == 0
     assert metrics["remote_model_counts"] == {
-        "remote_only": 2,
+        RemoteClass.REMOTE_ONLY.value: 2,
         "remote_but_geo_restricted": 1,
-        "non_remote": 1,
-        "unknown": 0,
+        RemoteClass.NON_REMOTE.value: 1,
+        RemoteClass.UNKNOWN.value: 0,
     }
     assert metrics["companies_processed"] == 2
     assert metrics["companies_failed"] == 1

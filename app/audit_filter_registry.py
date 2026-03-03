@@ -1,5 +1,7 @@
 from typing import Dict, List
 
+from app.domain.classification.enums import ComplianceStatus, GeoClass, RemoteClass
+
 # Canonical filter values used by the internal audit panel.
 AUDIT_FILTER_REGISTRY: Dict[str, List[str]] = {
     "status": [
@@ -10,25 +12,25 @@ AUDIT_FILTER_REGISTRY: Dict[str, List[str]] = {
         "unreachable",
     ],
     "remote_class": [
-        "remote_only",
+        RemoteClass.REMOTE_ONLY.value,
         "remote_but_geo_restricted",
-        "non_remote",
-        "unknown",
+        RemoteClass.NON_REMOTE.value,
+        RemoteClass.UNKNOWN.value,
         # Backward-compatibility alias still present in some historical rows.
-        "remote_region_locked",
+        RemoteClass.REMOTE_REGION_LOCKED.value,
     ],
     "geo_class": [
-        "eu_member_state",
-        "eu_explicit",
-        "eu_region",
-        "uk",
-        "non_eu",
-        "unknown",
+        GeoClass.EU_MEMBER_STATE.value,
+        GeoClass.EU_EXPLICIT.value,
+        GeoClass.EU_REGION.value,
+        GeoClass.UK.value,
+        GeoClass.NON_EU.value,
+        GeoClass.UNKNOWN.value,
     ],
     "compliance_status": [
-        "approved",
-        "review",
-        "rejected",
+        ComplianceStatus.APPROVED.value,
+        ComplianceStatus.REVIEW.value,
+        ComplianceStatus.REJECTED.value,
     ],
 }
 

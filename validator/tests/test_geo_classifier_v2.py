@@ -1,3 +1,4 @@
+from app.domain.classification.enums import GeoClass
 from app.workers.policy.v2.geo_classifier import classify_geo_scope
 
 
@@ -6,7 +7,7 @@ def test_eu_explicit():
         "Backend Engineer",
         "Remote within European Union only",
     )
-    assert result["geo_class"] == "eu_explicit"
+    assert result["geo_class"] == GeoClass.EU_EXPLICIT.value
 
 
 def test_eu_member_state():
@@ -14,7 +15,7 @@ def test_eu_member_state():
         "Backend Engineer",
         "This role is remote in Poland",
     )
-    assert result["geo_class"] == "eu_member_state"
+    assert result["geo_class"] == GeoClass.EU_MEMBER_STATE.value
 
 
 def test_non_eu():
@@ -22,7 +23,7 @@ def test_non_eu():
         "Backend Engineer",
         "Remote – USA only",
     )
-    assert result["geo_class"] == "non_eu"
+    assert result["geo_class"] == GeoClass.NON_EU.value
 
 
 def test_us_hard_phrases_non_eu():
@@ -30,7 +31,7 @@ def test_us_hard_phrases_non_eu():
         "Backend Engineer",
         "Remote US, must live in the US, US-based only",
     )
-    assert result["geo_class"] == "non_eu"
+    assert result["geo_class"] == GeoClass.NON_EU.value
 
 
 def test_canada_hard_signal_non_eu():
@@ -38,7 +39,7 @@ def test_canada_hard_signal_non_eu():
         "Backend Engineer",
         "Remote in Canada only",
     )
-    assert result["geo_class"] == "non_eu"
+    assert result["geo_class"] == GeoClass.NON_EU.value
 
 
 def test_apac_signal_non_eu():
@@ -46,7 +47,7 @@ def test_apac_signal_non_eu():
         "Backend Engineer",
         "Open to APAC candidates",
     )
-    assert result["geo_class"] == "non_eu"
+    assert result["geo_class"] == GeoClass.NON_EU.value
 
 
 def test_us_states_three_abbreviations_non_eu():
@@ -54,7 +55,7 @@ def test_us_states_three_abbreviations_non_eu():
         "Backend Engineer",
         "Applicants can be based in CA, NY, TX",
     )
-    assert result["geo_class"] == "non_eu"
+    assert result["geo_class"] == GeoClass.NON_EU.value
 
 
 def test_worldwide_is_unknown():
@@ -62,7 +63,7 @@ def test_worldwide_is_unknown():
         "Backend Engineer",
         "Fully remote worldwide",
     )
-    assert result["geo_class"] == "unknown"
+    assert result["geo_class"] == GeoClass.UNKNOWN.value
 
 
 def test_uk():
@@ -70,7 +71,7 @@ def test_uk():
         "Backend Engineer",
         "London office",
     )
-    assert result["geo_class"] == "uk"
+    assert result["geo_class"] == GeoClass.UK.value
 
 
 def test_unknown():
@@ -78,4 +79,4 @@ def test_unknown():
         "Backend Engineer",
         "Some vague description without geo info",
     )
-    assert result["geo_class"] == "unknown"
+    assert result["geo_class"] == GeoClass.UNKNOWN.value

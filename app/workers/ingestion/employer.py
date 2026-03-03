@@ -5,6 +5,7 @@ from time import perf_counter
 import requests
 from sqlalchemy import text
 
+from app.domain.classification.enums import RemoteClass
 from storage.db_engine import get_engine
 from storage.db_logic import upsert_job
 
@@ -19,13 +20,13 @@ SOURCE = "employer_ing"
 
 def _normalize_remote_model_for_metrics(remote_model: str | None) -> str:
     model = (remote_model or "").strip().lower()
-    if model == "remote_only":
-        return "remote_only"
-    if model in {"remote_region_locked", "remote_but_geo_restricted"}:
+    if model == RemoteClass.REMOTE_ONLY.value:
+        return RemoteClass.REMOTE_ONLY.value
+    if model in {RemoteClass.REMOTE_REGION_LOCKED.value, "remote_but_geo_restricted"}:
         return "remote_but_geo_restricted"
     if model in {"office_first", "hybrid"}:
-        return "non_remote"
-    return "unknown"
+        return RemoteClass.NON_REMOTE.value
+    return RemoteClass.UNKNOWN.value
 
 
 def load_active_ats_companies(conn):
@@ -138,14 +139,14 @@ def ingest_company(company: dict):
     rejected_policy_count = 0
     hard_geo_rejected_count = 0
     rejected_by_reason = {
-        "non_remote": 0,
+        RemoteClass.NON_REMOTE.value: 0,
         "geo_restriction": 0,
     }
     remote_model_counts = {
-        "remote_only": 0,
+        RemoteClass.REMOTE_ONLY.value: 0,
         "remote_but_geo_restricted": 0,
-        "non_remote": 0,
-        "unknown": 0,
+        RemoteClass.NON_REMOTE.value: 0,
+        RemoteClass.UNKNOWN.value: 0,
     }
 
     try:
@@ -239,14 +240,14 @@ def run_employer_ingestion() -> dict:
     total_accepted = 0
     total_rejected_policy = 0
     rejected_by_reason = {
-        "non_remote": 0,
+        RemoteClass.NON_REMOTE.value: 0,
         "geo_restriction": 0,
     }
     remote_model_counts = {
-        "remote_only": 0,
+        RemoteClass.REMOTE_ONLY.value: 0,
         "remote_but_geo_restricted": 0,
-        "non_remote": 0,
-        "unknown": 0,
+        RemoteClass.NON_REMOTE.value: 0,
+        RemoteClass.UNKNOWN.value: 0,
     }
     total_hard_geo_rejected = 0
 
@@ -282,7 +283,9 @@ def run_employer_ingestion() -> dict:
                 total_skipped += int(result.get("skipped", 0) or 0)
                 total_rejected_policy += int(result.get("rejected_policy_count", 0) or 0)
                 source_reasons = result.get("rejected_by_reason", {}) or {}
-                rejected_by_reason["non_remote"] += int(source_reasons.get("non_remote", 0) or 0)
+                rejected_by_reason[RemoteClass.NON_REMOTE.value] += int(
+                    source_reasons.get(RemoteClass.NON_REMOTE.value, 0) or 0
+                )
                 rejected_by_reason["geo_restriction"] += int(source_reasons.get("geo_restriction", 0) or 0)
                 source_remote_model = result.get("remote_model_counts", {}) or {}
                 for key in remote_model_counts:
@@ -304,7 +307,7 @@ def run_employer_ingestion() -> dict:
             persisted=total_accepted,
             skipped=total_skipped,
             rejected_policy=total_rejected_policy,
-            rejected_non_remote=rejected_by_reason["non_remote"],
+            rejected_non_remote=rejected_by_reason[RemoteClass.NON_REMOTE.value],
             rejected_geo_restriction=rejected_by_reason["geo_restriction"],
             remote_model_counts=remote_model_counts.copy(),
             companies_processed=total_companies,
@@ -326,7 +329,7 @@ def run_employer_ingestion() -> dict:
         normalized=total_normalized,
         accepted=total_accepted,
         rejected_policy=total_rejected_policy,
-        rejected_non_remote=rejected_by_reason["non_remote"],
+        rejected_non_remote=rejected_by_reason[RemoteClass.NON_REMOTE.value],
         rejected_geo_restriction=rejected_by_reason["geo_restriction"],
         remote_model_counts=remote_model_counts.copy(),
         companies_processed=total_companies,

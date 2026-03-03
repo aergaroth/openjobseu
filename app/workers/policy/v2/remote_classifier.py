@@ -1,5 +1,6 @@
 from typing import Dict, List
 
+from app.domain.classification.enums import RemoteClass
 
 NEGATIVE_STRONG = [
     "relocation required",
@@ -84,7 +85,7 @@ def classify_remote_model(title: str, description: str, remote_scope: str = "") 
     # 4 Fully remote
     if _contains_any(text, REMOTE_STRONG):
         return {
-            "remote_model": "remote_only",
+            "remote_model": RemoteClass.REMOTE_ONLY.value,
             "confidence": 0.9,
             "signals": ["remote_strong"],
         }
@@ -92,13 +93,13 @@ def classify_remote_model(title: str, description: str, remote_scope: str = "") 
     # 5 Optional remote (benefit, not model)
     if _contains_any(text, REMOTE_OPTIONAL_SIGNALS):
         return {
-            "remote_model": "remote_optional",
+            "remote_model": RemoteClass.REMOTE_OPTIONAL.value,
             "confidence": 0.7,
-            "signals": ["remote_optional"],
+            "signals": [RemoteClass.REMOTE_OPTIONAL.value],
         }
 
     return {
-        "remote_model": "unknown",
+        "remote_model": RemoteClass.UNKNOWN.value,
         "confidence": 0.3,
         "signals": [],
     }

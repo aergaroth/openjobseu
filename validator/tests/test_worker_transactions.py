@@ -1,6 +1,7 @@
 import ast
 from pathlib import Path
 
+from app.domain.classification.enums import ComplianceStatus, GeoClass, RemoteClass
 from app.workers import availability, compliance_resolution, lifecycle
 
 
@@ -76,8 +77,16 @@ def test_availability_pipeline_uses_single_transaction_conn(monkeypatch):
 
 def test_compliance_resolution_uses_single_transaction_conn(monkeypatch):
     jobs = [
-        {"job_id": "j1", "remote_class": "remote_only", "geo_class": "eu_region"},
-        {"job_id": "j2", "remote_class": "unknown", "geo_class": "uk"},
+        {
+            "job_id": "j1",
+            "remote_class": RemoteClass.REMOTE_ONLY.value,
+            "geo_class": GeoClass.EU_REGION.value,
+        },
+        {
+            "job_id": "j2",
+            "remote_class": RemoteClass.UNKNOWN.value,
+            "geo_class": GeoClass.UK.value,
+        },
     ]
     seen_conn_ids = []
 
@@ -98,7 +107,7 @@ def test_compliance_resolution_uses_single_transaction_conn(monkeypatch):
 
     def _fake_update(*, updates, conn=None):
         assert len(updates) == 2
-        assert all(item["compliance_status"] == "review" for item in updates)
+        assert all(item["compliance_status"] == ComplianceStatus.REVIEW.value for item in updates)
         assert all(item["compliance_score"] == 65 for item in updates)
         seen_conn_ids.extend([id(conn)] * len(updates))
 

@@ -1,3 +1,4 @@
+from app.domain.classification.enums import RemoteClass
 from app.workers.policy.v2.remote_classifier import classify_remote_model
 
 
@@ -6,7 +7,7 @@ def test_detects_remote_only():
         "Backend Engineer",
         "This is a fully remote role. 100% remote.",
     )
-    assert result["remote_model"] == "remote_only"
+    assert result["remote_model"] == RemoteClass.REMOTE_ONLY.value
 
 
 def test_detects_hybrid():
@@ -39,4 +40,4 @@ def test_unknown_when_no_signal():
         "Account Manager",
         "Great opportunity in our growing company.",
     )
-    assert result["remote_model"] == "unknown"
+    assert result["remote_model"] == RemoteClass.UNKNOWN.value

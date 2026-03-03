@@ -1,3 +1,6 @@
+from app.domain.classification.enums import RemoteClass
+
+
 def format_tick_summary(payload: dict) -> str:
     metrics = payload.get("metrics", {})
     ingestion = metrics.get("ingestion", {})
@@ -32,12 +35,12 @@ def format_tick_summary(payload: dict) -> str:
         raw = data.get("raw_count", 0)
         accepted = data.get("persisted_count", 0)
         rejected = policy.get("rejected_total", 0)
-        non_remote = reasons.get("non_remote", 0)
+        non_remote = reasons.get(RemoteClass.NON_REMOTE.value, 0)
         geo_restriction = reasons.get("geo_restriction", 0)
         remote_model = data.get("remote_model") or data.get("remote_model_counts") or {}
-        remote_only = remote_model.get("remote_only", 0)
+        remote_only = remote_model.get(RemoteClass.REMOTE_ONLY.value, 0)
         remote_geo_restricted = remote_model.get("remote_but_geo_restricted", 0)
-        remote_unknown = remote_model.get("unknown", 0)
+        remote_unknown = remote_model.get(RemoteClass.UNKNOWN.value, 0)
         duration = data.get("duration_ms", 0)
 
         rej_percent = (rejected / raw * 100) if raw else 0.0

@@ -6,6 +6,7 @@ os.environ.setdefault("DB_MODE", "standard")
 from fastapi.testclient import TestClient
 
 import app.internal as internal_api
+from app.domain.classification.enums import ComplianceStatus, GeoClass, RemoteClass
 from app.main import app
 from storage.db_logic import init_db, upsert_job
 from storage.db_engine import get_engine
@@ -83,9 +84,13 @@ def test_internal_audit_filter_registry():
 
     assert payload["status"] == ["new", "active", "stale", "expired", "unreachable"]
     assert "remote_but_geo_restricted" in payload["remote_class"]
-    assert "remote_region_locked" in payload["remote_class"]
-    assert "eu_explicit" in payload["geo_class"]
-    assert payload["compliance_status"] == ["approved", "review", "rejected"]
+    assert RemoteClass.REMOTE_REGION_LOCKED.value in payload["remote_class"]
+    assert GeoClass.EU_EXPLICIT.value in payload["geo_class"]
+    assert payload["compliance_status"] == [
+        ComplianceStatus.APPROVED.value,
+        ComplianceStatus.REVIEW.value,
+        ComplianceStatus.REJECTED.value,
+    ]
 
 
 def test_internal_audit_jobs_filters_and_counts():
@@ -124,24 +129,24 @@ def test_internal_audit_jobs_filters_and_counts():
 
     _set_compliance(
         job_1["job_id"],
-        compliance_status="approved",
+        compliance_status=ComplianceStatus.APPROVED.value,
         compliance_score=95,
-        remote_class="remote_only",
-        geo_class="eu_region",
+        remote_class=RemoteClass.REMOTE_ONLY.value,
+        geo_class=GeoClass.EU_REGION.value,
     )
     _set_compliance(
         job_2["job_id"],
-        compliance_status="review",
+        compliance_status=ComplianceStatus.REVIEW.value,
         compliance_score=60,
-        remote_class="unknown",
-        geo_class="eu_member_state",
+        remote_class=RemoteClass.UNKNOWN.value,
+        geo_class=GeoClass.EU_MEMBER_STATE.value,
     )
     _set_compliance(
         job_3["job_id"],
-        compliance_status="rejected",
+        compliance_status=ComplianceStatus.REJECTED.value,
         compliance_score=0,
-        remote_class="non_remote",
-        geo_class="non_eu",
+        remote_class=RemoteClass.NON_REMOTE.value,
+        geo_class=GeoClass.NON_EU.value,
     )
 
     response = client.get(
@@ -161,8 +166,8 @@ def test_internal_audit_jobs_filters_and_counts():
     assert data["counts"]["source"]["remotive"] == 2
     assert data["counts"]["status"]["new"] == 1
     assert data["counts"]["status"]["active"] == 1
-    assert data["counts"]["compliance_status"]["approved"] == 1
-    assert data["counts"]["compliance_status"]["review"] == 1
+    assert data["counts"]["compliance_status"][ComplianceStatus.APPROVED.value] == 1
+    assert data["counts"]["compliance_status"][ComplianceStatus.REVIEW.value] == 1
 
     response_filtered = client.get(
         "/internal/audit/jobs",

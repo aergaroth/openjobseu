@@ -61,7 +61,7 @@ def test_apply_policy_v1_accepts_job():
     assert apply_policy_v1(job, source="remoteok") == (job, None)
     assert job["_compliance"]["policy_version"] == "v1"
     assert job["_compliance"]["policy_reason"] is None
-    assert job["_compliance"]["remote_model"] == "remote_only"
+    assert job["_compliance"]["remote_model"] == RemoteClass.REMOTE_ONLY.value
 
 
 def test_apply_policy_v1_calls_classifier_safely_when_fields_missing(monkeypatch):
@@ -71,7 +71,7 @@ def test_apply_policy_v1_calls_classifier_safely_when_fields_missing(monkeypatch
         v1,
         "classify_remote_model",
         lambda title, description, remote_scope="": calls.append((title, description, remote_scope))
-        or {"remote_model": "unknown"},
+        or {"remote_model": RemoteClass.UNKNOWN.value},
     )
 
     job = {
@@ -83,7 +83,7 @@ def test_apply_policy_v1_calls_classifier_safely_when_fields_missing(monkeypatch
     assert job["_compliance"] == {
         "policy_version": "v1",
         "policy_reason": None,
-        "remote_model": "unknown",
+        "remote_model": RemoteClass.UNKNOWN.value,
     }
 
 
@@ -203,7 +203,7 @@ def test_ingestion_persists_policy_flagged_jobs(
     assert result["metrics"]["accepted_count"] == 1
     assert result["metrics"]["rejected_policy_count"] == 0
     assert result["metrics"]["policy_rejected_total"] == 0
-    assert result["metrics"]["policy_rejected_by_reason"]["non_remote"] == 0
+    assert result["metrics"]["policy_rejected_by_reason"][RemoteClass.NON_REMOTE.value] == 0
     assert result["metrics"]["policy_rejected_by_reason"]["geo_restriction"] == 0
     assert result["metrics"]["raw_count"] == 1
     assert result["metrics"]["persisted_count"] == 1
@@ -274,5 +274,5 @@ def test_ingestion_emits_single_summary_log(monkeypatch):
     assert result["metrics"]["accepted_count"] == 2
     assert result["metrics"]["rejected_policy_count"] == 0
     assert result["metrics"]["policy_rejected_total"] == 0
-    assert result["metrics"]["policy_rejected_by_reason"]["non_remote"] == 0
+    assert result["metrics"]["policy_rejected_by_reason"][RemoteClass.NON_REMOTE.value] == 0
     assert result["metrics"]["policy_rejected_by_reason"]["geo_restriction"] == 0

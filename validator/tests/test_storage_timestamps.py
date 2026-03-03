@@ -1,4 +1,5 @@
 import datetime
+from app.domain.classification.enums import GeoClass, RemoteClass
 from app.domain.classification.mappers import normalize_geo_class, normalize_remote_class
 from app.workers.policy.v2.geo_classifier import classify_geo_scope
 
@@ -34,13 +35,17 @@ def fake_init_db():
 def _derive_remote_class(job: dict) -> str:
     compliance = job.get("_compliance")
     if not isinstance(compliance, dict):
-        return "remote_only" if bool(job.get("remote_source_flag")) else "unknown"
+        return (
+            RemoteClass.REMOTE_ONLY.value
+            if bool(job.get("remote_source_flag"))
+            else RemoteClass.UNKNOWN.value
+        )
 
     policy_reason = str(compliance.get("policy_reason") or "").strip().lower()
     remote_model = str(compliance.get("remote_model") or "").strip().lower()
 
-    if policy_reason == "non_remote":
-        return "non_remote"
+    if policy_reason == RemoteClass.NON_REMOTE.value:
+        return RemoteClass.NON_REMOTE.value
 
     return normalize_remote_class(remote_model).value
 
@@ -56,25 +61,25 @@ def _derive_geo_class(job: dict) -> str:
 
     if explicit_geo_class:
         normalized = _normalize_geo_class_value(str(explicit_geo_class))
-        if normalized != "unknown":
+        if normalized != GeoClass.UNKNOWN.value:
             return normalized
 
     if policy_reason in {"geo_restriction", "geo_restriction_hard"}:
-        return "non_eu"
+        return GeoClass.NON_EU.value
 
     classifier_result = classify_geo_scope(str(job.get("title") or ""), str(job.get("description") or ""))
     normalized_classifier_geo = _normalize_geo_class_value(str(classifier_result.get("geo_class") or ""))
-    if normalized_classifier_geo != "unknown":
+    if normalized_classifier_geo != GeoClass.UNKNOWN.value:
         return normalized_classifier_geo
 
     remote_scope = str(job.get("remote_scope") or "").strip()
     if remote_scope:
         remote_scope_result = classify_geo_scope(remote_scope, "")
         normalized_remote_scope_geo = _normalize_geo_class_value(str(remote_scope_result.get("geo_class") or ""))
-        if normalized_remote_scope_geo != "unknown":
+        if normalized_remote_scope_geo != GeoClass.UNKNOWN.value:
             return normalized_remote_scope_geo
 
-    return "unknown"
+    return GeoClass.UNKNOWN.value
 
 
 def fake_upsert_job(job: dict, conn=None, *, company_id: str | None = None):
@@ -141,15 +146,15 @@ def test_upsert_persists_derived_compliance_classes():
     job["remote_scope"] = "EU-wide"
     job["_compliance"] = {
         "policy_reason": None,
-        "remote_model": "remote_only",
+        "remote_model": RemoteClass.REMOTE_ONLY.value,
     }
 
     fake_upsert_job(job)
 
     row = _IN_MEMORY_JOBS.get(job["job_id"])
     assert row is not None
-    assert row["remote_class"] == "remote_only"
-    assert row["geo_class"] == "eu_region"
+    assert row["remote_class"] == RemoteClass.REMOTE_ONLY.value
+    assert row["geo_class"] == GeoClass.EU_REGION.value
 
 
 def test_upsert_marks_geo_non_eu_when_policy_flags_geo_restriction():
@@ -166,5 +171,5 @@ def test_upsert_marks_geo_non_eu_when_policy_flags_geo_restriction():
 
     row = _IN_MEMORY_JOBS.get(job["job_id"])
     assert row is not None
-    assert row["remote_class"] == "remote_region_locked"
-    assert row["geo_class"] == "non_eu"
+    assert row["remote_class"] == RemoteClass.REMOTE_REGION_LOCKED.value
+    assert row["geo_class"] == GeoClass.NON_EU.value

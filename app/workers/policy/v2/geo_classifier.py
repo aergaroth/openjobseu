@@ -1,6 +1,7 @@
 import re
 from typing import Dict
 
+from app.domain.classification.enums import GeoClass
 from app.workers.policy.v2.geo_data import (
     APAC_STRONG_SIGNALS,
     AUSTRALIA_STRONG_SIGNALS,
@@ -48,49 +49,49 @@ def classify_geo_scope(title: str, description: str) -> Dict:
     for kw in US_STRONG_SIGNALS:
         if _contains_phrase(full_text, kw):
             return {
-                "geo_class": "non_eu",
+                "geo_class": GeoClass.NON_EU.value,
                 "matched_keyword": kw,
             }
 
     for kw in CANADA_STRONG_SIGNALS:
         if _contains_phrase(full_text, kw):
             return {
-                "geo_class": "non_eu",
+                "geo_class": GeoClass.NON_EU.value,
                 "matched_keyword": kw,
             }
 
     for kw in APAC_STRONG_SIGNALS:
         if _contains_phrase(full_text, kw):
             return {
-                "geo_class": "non_eu",
+                "geo_class": GeoClass.NON_EU.value,
                 "matched_keyword": kw,
             }
 
     for kw in AUSTRALIA_STRONG_SIGNALS:
         if _contains_phrase(full_text, kw):
             return {
-                "geo_class": "non_eu",
+                "geo_class": GeoClass.NON_EU.value,
                 "matched_keyword": kw,
             }
 
     for kw in INDIA_STRONG_SIGNALS:
         if _contains_phrase(full_text, kw):
             return {
-                "geo_class": "non_eu",
+                "geo_class": GeoClass.NON_EU.value,
                 "matched_keyword": kw,
             }
 
     for kw in LATAM_STRONG_SIGNALS:
         if _contains_phrase(full_text, kw):
             return {
-                "geo_class": "non_eu",
+                "geo_class": GeoClass.NON_EU.value,
                 "matched_keyword": kw,
             }
 
     for kw in NON_EU_RESTRICTED:
         if _contains_phrase(full_text, kw):
             return {
-                "geo_class": "non_eu",
+                "geo_class": GeoClass.NON_EU.value,
                 "matched_keyword": kw,
             }
 
@@ -98,7 +99,7 @@ def classify_geo_scope(title: str, description: str) -> Dict:
     us_state_hits = _count_us_state_signal_hits(full_text)
     if us_state_hits >= US_STATE_SIGNAL_THRESHOLD:
         return {
-            "geo_class": "non_eu",
+            "geo_class": GeoClass.NON_EU.value,
             "matched_keyword": f"us_state_codes>={US_STATE_SIGNAL_THRESHOLD}",
         }
 
@@ -109,7 +110,7 @@ def classify_geo_scope(title: str, description: str) -> Dict:
         or _contains_phrase(full_text, "european union")
     ):
         return {
-            "geo_class": "eu_explicit",
+            "geo_class": GeoClass.EU_EXPLICIT.value,
             "matched_keyword": "eu",
         }
 
@@ -117,7 +118,7 @@ def classify_geo_scope(title: str, description: str) -> Dict:
     for country in EU_MEMBER_STATES:
         if _contains_phrase(full_text, country):
             return {
-                "geo_class": "eu_member_state",
+                "geo_class": GeoClass.EU_MEMBER_STATE.value,
                 "matched_keyword": country,
             }
 
@@ -125,13 +126,13 @@ def classify_geo_scope(title: str, description: str) -> Dict:
     for country in EOG_COUNTRIES:
         if _contains_phrase(full_text, country):
             return {
-                "geo_class": "eu_region",
+                "geo_class": GeoClass.EU_REGION.value,
                 "matched_keyword": country,
             }
     for kw in EU_REGION_KEYWORDS:
         if _contains_phrase(full_text, kw):
             return {
-                "geo_class": "eu_region",
+                "geo_class": GeoClass.EU_REGION.value,
                 "matched_keyword": kw,
             }
 
@@ -139,17 +140,17 @@ def classify_geo_scope(title: str, description: str) -> Dict:
     for kw in UK_KEYWORDS:
         if _contains_phrase(full_text, kw):
             return {
-                "geo_class": "uk",
+                "geo_class": GeoClass.UK.value,
                 "matched_keyword": kw,
             }
     if re.search(r"\buk\b", full_text):
         return {
-            "geo_class": "uk",
-            "matched_keyword": "uk",
+            "geo_class": GeoClass.UK.value,
+            "matched_keyword": GeoClass.UK.value,
         }
 
     # 7) Fallback
     return {
-        "geo_class": "unknown",
+        "geo_class": GeoClass.UNKNOWN.value,
         "matched_keyword": None,
     }

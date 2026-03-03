@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from time import perf_counter
 
+from app.domain.classification.enums import RemoteClass
 from ingestion.adapters.weworkremotely_rss import WeWorkRemotelyRssAdapter
 from app.workers.normalization.weworkremotely import (
     normalize_weworkremotely_job,
@@ -22,14 +23,14 @@ def run_weworkremotely_ingestion() -> dict:
     accepted_count = 0
     rejected_policy_count = 0
     rejected_by_reason = {
-        "non_remote": 0,
+        RemoteClass.NON_REMOTE.value: 0,
         "geo_restriction": 0,
     }
     remote_model_counts = {
-        "remote_only": 0,
+        RemoteClass.REMOTE_ONLY.value: 0,
         "remote_but_geo_restricted": 0,
-        "non_remote": 0,
-        "unknown": 0,
+        RemoteClass.NON_REMOTE.value: 0,
+        RemoteClass.UNKNOWN.value: 0,
     }
     skipped = 0
     write_committed = False
@@ -55,11 +56,13 @@ def run_weworkremotely_ingestion() -> dict:
                 normalized_count += 1
 
                 job, reason = apply_policy_v1(normalized_job, source=SOURCE)
-                model = normalized_job.get("_compliance", {}).get("remote_model", "unknown")
-                if model == "remote_region_locked":
+                model = normalized_job.get("_compliance", {}).get(
+                    "remote_model", RemoteClass.UNKNOWN.value
+                )
+                if model == RemoteClass.REMOTE_REGION_LOCKED.value:
                     model = "remote_but_geo_restricted"
                 if model not in remote_model_counts:
-                    model = "unknown"
+                    model = RemoteClass.UNKNOWN.value
                 remote_model_counts[model] += 1
 
                 if reason in rejected_by_reason:
@@ -80,7 +83,7 @@ def run_weworkremotely_ingestion() -> dict:
             normalized=normalized_count,
             accepted=accepted_count,
             rejected_policy=rejected_policy_count,
-            rejected_non_remote=rejected_by_reason["non_remote"],
+            rejected_non_remote=rejected_by_reason[RemoteClass.NON_REMOTE.value],
             rejected_geo_restriction=rejected_by_reason["geo_restriction"],
             remote_model_counts=remote_model_counts.copy(),
             duration_ms=duration_ms,
@@ -99,7 +102,7 @@ def run_weworkremotely_ingestion() -> dict:
             skipped=skipped,
             normalized=normalized_count,
             rejected_policy=rejected_policy_count,
-            rejected_non_remote=rejected_by_reason["non_remote"],
+            rejected_non_remote=rejected_by_reason[RemoteClass.NON_REMOTE.value],
             rejected_geo_restriction=rejected_by_reason["geo_restriction"],
             duration_ms=duration_ms,
             error=str(exc),
