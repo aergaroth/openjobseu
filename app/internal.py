@@ -76,7 +76,7 @@ def audit_filter_registry():
 
 @router.post("/audit/tick-dev")
 def run_tick_from_audit():
-    return tick(response_format="text")
+    return tick(force_text=True)
 
 
 @router.post("/tick")
@@ -90,7 +90,7 @@ def manual_tick(
     return tick(response_format=response_format)
 
 
-def tick(*, response_format: str = "auto"):
+def tick(*, response_format: str = "auto", force_text: bool = False):
     ingestion_mode = os.getenv("INGESTION_MODE", "prod")
 
     raw_sources = os.getenv("INGESTION_SOURCES")
@@ -127,6 +127,8 @@ def tick(*, response_format: str = "auto"):
     }
 
     render_mode = (response_format or "auto").strip().lower()
+    if force_text:
+        render_mode = "text"
     if render_mode == "text" or (render_mode == "auto" and should_use_text_logs()):
         return Response(
             content=format_tick_summary(payload),
