@@ -169,7 +169,7 @@
       <h1>Offer Audit Panel</h1>
       <div class="head-actions">
         <button id="refresh-btn" type="button">Refresh</button>
-        <button id="tick-btn" type="button">Run tick-dev.sh</button>
+        <button id="tick-btn" type="button">Run /internal/tick</button>
       </div>
     </div>
 
@@ -250,7 +250,7 @@
     </div>
 
     <div class="panel">
-      <strong>tick-dev.sh output</strong>
+      <strong>/internal/tick output</strong>
       <div id="tick-meta"></div>
       <pre class="tick-output" id="tick-output">No run yet.</pre>
     </div>
@@ -403,18 +403,13 @@
       out.textContent = "";
 
       try {
-        const response = await fetch("/internal/audit/tick-dev", { method: "POST" });
-        const data = await response.json();
-        meta.textContent = `status=${data.status} returncode=${data.returncode}`;
-        const stdout = data.stdout || "";
-        const stderr = data.stderr || "";
-        out.textContent = [
-          "STDOUT:",
-          stdout || "(empty)",
-          "",
-          "STDERR:",
-          stderr || "(empty)"
-        ].join("\n");
+        const response = await fetch("/internal/tick?format=text", { method: "POST" });
+        const bodyText = await response.text();
+        if (!response.ok) {
+          throw new Error(`tick request failed with status ${response.status}\n${bodyText}`);
+        }
+        meta.textContent = "POST /internal/tick?format=text";
+        out.textContent = bodyText || "(empty)";
       } catch (error) {
         meta.textContent = "failed";
         out.textContent = String(error);

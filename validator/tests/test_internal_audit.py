@@ -182,35 +182,16 @@ def test_internal_audit_jobs_filters_and_counts():
     assert filtered["items"][0]["job_id"] == "audit:1"
 
 
-def test_internal_audit_tick_dev_runs_script(monkeypatch):
+def test_internal_audit_tick_dev_runs_tick_with_text_output(monkeypatch):
     captured = {}
 
-    class FakeResult:
-        returncode = 0
-        stdout = "tick done"
-        stderr = ""
+    def fake_tick(force_text=False):
+        captured["force_text"] = force_text
+        return "tick as text"
 
-    def fake_run(cmd, cwd, capture_output, text, timeout, check):
-        captured["cmd"] = cmd
-        captured["cwd"] = cwd
-        captured["capture_output"] = capture_output
-        captured["text"] = text
-        captured["timeout"] = timeout
-        captured["check"] = check
-        return FakeResult()
-
-    monkeypatch.setattr(internal_api.subprocess, "run", fake_run)
+    monkeypatch.setattr(internal_api, "tick", fake_tick)
 
     response = client.post("/internal/audit/tick-dev")
     assert response.status_code == 200
-    payload = response.json()
-
-    assert payload["status"] == "ok"
-    assert payload["returncode"] == 0
-    assert payload["stdout"] == "tick done"
-    assert payload["stderr"] == ""
-
-    assert captured["cmd"][0] == "bash"
-    assert captured["cmd"][1].endswith("scripts/tick-dev.sh")
-    assert captured["capture_output"] is True
-    assert captured["text"] is True
+    assert response.text == "tick as text"
+    assert captured["force_text"] is True
