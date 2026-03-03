@@ -9,6 +9,8 @@ from app.workers.policy.v3.geo_data_v3 import (
     EU_REGION_CUSTOM,
     NON_EU_REGION_CUSTOM,
     COUNTRY_ALIASES,
+    NON_EU_SCOPE_TITLE_PHRASES,
+    NON_EU_SCOPE_TOKENS,
     # REGION_KEYWORDS
 )
 
@@ -75,6 +77,9 @@ def _classify_from_remote_scope(scope_l: str) -> Dict | None:
     found_eu = False
     found_non_eu = False
 
+    if any(_contains_phrase(scope_l, kw) for kw in NON_EU_SCOPE_TITLE_PHRASES):
+        found_non_eu = True
+
     for token in tokens:
         if token in COUNTRY_ALIASES:
             mapped_full_name = COUNTRY_ALIASES[token].lower()
@@ -91,6 +96,23 @@ def _classify_from_remote_scope(scope_l: str) -> Dict | None:
         if token in UK_KEYWORDS:
             found_eu = True
             continue
+
+        # Handle mixed free-form scopes, e.g. "Remote - US: Select locations".
+        token_parts = [_normalize_token(part) for part in re.split(r"[\s:\-]+", token) if part.strip()]
+        for token_part in token_parts:
+            if token_part in NON_EU_SCOPE_TOKENS:
+                found_non_eu = True
+                continue
+            if token_part in COUNTRY_ALIASES:
+                mapped = COUNTRY_ALIASES[token_part].lower()
+                if mapped in EU_MEMBER_STATES:
+                    found_eu = True
+                else:
+                    found_non_eu = True
+                continue
+            if token_part in EU_MEMBER_STATES:
+                found_eu = True
+                continue
 
     if found_eu and found_non_eu:
         return {"geo_class": GeoClass.EU_REGION, "reason": "mixed_region"}
@@ -145,6 +167,9 @@ def classify_geo_v3(
     # ------------------------------------------------------------
     for kw in NON_EU_REGION_CUSTOM:
         if kw in scope_l or kw in title_l:
+            return {"geo_class": GeoClass.NON_EU, "reason": kw}
+    for kw in NON_EU_SCOPE_TITLE_PHRASES:
+        if _contains_phrase(scope_l, kw) or _contains_phrase(title_l, kw):
             return {"geo_class": GeoClass.NON_EU, "reason": kw}
 
     # ------------------------------------------------------------
