@@ -52,6 +52,8 @@ def test_run_employer_ingestion_reports_standardized_metrics(monkeypatch):
         ]
     )
     monkeypatch.setattr(employer, "ingest_company", lambda _company: next(results))
+    log_calls = []
+    monkeypatch.setattr(employer, "log_ingestion", lambda **kwargs: log_calls.append(kwargs))
 
     result = employer.run_employer_ingestion()
     metrics = result["metrics"]
@@ -79,3 +81,30 @@ def test_run_employer_ingestion_reports_standardized_metrics(monkeypatch):
     assert metrics["companies_invalid_slug"] == 1
     assert metrics["accepted_jobs"] == 3
     assert metrics["hard_geo_rejected_count"] == 0
+
+    fetch_calls = [call for call in log_calls if call.get("phase") == "fetch"]
+    assert len(fetch_calls) == 1
+    assert fetch_calls[0]["source"] == "employer_ing"
+    assert fetch_calls[0]["raw_count"] == 2
+    assert fetch_calls[0]["companies_processed"] == 2
+    assert fetch_calls[0]["companies_load_duration_ms"] >= 0
+
+    summary_calls = [
+        call for call in log_calls if call.get("phase") == "ingestion_summary"
+    ]
+    assert len(summary_calls) == 1
+    summary = summary_calls[0]
+    assert summary["source"] == "employer_ing"
+    assert summary["fetched"] == 5
+    assert summary["normalized"] == 4
+    assert summary["accepted"] == 3
+    assert summary["rejected_policy"] == 1
+    assert summary["rejected_non_remote"] == 1
+    assert summary["rejected_geo_restriction"] == 0
+    assert summary["companies_processed"] == 2
+    assert summary["companies_failed"] == 1
+    assert summary["companies_invalid_slug"] == 1
+    assert summary["hard_geo_rejected_count"] == 0
+    assert summary["companies_load_duration_ms"] >= 0
+    assert summary["ingestion_loop_duration_ms"] >= 0
+    assert summary["duration_ms"] >= 0

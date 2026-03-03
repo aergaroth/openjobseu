@@ -9,10 +9,12 @@ from storage.db_engine import get_engine
 from storage.db_logic import upsert_job
 
 from ingestion.adapters.greenhouse_api import GreenhouseApiAdapter
+from app.workers.ingestion.log_helpers import log_ingestion
 from app.workers.normalization.greenhouse import normalize_greenhouse_job
 from app.workers.policy.v3.apply_policy_v3 import apply_policy_v3
 
 logger = logging.getLogger("openjobseu.ingestion.employer")
+SOURCE = "employer_ing"
 
 
 def _normalize_remote_model_for_metrics(remote_model: str | None) -> str:
@@ -225,6 +227,8 @@ def run_employer_ingestion() -> dict:
 
     started = perf_counter()
     engine = get_engine()
+    companies_load_duration_ms = 0
+    ingestion_loop_duration_ms = 0
 
     total_companies = 0
     companies_failed = 0
@@ -246,44 +250,98 @@ def run_employer_ingestion() -> dict:
     }
     total_hard_geo_rejected = 0
 
-    with engine.connect() as conn:
-        companies = load_active_ats_companies(conn)
+    try:
+        companies_load_started = perf_counter()
+        with engine.connect() as conn:
+            companies = load_active_ats_companies(conn)
+        companies_load_duration_ms = int((perf_counter() - companies_load_started) * 1000)
 
-    for company in companies:
-        total_companies += 1
+        total_companies = len(companies)
+        log_ingestion(
+            source=SOURCE,
+            phase="fetch",
+            raw_count=total_companies,
+            companies_processed=total_companies,
+            companies_load_duration_ms=companies_load_duration_ms,
+        )
 
-        try:
-            result = ingest_company(company)
+        ingestion_loop_started = perf_counter()
+        for company in companies:
+            try:
+                result = ingest_company(company)
 
-            if "error" in result:
+                if "error" in result:
+                    companies_failed += 1
+                    if result.get("error") == "invalid_ats_slug":
+                        companies_invalid_slug += 1
+                    continue
+
+                total_fetched += int(result.get("fetched", 0) or 0)
+                total_normalized += int(result.get("normalized_count", 0) or 0)
+                total_accepted += result["accepted"]
+                total_skipped += int(result.get("skipped", 0) or 0)
+                total_rejected_policy += int(result.get("rejected_policy_count", 0) or 0)
+                source_reasons = result.get("rejected_by_reason", {}) or {}
+                rejected_by_reason["non_remote"] += int(source_reasons.get("non_remote", 0) or 0)
+                rejected_by_reason["geo_restriction"] += int(source_reasons.get("geo_restriction", 0) or 0)
+                source_remote_model = result.get("remote_model_counts", {}) or {}
+                for key in remote_model_counts:
+                    remote_model_counts[key] += int(source_remote_model.get(key, 0) or 0)
+                total_hard_geo_rejected += int(result.get("hard_geo_rejected_count", 0) or 0)
+
+            except Exception:
                 companies_failed += 1
-                if result.get("error") == "invalid_ats_slug":
-                    companies_invalid_slug += 1
                 continue
+        ingestion_loop_duration_ms = int((perf_counter() - ingestion_loop_started) * 1000)
 
-            total_fetched += int(result.get("fetched", 0) or 0)
-            total_normalized += int(result.get("normalized_count", 0) or 0)
-            total_accepted += result["accepted"]
-            total_skipped += int(result.get("skipped", 0) or 0)
-            total_rejected_policy += int(result.get("rejected_policy_count", 0) or 0)
-            source_reasons = result.get("rejected_by_reason", {}) or {}
-            rejected_by_reason["non_remote"] += int(source_reasons.get("non_remote", 0) or 0)
-            rejected_by_reason["geo_restriction"] += int(source_reasons.get("geo_restriction", 0) or 0)
-            source_remote_model = result.get("remote_model_counts", {}) or {}
-            for key in remote_model_counts:
-                remote_model_counts[key] += int(source_remote_model.get(key, 0) or 0)
-            total_hard_geo_rejected += result.get("hard_geo_rejected_count", 0)
-
-        except Exception:
-            companies_failed += 1
-            continue
+    except Exception as exc:
+        duration_ms = int((perf_counter() - started) * 1000)
+        log_ingestion(
+            source=SOURCE,
+            phase="error",
+            raw_count=total_fetched,
+            normalized=total_normalized,
+            persisted=total_accepted,
+            skipped=total_skipped,
+            rejected_policy=total_rejected_policy,
+            rejected_non_remote=rejected_by_reason["non_remote"],
+            rejected_geo_restriction=rejected_by_reason["geo_restriction"],
+            remote_model_counts=remote_model_counts.copy(),
+            companies_processed=total_companies,
+            companies_failed=companies_failed,
+            companies_invalid_slug=companies_invalid_slug,
+            hard_geo_rejected_count=total_hard_geo_rejected,
+            companies_load_duration_ms=companies_load_duration_ms,
+            ingestion_loop_duration_ms=ingestion_loop_duration_ms,
+            duration_ms=duration_ms,
+            error=str(exc),
+        )
+        raise
 
     duration_ms = int((perf_counter() - started) * 1000)
+    log_ingestion(
+        source=SOURCE,
+        phase="ingestion_summary",
+        fetched=total_fetched,
+        normalized=total_normalized,
+        accepted=total_accepted,
+        rejected_policy=total_rejected_policy,
+        rejected_non_remote=rejected_by_reason["non_remote"],
+        rejected_geo_restriction=rejected_by_reason["geo_restriction"],
+        remote_model_counts=remote_model_counts.copy(),
+        companies_processed=total_companies,
+        companies_failed=companies_failed,
+        companies_invalid_slug=companies_invalid_slug,
+        hard_geo_rejected_count=total_hard_geo_rejected,
+        companies_load_duration_ms=companies_load_duration_ms,
+        ingestion_loop_duration_ms=ingestion_loop_duration_ms,
+        duration_ms=duration_ms,
+    )
 
     return {
         "actions": ["employer_ingestion_completed"],
         "metrics": {
-            "source": "employer_ing",
+            "source": SOURCE,
             "status": "ok",
             "fetched_count": total_fetched,
             "normalized_count": total_normalized,
