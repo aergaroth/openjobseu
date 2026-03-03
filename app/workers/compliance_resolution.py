@@ -2,8 +2,8 @@ import logging
 from time import perf_counter
 
 from app.workers.compliance_resolver import resolve_compliance
-from storage.db import get_engine
-from storage.sqlite import (
+from storage.db_engine import get_engine
+from storage.db_logic import (
     backfill_missing_compliance_classes,
     count_jobs_missing_compliance,
     get_jobs_for_compliance_resolution,

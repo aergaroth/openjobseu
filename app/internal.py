@@ -7,12 +7,13 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse
 
+from app.audit_filter_registry import get_audit_filter_registry
 from app.logging import should_use_text_logs
 from app.utils.tick_formatting import format_tick_summary
 from app.workers.ingestion.registry import INGESTION_HANDLERS
 from app.workers.tick import run_tick
 from app.workers.tick_pipeline import run_tick_pipeline
-from storage.sqlite import get_jobs_audit
+from storage.db_logic import get_jobs_audit
 
 logger = logging.getLogger("openjobseu.runtime")
 
@@ -76,6 +77,11 @@ def audit_jobs(
     )
 
 
+@router.get("/audit/filters")
+def audit_filter_registry():
+    return get_audit_filter_registry()
+
+
 @router.post("/audit/tick-dev")
 def run_tick_dev_script():
     if not TICK_DEV_SCRIPT_PATH.exists():
@@ -107,11 +113,17 @@ def run_tick_dev_script():
 
 
 @router.post("/tick")
-def manual_tick():
-    return tick()
+def manual_tick(
+    response_format: str = Query(
+        "auto",
+        alias="format",
+        pattern="^(auto|text|json)$",
+    ),
+):
+    return tick(response_format=response_format)
 
 
-def tick():
+def tick(*, response_format: str = "auto"):
     ingestion_mode = os.getenv("INGESTION_MODE", "prod")
 
     raw_sources = os.getenv("INGESTION_SOURCES")
@@ -147,7 +159,8 @@ def tick():
         **result,
     }
 
-    if should_use_text_logs():
+    render_mode = (response_format or "auto").strip().lower()
+    if render_mode == "text" or (render_mode == "auto" and should_use_text_logs()):
         return Response(
             content=format_tick_summary(payload),
             media_type="text/plain",

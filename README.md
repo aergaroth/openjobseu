@@ -141,11 +141,58 @@ Required database mode:
 - `DB_MODE=standard` with `DATABASE_URL=postgresql+psycopg://...`
 - or `DB_MODE=cloudsql` with `INSTANCE_CONNECTION_NAME`, `DB_NAME`, `DB_USER`
 
+## Testing 📦
+
+Most of the validator-level unit tests exercise real database logic, so they
+expect a PostgreSQL server to be available. The GitHub Actions workflow starts
+a `postgres:16` container and sets `DATABASE_URL` to
+`postgresql+psycopg://postgres:postgres@localhost:5432/testdb`; you can
+mimic that locally with your own container or an existing instance.
+
+A simple pattern to run tests in development:
+
+```bash
+# start a throw‑away postgres
+docker run --rm --name openjobspg -e POSTGRES_PASSWORD=postgres \
+    -e POSTGRES_DB=testdb -p 5432:5432 -d postgres:16
+
+# run pytest; conftest.py will default DATABASE_URL to
+# postgresql+psycopg://postgres:postgres@localhost:5432/testdb
+pytest -q
+```
+
+If the database is unreachable, the test suite will skip the SQL-heavy
+modules rather than failing outright, allowing you to edit code or run linters
+without a running backend.
+
 Ingestion runtime:
 
 - `INGESTION_MODE=prod` (default pipeline with external sources)
 - `INGESTION_MODE=local` (dev-only local JSON source)
 - optional: `INGESTION_SOURCES=remotive,remoteok,weworkremotely`
+
+### Internal tick endpoint
+
+Manual tick trigger:
+
+- `POST /internal/tick`
+- optional query param: `format=auto|text|json` (default: `auto`)
+
+Formatting behavior:
+
+- `format=auto`: text in local runtime, JSON in container/cloud runtime
+- `format=text`: forces the tabular text summary (same layout on localhost and Cloud Run)
+- `format=json`: forces JSON payload
+
+Examples:
+
+```bash
+# same human-readable tick summary everywhere (Cloud Run/local)
+curl -X POST "http://127.0.0.1:8000/internal/tick?format=text"
+
+# force JSON response
+curl -X POST "http://127.0.0.1:8000/internal/tick?format=json"
+```
 
 ---
 

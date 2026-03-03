@@ -5,7 +5,7 @@ from time import perf_counter
 
 from app.workers.availability import run_availability_pipeline
 from app.workers.lifecycle import run_lifecycle_pipeline
-from storage.sqlite import init_db
+from storage.db_logic import init_db
 
 logger = logging.getLogger("openjobseu.post_ingestion")
 

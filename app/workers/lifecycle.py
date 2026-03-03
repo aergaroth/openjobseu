@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
-from storage.db import get_engine
-from storage.sqlite import get_jobs_for_verification, update_jobs_availability
+from storage.db_engine import get_engine
+from storage.db_logic import get_jobs_for_verification, update_jobs_availability
 
 STALE_AFTER_DAYS = 7
 EXPIRE_AFTER_DAYS = 30

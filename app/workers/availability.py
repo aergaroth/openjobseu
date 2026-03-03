@@ -2,8 +2,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 import logging
 import requests
-from storage.db import get_engine
-from storage.sqlite import get_jobs_for_verification, update_jobs_availability
+from storage.db_engine import get_engine
+from storage.db_logic import get_jobs_for_verification, update_jobs_availability
 
 logger = logging.getLogger("openjobseu.worker.availability")
 

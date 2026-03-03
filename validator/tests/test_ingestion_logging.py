@@ -1,4 +1,5 @@
 from app.workers.ingestion import log_helpers
+from app.domain.classification.enums import RemoteClass
 
 
 def test_fetch_phase_logs_on_debug(monkeypatch):
@@ -66,10 +67,10 @@ def test_ingestion_summary_logs_on_info(monkeypatch):
         accepted=2,
         rejected_policy=1,
         remote_model_counts={
-            "remote_only": 2,
+            RemoteClass.REMOTE_ONLY.value: 2,
             "remote_but_geo_restricted": 1,
-            "non_remote": 3,
-            "unknown": 4,
+            RemoteClass.NON_REMOTE.value: 3,
+            RemoteClass.UNKNOWN.value: 4,
         },
         duration_ms=10,
     )
@@ -88,8 +89,8 @@ def test_ingestion_summary_logs_on_info(monkeypatch):
     assert extra["fetched"] == 4
     assert extra["accepted"] == 2
     assert extra["rejected_policy"] == 1
-    assert extra["remote_only"] == 2
+    assert extra[RemoteClass.REMOTE_ONLY.value] == 2
     assert extra["remote_non_remote"] == 3
     assert extra["remote_geo_restricted"] == 1
-    assert extra["remote_unknown"] == 4
+    assert extra[f"remote_{RemoteClass.UNKNOWN.value}"] == 4
     assert extra["duration_ms"] == 10

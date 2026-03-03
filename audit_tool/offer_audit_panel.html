@@ -175,14 +175,30 @@
 
     <div class="panel">
       <div class="filters" id="filters">
-        <label>Status<input id="status" placeholder="new / active / stale" /></label>
+        <label>Status
+          <select id="status">
+            <option value="">All</option>
+          </select>
+        </label>
         <label>Source<input id="source" placeholder="remotive / remoteok" /></label>
         <label>Company<input id="company" placeholder="contains..." /></label>
         <label>Title<input id="title" placeholder="contains..." /></label>
         <label>Remote scope<input id="remote_scope" placeholder="contains..." /></label>
-        <label>Remote class<input id="remote_class" placeholder="remote_only / unknown" /></label>
-        <label>Geo class<input id="geo_class" placeholder="eu_region / non_eu / uk" /></label>
-        <label>Compliance<input id="compliance_status" placeholder="approved / review / rejected" /></label>
+        <label>Remote class
+          <select id="remote_class">
+            <option value="">All</option>
+          </select>
+        </label>
+        <label>Geo class
+          <select id="geo_class">
+            <option value="">All</option>
+          </select>
+        </label>
+        <label>Compliance
+          <select id="compliance_status">
+            <option value="">All</option>
+          </select>
+        </label>
         <label>Min score<input id="min_compliance_score" type="number" min="0" max="100" /></label>
         <label>Max score<input id="max_compliance_score" type="number" min="0" max="100" /></label>
         <label>Limit<input id="limit" type="number" min="1" max="500" value="50" /></label>
@@ -256,6 +272,13 @@
       "offset"
     ];
 
+    const registrySelectIds = [
+      "status",
+      "remote_class",
+      "geo_class",
+      "compliance_status"
+    ];
+
     let debounceTimer = null;
 
     function esc(value) {
@@ -318,6 +341,34 @@
           </tr>
         `;
       }).join("");
+    }
+
+    function populateSelectOptions(selectId, values) {
+      const node = document.getElementById(selectId);
+      if (!node) return;
+      const currentValue = node.value || "";
+      node.innerHTML = '<option value="">All</option>';
+      for (const value of (values || [])) {
+        const opt = document.createElement("option");
+        opt.value = String(value);
+        opt.textContent = String(value);
+        node.appendChild(opt);
+      }
+      node.value = currentValue;
+      if (node.value !== currentValue) {
+        node.value = "";
+      }
+    }
+
+    async function loadFilterRegistry() {
+      const response = await fetch("/internal/audit/filters");
+      if (!response.ok) {
+        throw new Error(`audit filter registry request failed with status ${response.status}`);
+      }
+      const registry = await response.json();
+      for (const id of registrySelectIds) {
+        populateSelectOptions(id, registry?.[id] || []);
+      }
     }
 
     async function loadJobs() {
@@ -387,7 +438,16 @@
     document.getElementById("refresh-btn").addEventListener("click", safeLoadJobs);
     document.getElementById("tick-btn").addEventListener("click", runTickDev);
 
-    safeLoadJobs();
+    (async () => {
+      try {
+        await loadFilterRegistry();
+      } catch (error) {
+        const body = document.getElementById("rows");
+        body.innerHTML = `<tr><td class="error" colspan="12">${esc(error.message)}</td></tr>`;
+        return;
+      }
+      safeLoadJobs();
+    })();
   </script>
 </body>
 </html>

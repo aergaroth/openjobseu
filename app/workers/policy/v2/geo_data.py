@@ -199,3 +199,29 @@ US_STATE_CODES = (
 )
 
 US_STATE_SIGNAL_THRESHOLD = 3
+
+
+COUNTRY_ALIASES = {
+    "italien": "it",
+    "italy": "it",
+    "deutschland": "de",
+    "germany": "de",
+    "niederlande": "nl",
+    "netherlands": "nl",
+    "spain": "es",
+    "spanien": "es",
+    "ireland": "ie",
+}
+
+
+COUNTRY_ALIASES = {
+    "italien": "it",
+    "italy": "it",
+    "deutschland": "de",
+    "germany": "de",
+    "niederlande": "nl",
+    "netherlands": "nl",
+    "spain": "es",
+    "spanien": "es",
+    "ireland": "ie",
+}

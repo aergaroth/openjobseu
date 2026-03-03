@@ -3,16 +3,17 @@ from datetime import datetime, timezone
 from time import perf_counter
 from typing import Iterable, Dict, Callable, List
 
+from app.domain.classification.enums import RemoteClass
 from app.workers.compliance_resolution import run_compliance_resolution
 from app.workers.post_ingestion import run_post_ingestion
 
 logger = logging.getLogger("openjobseu.pipeline")
 
 REMOTE_MODEL_KEYS = (
-    "remote_only",
+    RemoteClass.REMOTE_ONLY.value,
     "remote_but_geo_restricted",
-    "non_remote",
-    "unknown",
+    RemoteClass.NON_REMOTE.value,
+    RemoteClass.UNKNOWN.value,
 )
 
 
@@ -28,7 +29,7 @@ def _int_metric(value, default: int = 0) -> int:
 def _policy_metrics(source_metrics: dict | None = None) -> dict:
     source_metrics = source_metrics or {}
     by_reason = source_metrics.get("policy_rejected_by_reason") or {}
-    non_remote = _int_metric(by_reason.get("non_remote", 0))
+    non_remote = _int_metric(by_reason.get(RemoteClass.NON_REMOTE.value, 0))
     geo_restriction = _int_metric(by_reason.get("geo_restriction", 0))
     rejected_total = _int_metric(
         source_metrics.get(
@@ -39,7 +40,7 @@ def _policy_metrics(source_metrics: dict | None = None) -> dict:
     return {
         "rejected_total": rejected_total,
         "by_reason": {
-            "non_remote": non_remote,
+            RemoteClass.NON_REMOTE.value: non_remote,
             "geo_restriction": geo_restriction,
         },
     }

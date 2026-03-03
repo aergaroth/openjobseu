@@ -1,4 +1,5 @@
 from app.workers import tick
+from app.domain.classification.enums import RemoteClass
 
 
 def test_local_tick_returns_runtime_metrics(monkeypatch):
@@ -19,17 +20,22 @@ def test_local_tick_returns_runtime_metrics(monkeypatch):
     assert result["metrics"]["ingestion"]["raw_count"] == 3
     assert "remote_model_totals" in result["metrics"]["ingestion"]
     totals = result["metrics"]["ingestion"]["remote_model_totals"]
-    for key in ("remote_only", "remote_but_geo_restricted", "non_remote", "unknown"):
+    for key in (
+        RemoteClass.REMOTE_ONLY.value,
+        "remote_but_geo_restricted",
+        RemoteClass.NON_REMOTE.value,
+        RemoteClass.UNKNOWN.value,
+    ):
         assert key in totals
         assert isinstance(totals[key], int)
     assert result["metrics"]["ingestion"]["per_source"]["local"]["status"] == "ok"
     assert "remote_model" in result["metrics"]["ingestion"]["per_source"]["local"]
     rm = result["metrics"]["ingestion"]["per_source"]["local"]["remote_model"]
     assert set(rm.keys()) == {
-        "remote_only",
+        RemoteClass.REMOTE_ONLY.value,
         "remote_but_geo_restricted",
-        "non_remote",
-        "unknown",
+        RemoteClass.NON_REMOTE.value,
+        RemoteClass.UNKNOWN.value,
     }
     for key in rm:
         assert isinstance(rm[key], int)
@@ -39,10 +45,10 @@ def test_local_tick_returns_runtime_metrics(monkeypatch):
     )
     rm_counts = result["metrics"]["ingestion"]["per_source"]["local"]["remote_model_counts"]
     assert set(rm_counts.keys()) == {
-        "remote_only",
+        RemoteClass.REMOTE_ONLY.value,
         "remote_but_geo_restricted",
-        "non_remote",
-        "unknown",
+        RemoteClass.NON_REMOTE.value,
+        RemoteClass.UNKNOWN.value,
     }
     for key in rm_counts:
         assert isinstance(rm_counts[key], int)
@@ -65,17 +71,22 @@ def test_local_tick_reports_failed_ingestion_metrics(monkeypatch):
     assert result["metrics"]["ingestion"]["sources_failed"] == 1
     assert "remote_model_totals" in result["metrics"]["ingestion"]
     totals = result["metrics"]["ingestion"]["remote_model_totals"]
-    for key in ("remote_only", "remote_but_geo_restricted", "non_remote", "unknown"):
+    for key in (
+        RemoteClass.REMOTE_ONLY.value,
+        "remote_but_geo_restricted",
+        RemoteClass.NON_REMOTE.value,
+        RemoteClass.UNKNOWN.value,
+    ):
         assert key in totals
         assert isinstance(totals[key], int)
     assert result["metrics"]["ingestion"]["per_source"]["local"]["status"] == "failed"
     assert "remote_model" in result["metrics"]["ingestion"]["per_source"]["local"]
     rm = result["metrics"]["ingestion"]["per_source"]["local"]["remote_model"]
     assert set(rm.keys()) == {
-        "remote_only",
+        RemoteClass.REMOTE_ONLY.value,
         "remote_but_geo_restricted",
-        "non_remote",
-        "unknown",
+        RemoteClass.NON_REMOTE.value,
+        RemoteClass.UNKNOWN.value,
     }
     for key in rm:
         assert isinstance(rm[key], int)
@@ -85,10 +96,10 @@ def test_local_tick_reports_failed_ingestion_metrics(monkeypatch):
     )
     rm_counts = result["metrics"]["ingestion"]["per_source"]["local"]["remote_model_counts"]
     assert set(rm_counts.keys()) == {
-        "remote_only",
+        RemoteClass.REMOTE_ONLY.value,
         "remote_but_geo_restricted",
-        "non_remote",
-        "unknown",
+        RemoteClass.NON_REMOTE.value,
+        RemoteClass.UNKNOWN.value,
     }
     for key in rm_counts:
         assert isinstance(rm_counts[key], int)

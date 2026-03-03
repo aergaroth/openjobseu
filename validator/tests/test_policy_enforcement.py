@@ -3,9 +3,23 @@ from types import SimpleNamespace
 
 import pytest
 
+# most of the policy-enforcement helpers don't actually touch the database
+# when they're used within this module.  however some of the worker modules
+# they import do access `get_engine()` during import time, which in turn
+# requires `DB_MODE`/`DATABASE_URL` to be set.  the session-wide fixture in
+# `conftest.py` already makes sure those environment variables are present
+# and points at a testing PostgreSQL instance, so we don't have to do any
+# special stubbing here.
+import os
+os.environ.setdefault("DB_MODE", "standard")
+
+# ensure the engine can be constructed now that DB_MODE is known
+import storage.db_engine as _db_engine  # noqa: F401
+
 sys.modules.setdefault("feedparser", SimpleNamespace(parse=lambda *_args, **_kwargs: None))
 
 from app.workers.ingestion import remoteok, remotive, weworkremotely
+from app.domain.classification.enums import GeoClass, RemoteClass
 from app.workers.policy import v1
 from app.workers.policy.v1 import apply_policy_v1
 
@@ -27,12 +41,13 @@ def test_apply_policy_v1_flags_job_without_rejecting():
     job = {
         "job_id": "remoteok:1",
         "title": "Senior PM",
-        "description": "100% remote but must be based in the US",
+        "description": "100% remote role",
+        "remote_scope": "US only, remote",
     }
 
-    assert apply_policy_v1(job, source="remoteok") == (job, "geo_restriction")
+    assert apply_policy_v1(job, source="remoteok") == (job, None)
     assert job["_compliance"]["policy_version"] == "v1"
-    assert job["_compliance"]["policy_reason"] == "geo_restriction"
+    assert job["_compliance"]["policy_reason"] is None
     assert job["_compliance"]["remote_model"] == "remote_but_geo_restricted"
 
 
@@ -46,7 +61,7 @@ def test_apply_policy_v1_accepts_job():
     assert apply_policy_v1(job, source="remoteok") == (job, None)
     assert job["_compliance"]["policy_version"] == "v1"
     assert job["_compliance"]["policy_reason"] is None
-    assert job["_compliance"]["remote_model"] == "remote_only"
+    assert job["_compliance"]["remote_model"] == RemoteClass.REMOTE_ONLY.value
 
 
 def test_apply_policy_v1_calls_classifier_safely_when_fields_missing(monkeypatch):
@@ -55,8 +70,8 @@ def test_apply_policy_v1_calls_classifier_safely_when_fields_missing(monkeypatch
     monkeypatch.setattr(
         v1,
         "classify_remote_model",
-        lambda title, description: calls.append((title, description))
-        or {"remote_model": "unknown"},
+        lambda title, description, remote_scope="": calls.append((title, description, remote_scope))
+        or {"remote_model": RemoteClass.UNKNOWN.value},
     )
 
     job = {
@@ -64,12 +79,74 @@ def test_apply_policy_v1_calls_classifier_safely_when_fields_missing(monkeypatch
     }
 
     assert apply_policy_v1(job, source="remoteok") == (job, None)
-    assert calls == [("", "")]
+    assert calls == [("", "", "")]
     assert job["_compliance"] == {
         "policy_version": "v1",
         "policy_reason": None,
-        "remote_model": "unknown",
+        "remote_model": RemoteClass.UNKNOWN.value,
     }
+
+
+def test_apply_policy_v3_short_circuits_on_hard_geo(monkeypatch):
+    # hard geo detection should return immediately and skip normal classifiers
+    from app.workers.policy.v3 import apply_policy_v3 as v3module
+
+    monkeypatch.setattr(
+        v3module,
+        "classify_remote_v3",
+        lambda **_: (_ for _ in ()).throw(RuntimeError("classify_remote_v3 should not be called")),
+    )
+    monkeypatch.setattr(
+        v3module,
+        "classify_geo_v3",
+        lambda **_: (_ for _ in ()).throw(RuntimeError("classify_geo_v3 should not be called")),
+    )
+
+    job = {
+        "title": "Backend Engineer",
+        "description": "This role is for US only candidates",
+        "remote_scope": "100% remote",
+    }
+
+    result_job, reason = v3module.apply_policy_v3(job.copy(), source="test")
+
+    # hard geo restriction should be detected and reason returned accordingly
+    assert reason == "geo_restriction_hard"
+    assert result_job is not None
+    assert result_job["_compliance"]["policy_version"] == "v3"
+    assert result_job["_compliance"]["policy_reason"] == "geo_restriction_hard"
+    assert result_job["_compliance"]["remote_model"] == RemoteClass.UNKNOWN
+    assert result_job["_compliance"]["geo_class"] == GeoClass.NON_EU
+
+
+def test_apply_policy_v3_classifies_without_v1_fallback(monkeypatch):
+    # when no hard restriction is present, v3 should use v3 classifiers directly
+    from app.workers.policy.v3 import apply_policy_v3 as v3module
+    calls = {"remote": 0, "geo": 0}
+
+    def fake_remote(**_kwargs):
+        calls["remote"] += 1
+        return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": "fake_remote"}
+
+    def fake_geo(**_kwargs):
+        calls["geo"] += 1
+        return {"geo_class": GeoClass.EU_REGION, "reason": "fake_geo"}
+
+    monkeypatch.setattr(v3module, "classify_remote_v3", fake_remote)
+    monkeypatch.setattr(v3module, "classify_geo_v3", fake_geo)
+
+    job = {"title": "Engineer", "description": "Fully remote role"}
+    result_job, reason = v3module.apply_policy_v3(job.copy(), source="test")
+
+    assert calls == {"remote": 1, "geo": 1}
+    assert reason is None
+    assert result_job is not None
+    assert result_job["_compliance"]["policy_version"] == "v3"
+    assert result_job["_compliance"]["policy_reason"] is None
+    assert result_job["_compliance"]["remote_model"] == RemoteClass.REMOTE_ONLY
+    assert result_job["_compliance"]["geo_class"] == GeoClass.EU_REGION
+    assert result_job["_compliance"]["remote_reason"] == "fake_remote"
+    assert result_job["_compliance"]["geo_reason"] == "fake_geo"
 
 
 @pytest.mark.parametrize(
@@ -99,7 +176,8 @@ def test_ingestion_persists_policy_flagged_jobs(
     rejected_job = {
         "job_id": "x:1",
         "title": "Senior PM",
-        "description": "100% remote but must be based in the US",
+        "description": "100% remote role",
+        "remote_scope": "US only, remote",
     }
 
     persisted = []
@@ -123,10 +201,10 @@ def test_ingestion_persists_policy_flagged_jobs(
     assert result["metrics"]["fetched_count"] == 1
     assert result["metrics"]["normalized_count"] == 1
     assert result["metrics"]["accepted_count"] == 1
-    assert result["metrics"]["rejected_policy_count"] == 1
-    assert result["metrics"]["policy_rejected_total"] == 1
-    assert result["metrics"]["policy_rejected_by_reason"]["non_remote"] == 0
-    assert result["metrics"]["policy_rejected_by_reason"]["geo_restriction"] == 1
+    assert result["metrics"]["rejected_policy_count"] == 0
+    assert result["metrics"]["policy_rejected_total"] == 0
+    assert result["metrics"]["policy_rejected_by_reason"][RemoteClass.NON_REMOTE.value] == 0
+    assert result["metrics"]["policy_rejected_by_reason"]["geo_restriction"] == 0
     assert result["metrics"]["raw_count"] == 1
     assert result["metrics"]["persisted_count"] == 1
     assert result["metrics"]["skipped_count"] == 0
@@ -142,7 +220,8 @@ def test_ingestion_emits_single_summary_log(monkeypatch):
         "raw-2": {
             "job_id": "remoteok:2",
             "title": "Senior PM",
-            "description": "Remote but must be based in the US",
+            "description": "Remote role",
+            "remote_scope": "US only, remote",
         },
         "raw-3": {
             "job_id": "remoteok:3",
@@ -181,9 +260,9 @@ def test_ingestion_emits_single_summary_log(monkeypatch):
     assert summary["fetched"] == 3
     assert summary["normalized"] == 2
     assert summary["accepted"] == 2
-    assert summary["rejected_policy"] == 1
+    assert summary["rejected_policy"] == 0
     assert summary["rejected_non_remote"] == 0
-    assert summary["rejected_geo_restriction"] == 1
+    assert summary["rejected_geo_restriction"] == 0
     assert summary["duration_ms"] >= 0
 
     assert len(persisted) == 2
@@ -193,7 +272,7 @@ def test_ingestion_emits_single_summary_log(monkeypatch):
     assert result["metrics"]["fetched_count"] == 3
     assert result["metrics"]["normalized_count"] == 2
     assert result["metrics"]["accepted_count"] == 2
-    assert result["metrics"]["rejected_policy_count"] == 1
-    assert result["metrics"]["policy_rejected_total"] == 1
-    assert result["metrics"]["policy_rejected_by_reason"]["non_remote"] == 0
-    assert result["metrics"]["policy_rejected_by_reason"]["geo_restriction"] == 1
+    assert result["metrics"]["rejected_policy_count"] == 0
+    assert result["metrics"]["policy_rejected_total"] == 0
+    assert result["metrics"]["policy_rejected_by_reason"][RemoteClass.NON_REMOTE.value] == 0
+    assert result["metrics"]["policy_rejected_by_reason"]["geo_restriction"] == 0

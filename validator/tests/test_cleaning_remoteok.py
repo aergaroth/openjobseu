@@ -1,3 +1,4 @@
+from app.domain.classification.enums import RemoteClass
 from app.workers.normalization.cleaning import clean_description
 from app.workers.policy.v1 import evaluate_policy
 
@@ -39,7 +40,7 @@ def test_policy_rejects_non_remote():
         "description": "Great role",
     }
 
-    assert evaluate_policy(job) == (False, "non_remote")
+    assert evaluate_policy(job) == (False, RemoteClass.NON_REMOTE.value)
 
 
 def test_policy_accepts_clean_remote_role():

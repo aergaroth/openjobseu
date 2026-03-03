@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query, Response
 from datetime import datetime, timezone
 
-from storage.sqlite import get_jobs
+from storage.db_logic import get_jobs
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 

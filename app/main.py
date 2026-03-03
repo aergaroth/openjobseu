@@ -5,8 +5,8 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from storage.db import get_engine, db_healthcheck
-from storage.sqlite import init_db
+from storage.db_engine import get_engine, db_healthcheck
+from storage.db_logic import init_db
 from app.workers.compliance_resolution import (
     run_compliance_resolution_for_existing_db,
 )

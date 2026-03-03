@@ -11,7 +11,7 @@ if PROJECT_ROOT not in sys.path:
 
 from app.workers.normalization.weworkremotely import _safe_wwr_source_job_id
 from sqlalchemy import text
-from storage.db import get_engine
+from storage.db_engine import get_engine
 
 engine = get_engine()
 

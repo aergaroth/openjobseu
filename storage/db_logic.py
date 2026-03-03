@@ -4,127 +4,150 @@ but retains the same function signatures and overall structure
 as before to minimize impact on other parts of the codebase. 
 '''
 
-import os
 from pathlib import Path
 from datetime import datetime, timezone
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
-from storage.db import get_engine
+from app.domain.classification.enums import GeoClass, RemoteClass
+from storage.db_engine import get_engine
+from app.domain.classification.mappers import normalize_geo_class, normalize_remote_class
 from app.workers.policy.v2.geo_classifier import classify_geo_scope
 
 engine = get_engine()
+MIGRATIONS_PATH = Path("storage/migrations")
+
+
+def _string_like(value: object | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+
+    enum_value = getattr(value, "value", None)
+    if isinstance(enum_value, str):
+        return enum_value
+
+    return str(value)
 
 
 def _derive_remote_class(job: dict) -> str:
     compliance = job.get("_compliance")
     if not isinstance(compliance, dict):
-        return "remote_only" if bool(job.get("remote_source_flag")) else "unknown"
+        return (
+            RemoteClass.REMOTE_ONLY.value
+            if bool(job.get("remote_source_flag"))
+            else RemoteClass.UNKNOWN.value
+        )
 
-    policy_reason = str(compliance.get("policy_reason") or "").strip().lower()
-    remote_model = str(compliance.get("remote_model") or "").strip().lower()
+    policy_reason = (_string_like(compliance.get("policy_reason")) or "").strip().lower()
+    remote_model = _string_like(compliance.get("remote_model"))
 
-    if policy_reason == "non_remote":
-        return "non_remote"
+    if policy_reason == RemoteClass.NON_REMOTE.value:
+        return RemoteClass.NON_REMOTE.value
 
-    mapping = {
-        "remote_only": "remote_only",
-        "remote_but_geo_restricted": "remote_but_geo_restricted",
-        "hybrid": "non_remote",
-        "office_first": "non_remote",
-        "non_remote": "non_remote",
-        "unknown": "unknown",
-    }
-    return mapping.get(remote_model, "unknown")
+    return normalize_remote_class(remote_model).value
 
 
-def _normalize_geo_class_value(value: str | None) -> str:
-    geo = str(value or "").strip().lower()
-    mapping = {
-        "eu_member_state": "eu_member_state",
-        "eu_region": "eu_region",
-        "eu_explicit": "eu_explicit",
-        "eog": "eu_region",
-        "uk": "uk",
-        "worldwide": "unknown",
-        "global": "unknown",
-        "eu_friendly": "unknown",
-        "non_eu": "non_eu",
-        "non_eu_restricted": "non_eu",
-        "unknown": "unknown",
-    }
-    return mapping.get(geo, "unknown")
+def _normalize_geo_class_value(value: object | None) -> str:
+    return normalize_geo_class(_string_like(value)).value
 
 
 def _derive_geo_class(job: dict) -> str:
+    
+    explicit_geo = job.get("geo_class")
+    if explicit_geo:
+        normalized_explicit_geo = _normalize_geo_class_value(explicit_geo)
+        if normalized_explicit_geo != GeoClass.UNKNOWN.value:
+            return normalized_explicit_geo
+
     compliance = job.get("_compliance")
     policy_reason = ""
-    remote_model = ""
     explicit_geo_class = None
 
     if isinstance(compliance, dict):
-        policy_reason = str(compliance.get("policy_reason") or "").strip().lower()
-        remote_model = str(compliance.get("remote_model") or "").strip().lower()
+        policy_reason = (_string_like(compliance.get("policy_reason")) or "").strip().lower()
         explicit_geo_class = compliance.get("geo_class")
 
     if explicit_geo_class:
-        normalized = _normalize_geo_class_value(str(explicit_geo_class))
-        if normalized != "unknown":
+        normalized = _normalize_geo_class_value(explicit_geo_class)
+        if normalized != GeoClass.UNKNOWN.value:
             return normalized
 
-    if policy_reason == "geo_restriction" or remote_model == "remote_but_geo_restricted":
-        return "non_eu"
+    if policy_reason in {"geo_restriction", "geo_restriction_hard"}:
+        return GeoClass.NON_EU.value
 
     classifier_result = classify_geo_scope(
         str(job.get("title") or ""),
         str(job.get("description") or ""),
     )
-    normalized_classifier_geo = _normalize_geo_class_value(
-        str(classifier_result.get("geo_class") or "")
-    )
-    if normalized_classifier_geo != "unknown":
+    normalized_classifier_geo = _normalize_geo_class_value(classifier_result.get("geo_class"))
+    if normalized_classifier_geo != GeoClass.UNKNOWN.value:
         return normalized_classifier_geo
 
     remote_scope = str(job.get("remote_scope") or "").strip()
     if remote_scope:
         remote_scope_result = classify_geo_scope(remote_scope, "")
-        normalized_remote_scope_geo = _normalize_geo_class_value(
-            str(remote_scope_result.get("geo_class") or "")
-        )
-        if normalized_remote_scope_geo != "unknown":
+        normalized_remote_scope_geo = _normalize_geo_class_value(remote_scope_result.get("geo_class"))
+        if normalized_remote_scope_geo != GeoClass.UNKNOWN.value:
             return normalized_remote_scope_geo
 
-    return "unknown"
+    return GeoClass.UNKNOWN.value
 
 
 def init_db():
-    with engine.begin() as conn:
+    db_engine = get_engine()
+
+    with db_engine.begin() as conn:
         conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS jobs (
-                job_id TEXT PRIMARY KEY,
-                source TEXT,
-                source_job_id TEXT,
-                source_url TEXT,
-                title TEXT,
-                company_name TEXT,
-                description TEXT,
-                remote_source_flag BOOLEAN,
-                remote_scope TEXT,
-                status TEXT,
-                first_seen_at TIMESTAMP WITH TIME ZONE,
-                last_seen_at TIMESTAMP WITH TIME ZONE,
-                last_verified_at TIMESTAMP WITH TIME ZONE,
-                verification_failures INTEGER NOT NULL DEFAULT 0,
-                updated_at TIMESTAMP WITH TIME ZONE,
-                remote_class TEXT,
-                geo_class TEXT,
-                policy_v1_decision TEXT,
-                policy_v1_reason TEXT,
-                policy_v2_decision TEXT,
-                policy_v2_reason TEXT,
-                compliance_status TEXT,
-                compliance_score INTEGER
-            );
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                version INTEGER PRIMARY KEY,
+                applied_at TIMESTAMPTZ NOT NULL
+            )
         """))
+
+        applied_rows = conn.execute(text("SELECT version FROM schema_migrations"))
+        applied_versions = {row[0] for row in applied_rows}
+
+        migration_files = sorted(MIGRATIONS_PATH.glob("*.sql"))
+        migration_versions = {int(file.name.split("_")[0]) for file in migration_files}
+
+        if not applied_versions:
+            existing_jobs = conn.execute(
+                text("SELECT to_regclass('public.jobs')")
+            ).scalar_one_or_none()
+            existing_companies = conn.execute(
+                text("SELECT to_regclass('public.companies')")
+            ).scalar_one_or_none()
+
+            if existing_jobs and existing_companies:
+                now = datetime.now(timezone.utc)
+                conn.execute(
+                    text("""
+                        INSERT INTO schema_migrations (version, applied_at)
+                        VALUES (:version, :applied_at)
+                        ON CONFLICT (version) DO NOTHING
+                    """),
+                    [
+                        {"version": version, "applied_at": now}
+                        for version in sorted(migration_versions)
+                    ],
+                )
+                applied_versions = set(migration_versions)
+
+        for migration_file in migration_files:
+            version = int(migration_file.name.split("_")[0])
+            if version in applied_versions:
+                continue
+
+            sql = migration_file.read_text()
+            conn.execute(text(sql))
+            conn.execute(
+                text("""
+                    INSERT INTO schema_migrations (version, applied_at)
+                    VALUES (:version, :applied_at)
+                """),
+                {"version": version, "applied_at": datetime.now(timezone.utc)},
+            )
 
 
 def _require_open_conn(conn: Connection | None, *, op_name: str) -> Connection:
@@ -141,6 +164,7 @@ def _upsert_job_in_conn(
     now,
     remote_class: str,
     geo_class: str,
+    company_id: str | None = None,
 ) -> None:
     conn.execute(
         text("""
@@ -158,7 +182,8 @@ def _upsert_job_in_conn(
                 first_seen_at,
                 last_seen_at,
                 remote_class,
-                geo_class
+                geo_class,
+                company_id
             )
             VALUES (
                 :job_id,
@@ -174,7 +199,8 @@ def _upsert_job_in_conn(
                 :first_seen_at,
                 :last_seen_at,
                 :remote_class,
-                :geo_class
+                :geo_class,
+                :company_id
             )
             ON CONFLICT (job_id) DO UPDATE SET
                 source_url = excluded.source_url,
@@ -186,6 +212,7 @@ def _upsert_job_in_conn(
                 status = excluded.status,
                 remote_class = excluded.remote_class,
                 geo_class = excluded.geo_class,
+                company_id = COALESCE(jobs.company_id, excluded.company_id),
                 first_seen_at = CASE
                     WHEN excluded.first_seen_at < jobs.first_seen_at
                     THEN excluded.first_seen_at
@@ -208,15 +235,17 @@ def _upsert_job_in_conn(
             "last_seen_at": now,
             "remote_class": remote_class,
             "geo_class": geo_class,
+            "company_id": company_id,
         },
     )
 
 
-def upsert_job(job: dict, conn: Connection | None = None):
+def upsert_job(job: dict, conn: Connection | None = None, *, company_id: str | None = None):
     now = datetime.now(timezone.utc)
     first_seen_at = job.get("first_seen_at") or now
     remote_class = _derive_remote_class(job)
     geo_class = _derive_geo_class(job)
+    
     target_conn = _require_open_conn(conn, op_name="upsert_job")
     _upsert_job_in_conn(
         target_conn,
@@ -225,6 +254,7 @@ def upsert_job(job: dict, conn: Connection | None = None):
         now=now,
         remote_class=remote_class,
         geo_class=geo_class,
+        company_id=company_id,
     )
 
 def get_jobs_for_verification(limit: int = 20) -> list[dict]:
@@ -353,7 +383,7 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
         if payload.get("policy_v1_reason"):
             payload["_compliance"] = {
                 "policy_reason": payload["policy_v1_reason"],
-                "remote_model": "unknown",
+                "remote_model": RemoteClass.UNKNOWN.value,
             }
 
         remote_class = payload.get("remote_class") or _derive_remote_class(payload)
