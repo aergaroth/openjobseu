@@ -1,6 +1,7 @@
 import os
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import InterfaceError, OperationalError, ProgrammingError
 
 # tests should run against PostgreSQL rather than SQLite.  the CI workflow
 # already exports a suitable `DATABASE_URL`; when running locally you can
@@ -56,9 +57,12 @@ def clean_db():
     """
     try:
         with _engine.begin() as conn:
-            # companies is referenced by a foreign key in jobs; cascade just in
-            # case tests add other data later.
-            conn.execute(text("TRUNCATE jobs, companies CASCADE"))
-    except Exception as exc:  # pragma: no cover - network errors etc
+            conn.execute(text("TRUNCATE jobs CASCADE"))
+    except (OperationalError, InterfaceError) as exc:  # pragma: no cover - network/auth errors etc
         pytest.skip(f"database unavailable, skipping tests: {exc}")
+    except ProgrammingError as exc:
+        raise RuntimeError(
+            "test database schema is missing (e.g. table 'jobs'). "
+            "Run init_db() before pytest."
+        ) from exc
     yield

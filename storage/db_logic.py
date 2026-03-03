@@ -9,10 +9,24 @@ from datetime import datetime, timezone
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 from storage.db_engine import get_engine
+from app.domain.classification.mappers import normalize_geo_class, normalize_remote_class
 from app.workers.policy.v2.geo_classifier import classify_geo_scope
 
 engine = get_engine()
 MIGRATIONS_PATH = Path("storage/migrations")
+
+
+def _string_like(value: object | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+
+    enum_value = getattr(value, "value", None)
+    if isinstance(enum_value, str):
+        return enum_value
+
+    return str(value)
 
 
 def _derive_remote_class(job: dict) -> str:
@@ -20,60 +34,37 @@ def _derive_remote_class(job: dict) -> str:
     if not isinstance(compliance, dict):
         return "remote_only" if bool(job.get("remote_source_flag")) else "unknown"
 
-    policy_reason = str(compliance.get("policy_reason") or "").strip().lower()
-    remote_model = str(compliance.get("remote_model") or "").strip().lower()
+    policy_reason = (_string_like(compliance.get("policy_reason")) or "").strip().lower()
+    remote_model = _string_like(compliance.get("remote_model"))
 
     if policy_reason == "non_remote":
         return "non_remote"
 
-    mapping = {
-        "remote_only": "remote_only",
-        "remote_but_geo_restricted": "remote_region_locked",
-        "remote_region_locked": "remote_region_locked",
-        "hybrid": "non_remote",
-        "office_first": "non_remote",
-        "non_remote": "non_remote",
-        "unknown": "unknown",
-    }
-    return mapping.get(remote_model, "unknown")
+    return normalize_remote_class(remote_model).value
 
 
-def _normalize_geo_class_value(value: str | None) -> str:
-    geo = str(value or "").strip().lower()
-    mapping = {
-        "eu_member_state": "eu_member_state",
-        "eu_region": "eu_region",
-        "eu_explicit": "eu_explicit",
-        "eog": "eu_region",
-        "uk": "uk",
-        "worldwide": "unknown",
-        "global": "unknown",
-        "eu_friendly": "unknown",
-        "non_eu": "non_eu",
-        "non_eu_restricted": "non_eu",
-        "unknown": "unknown",
-    }
-    return mapping.get(geo, "unknown")
+def _normalize_geo_class_value(value: object | None) -> str:
+    return normalize_geo_class(_string_like(value)).value
 
 
 def _derive_geo_class(job: dict) -> str:
     
     explicit_geo = job.get("geo_class")
     if explicit_geo:
-        return explicit_geo
+        normalized_explicit_geo = _normalize_geo_class_value(explicit_geo)
+        if normalized_explicit_geo != "unknown":
+            return normalized_explicit_geo
 
     compliance = job.get("_compliance")
     policy_reason = ""
-    remote_model = ""
     explicit_geo_class = None
 
     if isinstance(compliance, dict):
-        policy_reason = str(compliance.get("policy_reason") or "").strip().lower()
-        remote_model = str(compliance.get("remote_model") or "").strip().lower()
+        policy_reason = (_string_like(compliance.get("policy_reason")) or "").strip().lower()
         explicit_geo_class = compliance.get("geo_class")
 
     if explicit_geo_class:
-        normalized = _normalize_geo_class_value(str(explicit_geo_class))
+        normalized = _normalize_geo_class_value(explicit_geo_class)
         if normalized != "unknown":
             return normalized
 
@@ -84,18 +75,14 @@ def _derive_geo_class(job: dict) -> str:
         str(job.get("title") or ""),
         str(job.get("description") or ""),
     )
-    normalized_classifier_geo = _normalize_geo_class_value(
-        str(classifier_result.get("geo_class") or "")
-    )
+    normalized_classifier_geo = _normalize_geo_class_value(classifier_result.get("geo_class"))
     if normalized_classifier_geo != "unknown":
         return normalized_classifier_geo
 
     remote_scope = str(job.get("remote_scope") or "").strip()
     if remote_scope:
         remote_scope_result = classify_geo_scope(remote_scope, "")
-        normalized_remote_scope_geo = _normalize_geo_class_value(
-            str(remote_scope_result.get("geo_class") or "")
-        )
+        normalized_remote_scope_geo = _normalize_geo_class_value(remote_scope_result.get("geo_class"))
         if normalized_remote_scope_geo != "unknown":
             return normalized_remote_scope_geo
 

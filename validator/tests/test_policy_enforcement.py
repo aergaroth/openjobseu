@@ -19,6 +19,7 @@ import storage.db_engine as _db_engine  # noqa: F401
 sys.modules.setdefault("feedparser", SimpleNamespace(parse=lambda *_args, **_kwargs: None))
 
 from app.workers.ingestion import remoteok, remotive, weworkremotely
+from app.domain.classification.enums import GeoClass, RemoteClass
 from app.workers.policy import v1
 from app.workers.policy.v1 import apply_policy_v1
 
@@ -87,17 +88,19 @@ def test_apply_policy_v1_calls_classifier_safely_when_fields_missing(monkeypatch
 
 
 def test_apply_policy_v3_short_circuits_on_hard_geo(monkeypatch):
-    # ensure that hard geo detection takes priority over the v1 logic
-    # by patching apply_policy_v1 so it would raise if called
+    # hard geo detection should return immediately and skip normal classifiers
     from app.workers.policy.v3 import apply_policy_v3 as v3module
 
-    def fake_v1(job, source):
-        raise RuntimeError("v1 should not be invoked when hard geo is detected")
-
-    monkeypatch.setattr(v3module, "apply_policy_v1", fake_v1)
-
-    # the remote classifier runs before the geo check; patch it to return a known value
-    monkeypatch.setattr(v3module, "classify_remote_model", lambda **_: {"remote_model": "remote_only"})
+    monkeypatch.setattr(
+        v3module,
+        "classify_remote_v3",
+        lambda **_: (_ for _ in ()).throw(RuntimeError("classify_remote_v3 should not be called")),
+    )
+    monkeypatch.setattr(
+        v3module,
+        "classify_geo_v3",
+        lambda **_: (_ for _ in ()).throw(RuntimeError("classify_geo_v3 should not be called")),
+    )
 
     job = {
         "title": "Backend Engineer",
@@ -112,31 +115,38 @@ def test_apply_policy_v3_short_circuits_on_hard_geo(monkeypatch):
     assert result_job is not None
     assert result_job["_compliance"]["policy_version"] == "v3"
     assert result_job["_compliance"]["policy_reason"] == "geo_restriction_hard"
-    # remote model was filled from the patched classifier
-    assert result_job["_compliance"]["remote_model"] == "remote_only"
+    assert result_job["_compliance"]["remote_model"] == RemoteClass.UNKNOWN
+    assert result_job["_compliance"]["geo_class"] == GeoClass.NON_EU
 
 
-def test_apply_policy_v3_falls_back_to_v1(monkeypatch):
-    # when no hard geo restriction is present, apply_policy_v3 should delegate to v1
+def test_apply_policy_v3_classifies_without_v1_fallback(monkeypatch):
+    # when no hard restriction is present, v3 should use v3 classifiers directly
     from app.workers.policy.v3 import apply_policy_v3 as v3module
-    calls = []
+    calls = {"remote": 0, "geo": 0}
 
-    def fake_v1(job, source):
-        calls.append((job.copy(), source))
-        # return the job unmodified with no reason
-        return job, None
+    def fake_remote(**_kwargs):
+        calls["remote"] += 1
+        return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": "fake_remote"}
 
-    monkeypatch.setattr(v3module, "apply_policy_v1", fake_v1)
+    def fake_geo(**_kwargs):
+        calls["geo"] += 1
+        return {"geo_class": GeoClass.EU_REGION, "reason": "fake_geo"}
+
+    monkeypatch.setattr(v3module, "classify_remote_v3", fake_remote)
+    monkeypatch.setattr(v3module, "classify_geo_v3", fake_geo)
 
     job = {"title": "Engineer", "description": "Fully remote role"}
     result_job, reason = v3module.apply_policy_v3(job.copy(), source="test")
 
-    assert calls, "v1 should have been called when no hard geo restriction"
+    assert calls == {"remote": 1, "geo": 1}
     assert reason is None
-    # apply_policy_v3 tags the job with a v3 policy marker even when delegating
-    # to v1; ensure the returned job carries the v3 policy_version annotation.
     assert result_job is not None
-    assert result_job.get("_compliance", {}).get("policy_version") == "v3"
+    assert result_job["_compliance"]["policy_version"] == "v3"
+    assert result_job["_compliance"]["policy_reason"] is None
+    assert result_job["_compliance"]["remote_model"] == RemoteClass.REMOTE_ONLY
+    assert result_job["_compliance"]["geo_class"] == GeoClass.EU_REGION
+    assert result_job["_compliance"]["remote_reason"] == "fake_remote"
+    assert result_job["_compliance"]["geo_reason"] == "fake_geo"
 
 
 @pytest.mark.parametrize(

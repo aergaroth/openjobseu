@@ -1,5 +1,6 @@
 from typing import Tuple
 
+from app.domain.classification.enums import GeoClass, RemoteClass
 from app.workers.policy.v3.remote_v3 import classify_remote_v3
 from app.workers.policy.v3.geo_v3 import classify_geo_v3
 from app.workers.policy.v3.hard_geo_detector import detect_hard_geo_restriction
@@ -18,8 +19,8 @@ def apply_policy_v3(job: dict, source: str) -> Tuple[dict | None, str | None]:
         job["_compliance"] = {
             "policy_version": "v3",
             "policy_reason": "geo_restriction_hard",
-            "remote_model": "unknown",
-            "geo_class": "non_eu",
+            "remote_model": RemoteClass.UNKNOWN,
+            "geo_class": GeoClass.NON_EU,
         }
         return job, "geo_restriction_hard"
 

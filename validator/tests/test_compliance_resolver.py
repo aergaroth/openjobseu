@@ -1,97 +1,74 @@
-from app.workers.compliance_resolver import resolve_compliance
+import pytest
+
+from app.workers.compliance_resolver import calculate_compliance_score, resolve_compliance
 
 
-def test_rejected_non_remote():
-    result = resolve_compliance("non_remote", "eu_member_state")
+@pytest.mark.parametrize(
+    ("remote_class", "geo_class"),
+    [
+        ("non_remote", "eu_member_state"),
+        ("office_first", "eu_member_state"),
+        ("hybrid", "uk"),
+    ],
+)
+def test_non_remote_variants_are_hard_rejected(remote_class: str, geo_class: str):
+    result = resolve_compliance(remote_class, geo_class)
     assert result["compliance_status"] == "rejected"
     assert result["compliance_score"] == 0
 
 
-def test_rejected_non_eu():
-    result = resolve_compliance("remote_only", "non_eu")
+@pytest.mark.parametrize("geo_class", ["non_eu", "non_eu_restricted"])
+def test_non_eu_variants_are_hard_rejected(geo_class: str):
+    result = resolve_compliance("remote_only", geo_class)
     assert result["compliance_status"] == "rejected"
     assert result["compliance_score"] == 0
 
 
-def test_rejected_non_eu_alias():
-    result = resolve_compliance("remote_only", "non_eu_restricted")
-    assert result["compliance_status"] == "rejected"
-    assert result["compliance_score"] == 0
-
-
-def test_approved_remote_only_eu_member_state():
-    result = resolve_compliance("remote_only", "eu_member_state")
+@pytest.mark.parametrize(
+    "geo_class",
+    [
+        "eu_member_state",
+        "eu_explicit",
+        "eu_region",
+        "uk",
+        "eog",
+    ],
+)
+def test_remote_only_on_eu_eligible_geo_is_approved(geo_class: str):
+    result = resolve_compliance("remote_only", geo_class)
     assert result["compliance_status"] == "approved"
     assert result["compliance_score"] == 100
 
 
-def test_approved_remote_only_eu_region():
-    result = resolve_compliance("remote_only", "eu_region")
+@pytest.mark.parametrize("remote_class", ["remote_but_geo_restricted", "remote_region_locked"])
+@pytest.mark.parametrize("geo_class", ["eu_member_state", "eu_explicit", "eu_region", "uk"])
+def test_region_locked_remote_on_eu_eligible_geo_is_approved(remote_class: str, geo_class: str):
+    result = resolve_compliance(remote_class, geo_class)
     assert result["compliance_status"] == "approved"
     assert result["compliance_score"] == 90
 
 
-def test_approved_remote_only_eu_explicit_alias():
-    result = resolve_compliance("remote_only", "eu_explicit")
-    assert result["compliance_status"] == "approved"
-    assert result["compliance_score"] == 90
-
-
-def test_approved_remote_only_uk():
-    result = resolve_compliance("remote_only", "uk")
-    assert result["compliance_status"] == "approved"
-    assert result["compliance_score"] == 85
-
-
-def test_worldwide_alias_is_unknown_and_rejected():
-    result = resolve_compliance("remote_only", "worldwide")
-    assert result["compliance_status"] == "rejected"
-    assert result["compliance_score"] == 20
-
-
-def test_review_remote_geo_restricted_eu_member_state():
-    result = resolve_compliance("remote_but_geo_restricted", "eu_member_state")
-    assert result["compliance_status"] == "review"
-    assert result["compliance_score"] == 70
-
-
-def test_review_remote_geo_restricted_eu_region():
-    result = resolve_compliance("remote_but_geo_restricted", "eu_region")
-    assert result["compliance_status"] == "review"
-    assert result["compliance_score"] == 65
-
-
-def test_worldwide_alias_rejected_for_geo_restricted_remote():
-    result = resolve_compliance("remote_but_geo_restricted", "worldwide")
-    assert result["compliance_status"] == "rejected"
-    assert result["compliance_score"] == 20
-
-
-def test_review_unknown_remote_eu_member_state():
-    result = resolve_compliance("unknown", "eu_member_state")
+@pytest.mark.parametrize("geo_class", ["eu_member_state", "eu_explicit", "eu_region", "uk"])
+def test_remote_optional_on_eu_eligible_geo_is_review(geo_class: str):
+    result = resolve_compliance("remote_optional", geo_class)
     assert result["compliance_status"] == "review"
     assert result["compliance_score"] == 60
 
 
-def test_review_unknown_remote_eu_region():
-    result = resolve_compliance("unknown", "eu_region")
+@pytest.mark.parametrize("geo_class", ["eu_member_state", "eu_explicit", "eu_region", "uk"])
+def test_unknown_remote_on_eu_eligible_geo_is_review(geo_class: str):
+    result = resolve_compliance("unknown", geo_class)
     assert result["compliance_status"] == "review"
     assert result["compliance_score"] == 55
 
 
-def test_review_unknown_remote_uk():
-    result = resolve_compliance("unknown", "uk")
-    assert result["compliance_status"] == "review"
-    assert result["compliance_score"] == 55
-
-
-def test_worldwide_alias_rejected_for_unknown_remote():
-    result = resolve_compliance("unknown", "worldwide")
+@pytest.mark.parametrize("geo_class", ["worldwide", "global", "eu_friendly", "unknown", "unexpected"])
+def test_unknown_geo_variants_fall_back_to_rejected(geo_class: str):
+    result = resolve_compliance("remote_only", geo_class)
     assert result["compliance_status"] == "rejected"
     assert result["compliance_score"] == 20
 
 
-def test_default_fallback_rejected_with_score_20():
-    result = resolve_compliance("remote_only", "unknown")
-    assert result["compliance_status"] == "rejected"
-    assert result["compliance_score"] == 20
+def test_calculate_compliance_score_returns_score_only():
+    assert calculate_compliance_score("remote_only", "eu_member_state") == 100
+    assert calculate_compliance_score("remote_only", "unknown") == 20

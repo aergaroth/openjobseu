@@ -1,4 +1,5 @@
 import datetime
+from app.domain.classification.mappers import normalize_geo_class, normalize_remote_class
 from app.workers.policy.v2.geo_classifier import classify_geo_scope
 
 
@@ -41,34 +42,11 @@ def _derive_remote_class(job: dict) -> str:
     if policy_reason == "non_remote":
         return "non_remote"
 
-    mapping = {
-        "remote_only": "remote_only",
-        "remote_but_geo_restricted": "remote_but_geo_restricted",
-        "remote_region_locked": "remote_but_geo_restricted",
-        "hybrid": "non_remote",
-        "office_first": "non_remote",
-        "non_remote": "non_remote",
-        "unknown": "unknown",
-    }
-    return mapping.get(remote_model, "unknown")
+    return normalize_remote_class(remote_model).value
 
 
 def _normalize_geo_class_value(value: str | None) -> str:
-    geo = str(value or "").strip().lower()
-    mapping = {
-        "eu_member_state": "eu_member_state",
-        "eu_region": "eu_region",
-        "eu_explicit": "eu_explicit",
-        "eog": "eu_region",
-        "uk": "uk",
-        "worldwide": "unknown",
-        "global": "unknown",
-        "eu_friendly": "unknown",
-        "non_eu": "non_eu",
-        "non_eu_restricted": "non_eu",
-        "unknown": "unknown",
-    }
-    return mapping.get(geo, "unknown")
+    return normalize_geo_class(value).value
 
 
 def _derive_geo_class(job: dict) -> str:
@@ -188,5 +166,5 @@ def test_upsert_marks_geo_non_eu_when_policy_flags_geo_restriction():
 
     row = _IN_MEMORY_JOBS.get(job["job_id"])
     assert row is not None
-    assert row["remote_class"] == "remote_but_geo_restricted"
+    assert row["remote_class"] == "remote_region_locked"
     assert row["geo_class"] == "non_eu"
