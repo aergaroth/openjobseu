@@ -76,7 +76,12 @@ def audit_filter_registry():
 
 @router.post("/audit/tick-dev")
 def run_tick_from_audit():
-    return tick(force_text=True)
+    result = tick(force_text=True)
+    if isinstance(result, Response):
+        return result
+    if isinstance(result, str):
+        return Response(content=result, media_type="text/plain")
+    return result
 
 
 @router.post("/tick")
