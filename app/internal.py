@@ -1,6 +1,5 @@
 import logging
 import os
-import subprocess
 from functools import lru_cache
 from pathlib import Path
 
@@ -13,7 +12,12 @@ from app.utils.tick_formatting import format_tick_summary
 from app.workers.ingestion.registry import INGESTION_HANDLERS
 from app.workers.tick import run_tick
 from app.workers.tick_pipeline import run_tick_pipeline
-from storage.db_logic import get_jobs_audit
+from storage.db_logic import (
+    get_audit_company_compliance_stats,
+    get_audit_source_compliance_stats_last_7d,
+    get_audit_source_filter_values,
+    get_jobs_audit,
+)
 
 logger = logging.getLogger("openjobseu.runtime")
 
@@ -21,13 +25,6 @@ router = APIRouter(prefix="/internal", tags=["internal"])
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 AUDIT_PANEL_PATH = REPO_ROOT / "audit_tool" / "offer_audit_panel.html"
-TICK_DEV_SCRIPT_PATH = REPO_ROOT / "scripts" / "tick-dev.sh"
-
-
-def _truncate_output(value: str, max_chars: int = 8000) -> str:
-    if len(value) <= max_chars:
-        return value
-    return value[-max_chars:]
 
 
 @lru_cache(maxsize=1)
@@ -79,37 +76,37 @@ def audit_jobs(
 
 @router.get("/audit/filters")
 def audit_filter_registry():
-    return get_audit_filter_registry()
+    payload = get_audit_filter_registry()
+    payload["source"] = get_audit_source_filter_values()
+    return payload
+
+
+@router.get("/audit/stats/company")
+def audit_company_stats(
+    min_total_jobs: int = Query(10, ge=0, le=10000),
+):
+    return {
+        "min_total_jobs": int(min_total_jobs),
+        "items": get_audit_company_compliance_stats(min_total_jobs=min_total_jobs),
+    }
+
+
+@router.get("/audit/stats/source-7d")
+def audit_source_stats_7d():
+    return {
+        "window": "last_7_days",
+        "items": get_audit_source_compliance_stats_last_7d(),
+    }
 
 
 @router.post("/audit/tick-dev")
-def run_tick_dev_script():
-    if not TICK_DEV_SCRIPT_PATH.exists():
-        raise HTTPException(status_code=404, detail="scripts/tick-dev.sh not found")
-
-    try:
-        result = subprocess.run(
-            ["bash", str(TICK_DEV_SCRIPT_PATH)],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            timeout=180,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as exc:
-        return {
-            "status": "timeout",
-            "returncode": -1,
-            "stdout": _truncate_output(str(exc.stdout or "")),
-            "stderr": _truncate_output(str(exc.stderr or "")),
-        }
-
-    return {
-        "status": "ok" if result.returncode == 0 else "failed",
-        "returncode": int(result.returncode),
-        "stdout": _truncate_output(result.stdout or ""),
-        "stderr": _truncate_output(result.stderr or ""),
-    }
+def run_tick_from_audit():
+    result = tick(force_text=True)
+    if isinstance(result, Response):
+        return result
+    if isinstance(result, str):
+        return Response(content=result, media_type="text/plain")
+    return result
 
 
 @router.post("/tick")
@@ -123,7 +120,7 @@ def manual_tick(
     return tick(response_format=response_format)
 
 
-def tick(*, response_format: str = "auto"):
+def tick(*, response_format: str = "auto", force_text: bool = False):
     ingestion_mode = os.getenv("INGESTION_MODE", "prod")
 
     raw_sources = os.getenv("INGESTION_SOURCES")
@@ -160,6 +157,8 @@ def tick(*, response_format: str = "auto"):
     }
 
     render_mode = (response_format or "auto").strip().lower()
+    if force_text:
+        render_mode = "text"
     if render_mode == "text" or (render_mode == "auto" and should_use_text_logs()):
         return Response(
             content=format_tick_summary(payload),

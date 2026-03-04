@@ -2,197 +2,161 @@
 
 ## Overview
 
-OpenJobsEU is an open-source, compliance-first platform for aggregating legally accessible, EU-focused remote job offers.
+OpenJobsEU is a backend-first, compliance-focused pipeline for aggregating legally accessible remote job offers with EU relevance signals.
 
-The system is designed as a backend-oriented, production-grade pipeline with a strong emphasis on:
-- clear separation of concerns
-- data freshness and lifecycle correctness
-- operational transparency
-- cloud-native deployment
-
-User-facing functionality is intentionally minimal and strictly read-only.
+The runtime is intentionally read-only on the public side and operationally explicit on the internal side.
 
 ---
 
-## High-Level Architecture
+## High-Level Flow
 
 ![Architecture diagram](./architecture.png)
 
+Pipeline mode flow:
 
-The system operates as a periodic **tick-based pipeline**:
-
-External Sources -> Ingestion -> Normalization -> Storage -> Compliance Resolution -> Post-ingestion -> Read API -> Consumers
-
-This model ensures predictable behavior, resilience to partial failures, and clear operational boundaries.
-
-> In production (Cloud Run), OpenJobsEU runs in prod mode by default.
-> Development-only local ingestion requires explicitly setting ```INGESTION_MODE=local```
-
-> Logging format is determined by runtime mode. Local development uses text logs, while containerized deployments emit 
-> structured JSON logs.
-
-> Database backend is selected via `DB_MODE`:
-> - `standard` -> PostgreSQL via `DATABASE_URL` (`postgresql+psycopg://...`)
-> - `cloudsql` -> Cloud SQL Python Connector (`pg8000`, IAM auth)
+External Sources -> Ingestion Handlers -> Source Normalization + Policy Signals -> DB Upsert -> Compliance Resolution -> Post-Ingestion Workers -> Read APIs
 
 ---
 
-## Core Components
+## Runtime Modes
 
-### External Job Sources
+- `INGESTION_MODE=local`
+  - runs `app.workers.tick.run_tick`
+  - reads `ingestion/sources/example_jobs.json`
+  - runs post-ingestion workers
+- any non-local mode (`prod`, `dev`, etc.)
+  - runs `app.workers.tick_pipeline.run_tick_pipeline`
+  - executes configured ingestion handlers
+  - runs compliance resolution + post-ingestion
 
-Legally accessible, public job data sources such as:
-- public RSS feeds
-- public JSON APIs
+Handler selection:
+- if `INGESTION_SOURCES` is set, its comma-separated values are used
+- otherwise all handlers from `app/workers/ingestion/registry.py` are used
 
-No scraping, authentication bypassing, or automated interactions are performed.
-
----
-
-### Ingestion Adapters
-
-Each source is integrated via a dedicated ingestion adapter responsible for:
-- fetching raw job data
-- handling source-specific formats
-- emitting raw job entries
-
-Adapters are isolated so failures in one source do not affect others.
+Current active handlers in registry:
+- `remotive`
+- `employer_ing`
 
 ---
 
-### Normalization Layer
+## Ingestion Layer
 
-The normalization layer converts raw job entries into a single **canonical job model**.
+### `remotive`
 
-Responsibilities:
-- enforce required fields
-- apply source-specific heuristics safely
-- reject malformed or out-of-scope source entries
-- produce source-agnostic job records
+Runtime path:
+- adapter: `ingestion/adapters/remotive_api.py`
+- normalization: `app/workers/normalization/remotive.py`
+- policy tagging: `app/workers/policy/v1.py`
 
-Normalization does not compute final compliance score/status.
+### `employer_ing`
 
----
+Runtime path:
+- loads active ATS companies from `companies` table (`is_active=true`, `ats_provider`, `ats_slug`)
+- currently supports `ats_provider=greenhouse`
+- adapter: `ingestion/adapters/greenhouse_api.py`
+- normalization: `app/workers/normalization/greenhouse.py`
+- policy tagging: `app/workers/policy/v3/apply_policy_v3.py`
 
-### Job Store
+`employer_ing` can hard-skip records with `geo_restriction_hard` signals before DB upsert.
 
-The job store is the system’s single source of truth.
+### Present in code but disabled in registry
 
-Responsibilities:
-- persist normalized job data
-- track lifecycle-related timestamps
-- support idempotent upserts
+- `remoteok`
+- `weworkremotely`
 
-Current runtime uses SQLAlchemy Core with PostgreSQL-compatible SQL.
-It supports standard PostgreSQL URLs and Cloud SQL connector mode.
-
----
-
-### Compliance Resolution Layer
-
-After ingestion, the pipeline runs deterministic compliance resolution:
-- derive/normalize `remote_class`
-- derive/normalize `geo_class`
-- compute `compliance_status` (`approved` / `review` / `rejected`)
-- compute `compliance_score` (0-100)
-
-On app startup, existing rows missing compliance metadata are batch-backfilled.
+Those adapters/workers exist but are commented out in the default ingestion registry.
 
 ---
 
-### Availability & Lifecycle
+## Storage Layer
 
-Background workers handle:
-- periodic availability verification of job URLs
-- lifecycle transitions (NEW → ACTIVE → STALE → EXPIRED / UNREACHABLE)
+The storage backend uses SQLAlchemy Core and PostgreSQL.
 
-These processes are asynchronous and do not block ingestion or API access.
+Database modes:
+- `DB_MODE=standard` + `DATABASE_URL=postgresql+psycopg://...`
+- `DB_MODE=cloudsql` + Cloud SQL connector settings (`INSTANCE_CONNECTION_NAME`, `DB_NAME`, `DB_USER`)
 
----
+Schema initialization is migration-file based (`storage/migrations/*.sql`) and tracked in `schema_migrations`.
 
-### Read API
+Core tables:
+- `jobs`
+- `companies`
 
-The Read API exposes job data in a strictly read-only manner.
-
-Key properties:
-- stateless
-- cache-friendly
-- contract-stable
-
-Endpoints:
-- GET /jobs
-- GET /jobs/feed
-
-`/jobs/feed` is additionally filtered by `min_compliance_score=80`.
-
-Only visible jobs (NEW and ACTIVE) are exposed to consumers.
-
-Internal operational endpoints:
-- POST /internal/tick (`format=auto|text|json`, default `auto`)
-- GET /internal/audit
-- GET /internal/audit/jobs
-- POST /internal/audit/tick-dev
+`jobs.company_id` references `companies.company_id` (nullable FK).
 
 ---
 
-### Frontend & Consumers
+## Classification and Compliance
 
-Consumers include:
-- a minimal reference frontend
-- external aggregators
-- automated systems
+At write-time, job rows are normalized to canonical classes (`remote_class`, `geo_class`) during upsert.
 
-All consumers interact exclusively via the Read API or public feed.
+After ingestion, compliance resolution (`app/workers/compliance_resolution.py`) computes:
+- `compliance_status`: `approved | review | rejected`
+- `compliance_score`: `0..100`
 
----
-
-## Execution Model
-
-The entire system is executed via a periodic **scheduler-triggered tick**:
-
-1. Ingestion phase
-2. Compliance resolution phase
-3. Post-ingestion processing
-4. Availability checks (inside post-ingestion)
-5. Lifecycle transitions (inside post-ingestion)
-
-This design avoids long-running workers and ensures deterministic execution.
+On startup, missing class/compliance fields are backfilled in batches.
 
 ---
 
-## Observability
+## Post-Ingestion Workers
 
-Observability is provided via:
-- structured application logs
-- explicit ingestion phase logging
-- runtime tick metrics (duration, per-source ingestion counts, policy counters, remote-model counters)
-- compliance resolution summaries
-- health and readiness endpoints
+`run_post_ingestion()` executes:
+- availability checks (`app/workers/availability.py`)
+- lifecycle transitions (`app/workers/lifecycle.py`)
 
-More advanced metrics and alerting are planned.
-
-The repository also includes a DB/runtime smoke script: `scripts/db_smoke_check.py`.
-
-The smoke check validates:
-- application health endpoint
-- successful tick execution
-- database accessibility and integrity
-- job_id uniqueness
-- basic feed consistency
-
-For manual runtime checks, `/internal/tick?format=text` can be used to force
-the same tabular summary format in both localhost and Cloud Run environments.
-
-When integrated in CI/CD, any failure should block deployment and require investigation.
-
+Lifecycle states in runtime:
+- `new`, `active`, `stale`, `expired`, `unreachable`
 
 ---
 
-## Compliance Boundaries
+## API Layer
 
-OpenJobsEU explicitly avoids:
-- scraping closed platforms
-- user tracking or profiling
-- automated redistribution to third parties
+Public endpoints:
+- `GET /health`
+- `GET /ready`
+- `GET /jobs`
+- `GET /jobs/feed`
+- `GET /jobs/stats/compliance-7d`
 
-All processing is limited to legally accessible data sources.
+Feed behavior:
+- visible jobs only (`new`, `active`)
+- minimum compliance score: `80`
+- cache header: `Cache-Control: public, max-age=300`
+
+Internal endpoints:
+- `POST /internal/tick` (`format=auto|text|json`)
+- `GET /internal/audit`
+- `GET /internal/audit/jobs`
+- `GET /internal/audit/filters`
+- `GET /internal/audit/stats/company`
+- `GET /internal/audit/stats/source-7d`
+- `POST /internal/audit/tick-dev`
+
+Audit panel data shape:
+- `/internal/audit/filters` returns canonical filter lists and dynamic `source` values from DB
+- `/internal/audit/stats/company` provides aggregated compliance ratio by `companies.legal_name` (`HAVING COUNT(*) > 10` by default)
+- `/internal/audit/stats/source-7d` provides aggregated compliance ratio by source for rows with `first_seen_at` in last 7 days
+
+---
+
+## Logging and Metrics
+
+Logging mode:
+- text formatter in local runtime (`APP_RUNTIME=local` or non-container)
+- JSON formatter in container/cloud runtime
+
+Tick payload/summary includes:
+- per-source fetch/persist/skip counters
+- policy rejection counters
+- remote model counters
+- timing metrics
+
+---
+
+## Deployment Shape
+
+Infrastructure is managed with Terraform in split environments:
+- `infra/gcp/dev`
+- `infra/gcp/prod`
+
+Production scheduler triggers `POST /internal/tick` every 15 minutes.

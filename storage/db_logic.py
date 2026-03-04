@@ -710,6 +710,131 @@ def get_jobs_audit(
     }
 
 
+def get_compliance_stats_last_7d() -> dict:
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("""
+                SELECT
+                    COUNT(*) AS total_jobs,
+                    COUNT(*) FILTER (WHERE compliance_status = 'approved') AS approved,
+                    COUNT(*) FILTER (WHERE compliance_status = 'review') AS review,
+                    COUNT(*) FILTER (WHERE compliance_status = 'rejected') AS rejected,
+                    ROUND(
+                        COUNT(*) FILTER (WHERE compliance_status = 'approved')::numeric
+                        / NULLIF(COUNT(*), 0) * 100,
+                        2
+                    ) AS approved_ratio_pct
+                FROM jobs
+                WHERE first_seen_at > NOW() - INTERVAL '7 days'
+            """)
+        ).mappings().one()
+
+    ratio = row["approved_ratio_pct"]
+    return {
+        "window": "last_7_days",
+        "total_jobs": int(row["total_jobs"] or 0),
+        "approved": int(row["approved"] or 0),
+        "review": int(row["review"] or 0),
+        "rejected": int(row["rejected"] or 0),
+        "approved_ratio_pct": float(ratio) if ratio is not None else None,
+    }
+
+
+def get_audit_source_filter_values() -> list[str]:
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT
+                    source,
+                    COUNT(*) AS count
+                FROM jobs
+                WHERE source IS NOT NULL
+                  AND btrim(source) <> ''
+                GROUP BY source
+                ORDER BY count DESC, source ASC
+            """)
+        ).mappings().all()
+
+    return [str(row["source"]) for row in rows]
+
+
+def get_audit_company_compliance_stats(
+    *,
+    min_total_jobs: int = 10,
+) -> list[dict]:
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT
+                    c.legal_name,
+                    COUNT(*) AS total_jobs,
+                    COUNT(*) FILTER (WHERE j.compliance_status = 'approved') AS approved,
+                    COUNT(*) FILTER (WHERE j.compliance_status = 'rejected') AS rejected,
+                    ROUND(
+                        COUNT(*) FILTER (WHERE j.compliance_status = 'approved')::numeric
+                        / NULLIF(COUNT(*), 0) * 100,
+                        2
+                    ) AS approved_ratio_pct
+                FROM jobs j
+                JOIN companies c ON c.company_id = j.company_id
+                GROUP BY c.legal_name
+                HAVING COUNT(*) > :min_total_jobs
+                ORDER BY approved_ratio_pct ASC NULLS FIRST, c.legal_name ASC
+            """),
+            {"min_total_jobs": int(min_total_jobs)},
+        ).mappings().all()
+
+    result: list[dict] = []
+    for row in rows:
+        ratio = row["approved_ratio_pct"]
+        result.append(
+            {
+                "legal_name": str(row["legal_name"]),
+                "total_jobs": int(row["total_jobs"] or 0),
+                "approved": int(row["approved"] or 0),
+                "rejected": int(row["rejected"] or 0),
+                "approved_ratio_pct": float(ratio) if ratio is not None else None,
+            }
+        )
+    return result
+
+
+def get_audit_source_compliance_stats_last_7d() -> list[dict]:
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT
+                    source,
+                    COUNT(*) AS total_jobs,
+                    COUNT(*) FILTER (WHERE compliance_status = 'approved') AS approved,
+                    COUNT(*) FILTER (WHERE compliance_status = 'rejected') AS rejected,
+                    ROUND(
+                        COUNT(*) FILTER (WHERE compliance_status = 'approved')::numeric
+                        / NULLIF(COUNT(*), 0) * 100,
+                        2
+                    ) AS approved_ratio_pct
+                FROM jobs
+                WHERE first_seen_at > NOW() - INTERVAL '7 days'
+                GROUP BY source
+                ORDER BY approved_ratio_pct ASC NULLS FIRST, source ASC
+            """)
+        ).mappings().all()
+
+    result: list[dict] = []
+    for row in rows:
+        ratio = row["approved_ratio_pct"]
+        result.append(
+            {
+                "source": row["source"],
+                "total_jobs": int(row["total_jobs"] or 0),
+                "approved": int(row["approved"] or 0),
+                "rejected": int(row["rejected"] or 0),
+                "approved_ratio_pct": float(ratio) if ratio is not None else None,
+            }
+        )
+    return result
+
+
 def get_jobs(
     status: str | None = None,
     company: str | None = None,

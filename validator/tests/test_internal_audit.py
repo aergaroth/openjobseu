@@ -1,4 +1,6 @@
 import os
+import uuid
+from datetime import datetime, timedelta, timezone
 
 # guarantee that the database mode is configured even during module import.
 os.environ.setdefault("DB_MODE", "standard")
@@ -70,6 +72,36 @@ def _set_compliance(
         )
 
 
+def _insert_company(legal_name: str) -> str:
+    company_id = str(uuid.uuid4())
+    with engine.begin() as conn:
+        conn.execute(
+            text("""
+                INSERT INTO companies (
+                    company_id,
+                    legal_name,
+                    hq_country,
+                    remote_posture,
+                    created_at,
+                    updated_at
+                )
+                VALUES (
+                    :company_id,
+                    :legal_name,
+                    'PL',
+                    'UNKNOWN',
+                    NOW(),
+                    NOW()
+                )
+            """),
+            {
+                "company_id": company_id,
+                "legal_name": legal_name,
+            },
+        )
+    return company_id
+
+
 def test_internal_audit_page_renders_html():
     response = client.get("/internal/audit")
     assert response.status_code == 200
@@ -83,14 +115,16 @@ def test_internal_audit_filter_registry():
     payload = response.json()
 
     assert payload["status"] == ["new", "active", "stale", "expired", "unreachable"]
-    assert "remote_but_geo_restricted" in payload["remote_class"]
     assert RemoteClass.REMOTE_REGION_LOCKED.value in payload["remote_class"]
+    assert RemoteClass.REMOTE_OPTIONAL.value in payload["remote_class"]
+    assert "remote_but_geo_restricted" in payload["remote_class"]
     assert GeoClass.EU_EXPLICIT.value in payload["geo_class"]
     assert payload["compliance_status"] == [
         ComplianceStatus.APPROVED.value,
         ComplianceStatus.REVIEW.value,
         ComplianceStatus.REJECTED.value,
     ]
+    assert payload["source"] == []
 
 
 def test_internal_audit_jobs_filters_and_counts():
@@ -181,36 +215,219 @@ def test_internal_audit_jobs_filters_and_counts():
     assert filtered["total"] == 1
     assert filtered["items"][0]["job_id"] == "audit:1"
 
+    filters_response = client.get("/internal/audit/filters")
+    assert filters_response.status_code == 200
+    source_values = filters_response.json()["source"]
+    assert "remotive" in source_values
+    assert "remoteok" in source_values
 
-def test_internal_audit_tick_dev_runs_script(monkeypatch):
+
+def test_internal_audit_tick_dev_runs_tick_with_text_output(monkeypatch):
     captured = {}
 
-    class FakeResult:
-        returncode = 0
-        stdout = "tick done"
-        stderr = ""
+    def fake_tick(force_text=False):
+        captured["force_text"] = force_text
+        return "tick as text"
 
-    def fake_run(cmd, cwd, capture_output, text, timeout, check):
-        captured["cmd"] = cmd
-        captured["cwd"] = cwd
-        captured["capture_output"] = capture_output
-        captured["text"] = text
-        captured["timeout"] = timeout
-        captured["check"] = check
-        return FakeResult()
-
-    monkeypatch.setattr(internal_api.subprocess, "run", fake_run)
+    monkeypatch.setattr(internal_api, "tick", fake_tick)
 
     response = client.post("/internal/audit/tick-dev")
     assert response.status_code == 200
+    assert response.text == "tick as text"
+    assert captured["force_text"] is True
+
+
+def test_internal_audit_company_stats():
+    init_db()
+    marker = "audit-company-stats-20260304"
+    company_low = _insert_company(f"{marker}-low")
+    company_high = _insert_company(f"{marker}-high")
+    company_small = _insert_company(f"{marker}-small")
+
+    updates = []
+    with engine.begin() as conn:
+        for i in range(12):
+            job_id = f"audit-company-low:{i}"
+            upsert_job(
+                _make_job(
+                    job_id,
+                    source="remotive",
+                    status="new",
+                    company=f"{marker}-low",
+                    title=f"{marker} low {i}",
+                    remote_scope="Europe",
+                ),
+                conn=conn,
+                company_id=company_low,
+            )
+            updates.append(
+                {
+                    "job_id": job_id,
+                    "compliance_status": "approved" if i < 3 else "rejected",
+                }
+            )
+
+        for i in range(12):
+            job_id = f"audit-company-high:{i}"
+            upsert_job(
+                _make_job(
+                    job_id,
+                    source="remotive",
+                    status="new",
+                    company=f"{marker}-high",
+                    title=f"{marker} high {i}",
+                    remote_scope="Europe",
+                ),
+                conn=conn,
+                company_id=company_high,
+            )
+            updates.append(
+                {
+                    "job_id": job_id,
+                    "compliance_status": "approved" if i < 9 else "rejected",
+                }
+            )
+
+        for i in range(10):
+            job_id = f"audit-company-small:{i}"
+            upsert_job(
+                _make_job(
+                    job_id,
+                    source="remotive",
+                    status="new",
+                    company=f"{marker}-small",
+                    title=f"{marker} small {i}",
+                    remote_scope="Europe",
+                ),
+                conn=conn,
+                company_id=company_small,
+            )
+            updates.append(
+                {
+                    "job_id": job_id,
+                    "compliance_status": "approved",
+                }
+            )
+
+        conn.execute(
+            text("""
+                UPDATE jobs
+                SET compliance_status = :compliance_status
+                WHERE job_id = :job_id
+            """),
+            updates,
+        )
+
+    response = client.get("/internal/audit/stats/company")
+    assert response.status_code == 200
     payload = response.json()
 
-    assert payload["status"] == "ok"
-    assert payload["returncode"] == 0
-    assert payload["stdout"] == "tick done"
-    assert payload["stderr"] == ""
+    assert payload["min_total_jobs"] == 10
+    items = payload["items"]
+    assert len(items) == 2
+    assert [item["legal_name"] for item in items] == [f"{marker}-low", f"{marker}-high"]
+    assert items[0]["total_jobs"] == 12
+    assert items[0]["approved"] == 3
+    assert items[0]["rejected"] == 9
+    assert items[0]["approved_ratio_pct"] == 25.0
+    assert items[1]["approved_ratio_pct"] == 75.0
 
-    assert captured["cmd"][0] == "bash"
-    assert captured["cmd"][1].endswith("scripts/tick-dev.sh")
-    assert captured["capture_output"] is True
-    assert captured["text"] is True
+
+def test_internal_audit_source_stats_7d():
+    init_db()
+    marker = "audit-source-stats-20260304"
+    now = datetime.now(timezone.utc)
+
+    updates = []
+    with engine.begin() as conn:
+        for i in range(4):
+            job_id = f"audit-source-remotive:{i}"
+            upsert_job(
+                _make_job(
+                    job_id,
+                    source="remotive",
+                    status="new",
+                    company=f"{marker}-r",
+                    title=f"{marker} remotive {i}",
+                    remote_scope="Europe",
+                ),
+                conn=conn,
+            )
+            updates.append(
+                {
+                    "job_id": job_id,
+                    "compliance_status": "approved" if i == 0 else "rejected",
+                    "first_seen_at": now - timedelta(days=2),
+                }
+            )
+
+        for i in range(2):
+            job_id = f"audit-source-greenhouse:{i}"
+            upsert_job(
+                _make_job(
+                    job_id,
+                    source="greenhouse:acme",
+                    status="new",
+                    company=f"{marker}-g",
+                    title=f"{marker} greenhouse {i}",
+                    remote_scope="Europe",
+                ),
+                conn=conn,
+            )
+            updates.append(
+                {
+                    "job_id": job_id,
+                    "compliance_status": "approved",
+                    "first_seen_at": now - timedelta(days=3),
+                }
+            )
+
+        for i in range(2):
+            job_id = f"audit-source-old:{i}"
+            upsert_job(
+                _make_job(
+                    job_id,
+                    source="remoteok",
+                    status="new",
+                    company=f"{marker}-o",
+                    title=f"{marker} old {i}",
+                    remote_scope="Europe",
+                ),
+                conn=conn,
+            )
+            updates.append(
+                {
+                    "job_id": job_id,
+                    "compliance_status": "approved",
+                    "first_seen_at": now - timedelta(days=10),
+                }
+            )
+
+        for row in updates:
+            conn.execute(
+                text("""
+                    UPDATE jobs
+                    SET
+                        compliance_status = :compliance_status,
+                        first_seen_at = :first_seen_at
+                    WHERE job_id = :job_id
+                """),
+                {
+                    "job_id": row["job_id"],
+                    "compliance_status": row["compliance_status"],
+                    "first_seen_at": row["first_seen_at"],
+                },
+            )
+
+    response = client.get("/internal/audit/stats/source-7d")
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["window"] == "last_7_days"
+    items = payload["items"]
+    assert [item["source"] for item in items] == ["remotive", "greenhouse:acme"]
+    assert items[0]["total_jobs"] == 4
+    assert items[0]["approved"] == 1
+    assert items[0]["rejected"] == 3
+    assert items[0]["approved_ratio_pct"] == 25.0
+    assert items[1]["approved_ratio_pct"] == 100.0

@@ -1,51 +1,49 @@
 # Canonical Job Model – OpenJobsEU
 
-The canonical job model defines a single, source-agnostic representation of job offers within OpenJobsEU.
-
-All incoming job data is normalized to this model to ensure consistent processing,
-storage, and querying across different sources.
+The canonical model is the persisted shape of job offers in `jobs` table after normalization and upsert.
 
 ---
 
 ## Core Identifiers (implemented)
 
-- **job_id**: globally unique identifier (string, source-scoped, stable)
-- **source**: identifier of the original data source (e.g. `weworkremotely`, `remotive`, `remoteok`)
-- **source_job_id**: job identifier in the source system
-- **source_url**: original job posting URL
+- **job_id**: globally unique identifier, source-scoped
+- **source**: source identifier (examples: `remotive`, `greenhouse:{board_token}`)
+- **source_job_id**: source-native identifier
+- **source_url**: source posting URL (sanitized)
+
+Notes:
+- historical rows may also contain `remoteok` or `weworkremotely` source values
+- current default ingestion registry runs `remotive` and `employer_ing` only
 
 ---
 
 ## Job Metadata (implemented)
 
-- **title**: job title
-- **company_name**: company or organization name
-- **description**: normalized job description (plain text)
+- **title**
+- **company_name**
+- **description**
 
 ---
 
-## Location & Scope (implemented)
+## Location and Remote Signals (implemented)
 
-- **remote_source_flag**: boolean source-level remote indicator (must be `true` for inclusion)
-- **remote_scope**: source-provided scope, preserved verbatim 
-  Examples:
-  - `EU-wide`
-  - `Worldwide`
-  - `Europe`
-  - `Europe, Canada, South Africa`
+- **remote_source_flag**: source-level remote indicator (bool)
+- **remote_scope**: source-provided geographic/scope text
 
-Normalization may reject malformed/out-of-scope source records.
-Final compliance decision is resolved in a dedicated post-ingestion stage.
+`remote_source_flag` can differ by source quality; final policy/compliance decision is resolved downstream.
 
 ---
 
-## Compliance Classification (implemented)
+## Classification and Compliance (implemented)
 
 - **remote_class**:
-  `remote_only | remote_but_geo_restricted | non_remote | unknown`
+  `remote_only | remote_region_locked | remote_optional | non_remote | unknown`
+
+Historical alias still present in some data paths/metrics:
+- `remote_but_geo_restricted` (legacy alias for `remote_region_locked`)
 
 - **geo_class**:
-  `eu_member_state | eu_region | eu_explicit | uk | non_eu | unknown`
+  `eu_member_state | eu_explicit | eu_region | uk | non_eu | unknown`
 
 - **compliance_status**:
   `approved | review | rejected`
@@ -53,103 +51,72 @@ Final compliance decision is resolved in a dedicated post-ingestion stage.
 - **compliance_score**:
   integer `0..100`
 
-These fields are used by the public feed contract:
-- `/jobs/feed` returns only visible jobs with `compliance_score >= 80`
+Feed usage:
+- `/jobs/feed` returns visible jobs with `compliance_score >= 80`
 
 ---
 
-## Lifecycle & Tracking (implemented)
+## Lifecycle and Tracking (implemented)
 
 - **status**:
   `new | active | stale | expired | unreachable`
+- **first_seen_at**
+- **last_seen_at**
+- **last_verified_at**
+- **verification_failures**
+- **updated_at**
 
-- **first_seen_at**: timestamp of first successful ingestion
-- **last_seen_at**: timestamp of last successful ingestion
-- **last_verified_at**: timestamp of last successful availability check
-- **verification_failures**: number of consecutive availability check failures
+Status semantics:
+- `new` -> first 24h from `first_seen_at`
+- `active` -> healthy/visible
+- `stale` -> verification outdated
+- `expired` -> unavailable or aged-out by rules
+- `unreachable` -> temporary access failure
 
-### Status semantics
-
-- **NEW** – freshly discovered job (first 24h after `first_seen_at`)
-- **ACTIVE** – verified and visible job
-- **STALE** – job not verified within a defined time window
-- **EXPIRED** – job confirmed unavailable or outdated
-- **UNREACHABLE** – temporarily unreachable job source
-
-From an API consumer perspective, **NEW and ACTIVE jobs are treated as visible**.
-
----
-
-## Persistence notes
-
-- `first_seen_at` prefers source publication timestamp when available
-- if source publication timestamp is missing, `first_seen_at` falls back to ingestion time
-- on repeated upserts of the same `job_id`, the earliest `first_seen_at` is preserved
-- `last_seen_at` is updated on each successful ingestion of the same job
-- `last_verified_at` is updated only by the availability checker
-- `remote_class` and `geo_class` are derived at write time and backfilled when missing
-- `compliance_status` and `compliance_score` are updated by the compliance resolution worker
-- ingestion and normalization do not modify lifecycle state beyond initial creation
+Visible jobs for API/feed: `new`, `active`.
 
 ---
 
-## Planned near-term extension
+## Company Linkage (implemented)
 
-### Source posting date (planned)
+- **company_id**: nullable UUID FK to `companies.company_id`
 
-- **posted_at**: original publication date provided by the source (if available)
-
-Notes:
-- This field will be used to improve freshness handling and deduplication
-- Lifecycle logic will continue to rely on `first_seen_at` and verification checks
-- `posted_at` will never override lifecycle state directly
+Usage:
+- `employer_ing` writes jobs with explicit `company_id`
+- legacy/other sources may leave `company_id` null
 
 ---
 
-## Planned extensions (not yet implemented)
+## Persistence Notes
 
-The following fields are part of the long-term canonical model but are not yet populated by the current runtime:
-
-### Job attributes
-- employment_type
-- seniority
-- role_category
-- tech_tags
-
-### Compensation
-- salary_min
-- salary_max
-- salary_currency
-- salary_period
-
-### Constraints
-- timezone_requirements
-- country_restrictions
-
-These fields are intentionally deferred to keep the initial implementation focused and minimal.
+- earliest `first_seen_at` is preserved on conflict upsert
+- `last_seen_at` is refreshed on each successful upsert
+- `remote_class` and `geo_class` are normalized at write-time and backfilled when missing
+- compliance resolver updates `compliance_status` and `compliance_score`
+- availability/lifecycle workers update `status`, `last_verified_at`, `verification_failures`
 
 ---
 
-## Ingestion & Normalization Contract
+## Intentionally Deferred Fields
 
-### Adapters
-Each ingestion adapter must:
-- fetch raw job data from a single source
-- expose source identifier and source job ID
-- return unmodified source payloads
+The runtime does not currently persist enriched fields such as:
+- employment type / seniority / role category
+- compensation ranges
+- timezone or detailed country restrictions
 
-Adapters **must not**:
-- apply heuristics
-- enforce OpenJobsEU policy
-- modify lifecycle state
-- persist data
+These can be added in later model revisions once source reliability and policy contracts are defined.
 
-### Normalization
-Normalization is responsible for:
-- validating required fields
-- enforcing source-specific structural and scope constraints
-- mapping raw payloads to the canonical job model
-- sanitizing source URL and location fields
-- preparing data for downstream compliance resolution
+---
 
-Normalization is source-specific, deterministic, and covered by automated tests.
+## Adapter vs Normalization Contract
+
+Adapters:
+- fetch source payloads
+- handle transport and source-specific wire formats
+- do not persist
+
+Normalization:
+- validates required fields
+- maps payloads to canonical fields
+- sanitizes URLs/locations
+- may reject malformed or clearly out-of-scope records

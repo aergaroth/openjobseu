@@ -13,11 +13,12 @@ AUDIT_FILTER_REGISTRY: Dict[str, List[str]] = {
     ],
     "remote_class": [
         RemoteClass.REMOTE_ONLY.value,
-        "remote_but_geo_restricted",
+        RemoteClass.REMOTE_REGION_LOCKED.value,
         RemoteClass.NON_REMOTE.value,
+        RemoteClass.REMOTE_OPTIONAL.value,
         RemoteClass.UNKNOWN.value,
         # Backward-compatibility alias still present in some historical rows.
-        RemoteClass.REMOTE_REGION_LOCKED.value,
+        "remote_but_geo_restricted",
     ],
     "geo_class": [
         GeoClass.EU_MEMBER_STATE.value,

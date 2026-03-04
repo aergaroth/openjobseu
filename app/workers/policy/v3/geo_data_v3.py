@@ -111,3 +111,16 @@ NON_EU_REGION_CUSTOM = (
     "apac",
 )
 
+NON_EU_SCOPE_TITLE_PHRASES = (
+    "united states",
+    "us only",
+    "u.s.",
+    "usa",
+    "canada",
+)
+
+NON_EU_SCOPE_TOKENS = {
+    "us",
+    "usa",
+    "canada",
+}
