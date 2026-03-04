@@ -12,7 +12,12 @@ from app.utils.tick_formatting import format_tick_summary
 from app.workers.ingestion.registry import INGESTION_HANDLERS
 from app.workers.tick import run_tick
 from app.workers.tick_pipeline import run_tick_pipeline
-from storage.db_logic import get_jobs_audit
+from storage.db_logic import (
+    get_audit_company_compliance_stats,
+    get_audit_source_compliance_stats_last_7d,
+    get_audit_source_filter_values,
+    get_jobs_audit,
+)
 
 logger = logging.getLogger("openjobseu.runtime")
 
@@ -71,7 +76,27 @@ def audit_jobs(
 
 @router.get("/audit/filters")
 def audit_filter_registry():
-    return get_audit_filter_registry()
+    payload = get_audit_filter_registry()
+    payload["source"] = get_audit_source_filter_values()
+    return payload
+
+
+@router.get("/audit/stats/company")
+def audit_company_stats(
+    min_total_jobs: int = Query(10, ge=0, le=10000),
+):
+    return {
+        "min_total_jobs": int(min_total_jobs),
+        "items": get_audit_company_compliance_stats(min_total_jobs=min_total_jobs),
+    }
+
+
+@router.get("/audit/stats/source-7d")
+def audit_source_stats_7d():
+    return {
+        "window": "last_7_days",
+        "items": get_audit_source_compliance_stats_last_7d(),
+    }
 
 
 @router.post("/audit/tick-dev")

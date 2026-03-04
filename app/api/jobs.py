@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query, Response
 from datetime import datetime, timezone
 
-from storage.db_logic import get_jobs
+from storage.db_logic import get_compliance_stats_last_7d, get_jobs
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -72,3 +72,8 @@ def jobs_feed(response: Response):
 
     response.headers["Cache-Control"] = "public, max-age=300"
     return payload
+
+
+@router.get("/stats/compliance-7d")
+def jobs_compliance_stats_7d():
+    return get_compliance_stats_last_7d()

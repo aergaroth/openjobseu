@@ -33,9 +33,12 @@ Non-goals remain unchanged:
 
 ### API and audit
 - [x] Public read API: `/jobs`, `/jobs/feed`
+- [x] Public 7-day compliance snapshot endpoint: `/jobs/stats/compliance-7d`
 - [x] Feed threshold: `min_compliance_score=80`
 - [x] Internal tick endpoint with text/json formatting
 - [x] Internal audit panel and filterable audit API
+- [x] Internal audit aggregate stats endpoints (`/internal/audit/stats/company`, `/internal/audit/stats/source-7d`)
+- [x] Audit filter registry extended with dynamic source dropdown values
 
 ### Ops
 - [x] Cloud Run deployment via Terraform (`infra/gcp/dev`, `infra/gcp/prod`)

@@ -42,18 +42,30 @@ Public/read-only:
 - `GET /ready`
 - `GET /jobs`
 - `GET /jobs/feed`
+- `GET /jobs/stats/compliance-7d`
 
 Internal/ops:
 - `POST /internal/tick`
 - `GET /internal/audit`
 - `GET /internal/audit/jobs`
 - `GET /internal/audit/filters`
+- `GET /internal/audit/stats/company`
+- `GET /internal/audit/stats/source-7d`
 - `POST /internal/audit/tick-dev`
 
 Feed contract:
 - `/jobs/feed` returns only visible jobs (`new`, `active`)
 - feed applies `min_compliance_score=80`
 - feed response has `Cache-Control: public, max-age=300`
+
+Stats contracts:
+- `/jobs/stats/compliance-7d` returns global 7-day compliance aggregate by `first_seen_at`
+- `/internal/audit/stats/company` returns company-level compliance ratio (default threshold: total jobs > 10)
+- `/internal/audit/stats/source-7d` returns source-level compliance ratio for last 7 days
+
+Audit panel behavior:
+- filter dropdowns are registry-driven and include dynamic `source` values from DB
+- panel includes two additional stats tables (company compliance ratio and source compliance ratio 7d)
 
 ---
 

@@ -116,6 +116,7 @@ Public endpoints:
 - `GET /ready`
 - `GET /jobs`
 - `GET /jobs/feed`
+- `GET /jobs/stats/compliance-7d`
 
 Feed behavior:
 - visible jobs only (`new`, `active`)
@@ -127,7 +128,14 @@ Internal endpoints:
 - `GET /internal/audit`
 - `GET /internal/audit/jobs`
 - `GET /internal/audit/filters`
+- `GET /internal/audit/stats/company`
+- `GET /internal/audit/stats/source-7d`
 - `POST /internal/audit/tick-dev`
+
+Audit panel data shape:
+- `/internal/audit/filters` returns canonical filter lists and dynamic `source` values from DB
+- `/internal/audit/stats/company` provides aggregated compliance ratio by `companies.legal_name` (`HAVING COUNT(*) > 10` by default)
+- `/internal/audit/stats/source-7d` provides aggregated compliance ratio by source for rows with `first_seen_at` in last 7 days
 
 ---
 
