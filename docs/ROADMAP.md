@@ -1,119 +1,73 @@
 # OpenJobsEU Roadmap
 
-## Project scope
+## Scope
 
-OpenJobsEU is an open-source, compliance-first platform for aggregating EU-focused remote job offers.
+OpenJobsEU remains a compliance-first aggregation backend for EU-relevant remote jobs.
 
-The project is developed incrementally, with a strong focus on:
-- clean domain modeling
-- operational correctness
-- real cloud deployment
-
-It is not a demo or mock system — all components are designed to run in production infrastructure.
+Non-goals remain unchanged:
+- no scraping of closed/protected platforms
+- no candidate accounts/tracking layer
+- no automated posting to third-party platforms
 
 ---
 
-## Explicit non-goals
+## Delivered Baseline
 
-- Scraping closed or protected job boards
-- Automated posting to third-party platforms
-- Candidate accounts, profiles, or tracking
+### Runtime and ingestion
+- [x] Tick-based runtime with local and pipeline modes
+- [x] Active handlers: `remotive`, `employer_ing`
+- [x] Curated employer ATS ingestion (Greenhouse)
+- [x] Source-specific normalization and policy signal stages
 
----
+### Data platform
+- [x] PostgreSQL schema with migration files (`jobs`, `companies`)
+- [x] SQLAlchemy Core storage backend
+- [x] `DB_MODE=standard` and `DB_MODE=cloudsql`
+- [x] Idempotent upsert and lifecycle timestamps
 
-## MVP v1 — DONE
+### Compliance and lifecycle
+- [x] Remote/geo class normalization
+- [x] Compliance status + scoring resolver
+- [x] Startup backfill for missing compliance metadata
+- [x] Availability and lifecycle workers (`new|active|stale|expired|unreachable`)
 
-### A1 – Ingestion
-- [x] Canonical job data model
-- [x] Local JSON ingestion (dev)
-- [x] RSS ingestion (WeWorkRemotely)
-- [x] Public API ingestion (Remotive, RemoteOK)
-- [x] Source-specific normalization with tests
+### API and audit
+- [x] Public read API: `/jobs`, `/jobs/feed`
+- [x] Feed threshold: `min_compliance_score=80`
+- [x] Internal tick endpoint with text/json formatting
+- [x] Internal audit panel and filterable audit API
 
-### A2 – Persistence
-- [x] SQLAlchemy Core storage layer
-- [x] PostgreSQL runtime backend (`DB_MODE=standard`)
-- [x] Idempotent job upsert
-- [x] First-seen and last-seen tracking
-
-### A3 – Availability checking
-- [x] HTTP-based availability checks
-- [x] Failure tracking and retries
-
-### A4 – Lifecycle management
-- [x] NEW / ACTIVE / STALE / EXPIRED / UNREACHABLE states
-- [x] Time-based transitions
-- [x] Failure-based expiration
-
-### A5 – Read API
-- [x] GET /jobs endpoint
-- [x] Status filtering
-- [x] Visible jobs abstraction (new + active)
-
-### A6 – Distribution & consumption
-- [x] Public JSON feed (`/jobs/feed`)
-- [x] Stable, cache-friendly feed contract
-- [x] Contract tests for public feed
-- [x] Minimal static reference frontend
-
-### Runtime & Infrastructure
-- [x] Cloud Run runtime managed via Terraform
-- [x] Remote Terraform state in GCS with locking
-- [x] Cloud Scheduler triggering `/internal/tick`
-- [x] CI pipeline with tests, image build and deploy
-- [x] Deterministic runtime initialization (fresh DB support)
-- [x] Startup DB health check
-- [x] Runtime-aware structured logging (JSON in container, text locally)
-
-Status: **live**
+### Ops
+- [x] Cloud Run deployment via Terraform (`infra/gcp/dev`, `infra/gcp/prod`)
+- [x] Cloud Scheduler trigger for `/internal/tick` in production
+- [x] CI test workflow with PostgreSQL service
+- [x] Runtime-aware logging (text local, JSON in containers)
 
 ---
 
-## Post-MVP evolution
+## Next Priorities
 
-### A7 – Content quality & policy layer (v1) — DONE
-- [x] Source-aware HTML cleaning layer
-- [x] Spam marker removal (RemoteOK-specific artifacts)
-- [x] Remote purity policy signals (soft tagging)
-- [x] Geo restriction signals (soft tagging)
-- [x] Global policy signal capture across all ingestion sources
-- [x] Cleaning and policy test coverage
-- [x] Audit scripts for source quality analysis (geo + remote purity)
+### P1 – Source strategy
+- [ ] Re-enable additional public sources only after current quality gate criteria are met
+- [ ] Finalize explicit activation policy for adapters present in code but disabled in registry
 
-### A8 – Observability & ops polish
-- [x] Structured logging
-- [x] Runtime metrics (tick duration, ingestion counts)
-- [x] Tick summary metrics (per source: fetched / accepted / rejected)
-- [x] Policy rejection metrics and reason tracking
-- [x] Internal audit panel + filtered audit API (`/internal/audit`, `/internal/audit/jobs`)
-- [ ] Rejection audit log (policy v1, persistent file-based)
-- [ ] Scheduler and tick failure alerting
+### P2 – Company data maturity
+- [ ] Add operational workflows for curated `companies` maintenance (ATS slug hygiene, activation lifecycle)
+- [ ] Connect company signal scoring pipeline into production runtime decisions
 
-### A9 – Compliance resolution (v2) — DONE
-- [x] Deterministic remote model classifier (`remote_only`, `non_remote`, etc.)
-- [x] Deterministic geo classifier (`eu_member_state`, `non_eu`, etc.)
-- [x] Compliance resolver (`approved` / `review` / `rejected`) with score `0..100`
-- [x] Compliance resolution phase inside tick pipeline
-- [x] Startup bootstrap for existing rows missing compliance fields
-- [x] Feed quality threshold (`/jobs/feed` uses `min_compliance_score=80`)
+### P3 – DB and migration hardening
+- [ ] Introduce explicit migration tooling (Alembic or equivalent)
+- [ ] Tune indexes for feed/audit/lifecycle query patterns
+- [ ] Add automated post-deploy smoke checks
 
-### A10 – Database platform hardening
-- [x] Connection backend split by runtime mode (`DB_MODE`)
-- [x] Standard PostgreSQL mode via `DATABASE_URL`
-- [x] CloudQL ready mode (`DB_MODE=cloudsql`, Cloud SQL connector + IAM auth)
-- [ ] Explicit migration tooling (Alembic or equivalent)
-- [ ] Index tuning aligned with lifecycle + feed query patterns
-- [ ] Automated post-deploy smoke check wired into CI/CD
+### P4 – Observability
+- [ ] Add scheduler/tick failure alerting
+- [ ] Add trend dashboards for per-source quality drift and rejection reasons
 
 ---
 
-## Future (design-level)
+## Future Direction
 
-- Company self-publishing workflow (manual, compliance-first)
-- Metadata enrichment (source-provided fields such as posted_at; heuristic-based, no AI by default)
-- Managed deployment options
-- Compliance/policy evolution:
-  - richer reason-code taxonomy persisted in DB
-  - confidence-aware scoring calibration
-  - drift detection per source (quality regression monitoring)
-  - review workflow for borderline (`review`) offers
+- Controlled company self-publishing workflows (manual/compliance-first)
+- Richer structured metadata once source quality is stable
+- Policy reason taxonomy expansion and review tooling for borderline offers

@@ -27,13 +27,18 @@ Each source is evaluated individually before integration.
 OpenJobsEU uses deterministic, code-defined compliance stages:
 
 1. Ingestion + normalization produce canonical job records
-2. Policy signals/classifiers derive remote and geo classes
-3. Compliance resolver assigns:
+2. Policy/classifier stages attach remote and geo signals
+3. DB upsert normalizes `remote_class` and `geo_class`
+4. Compliance resolver assigns:
    - `compliance_status`: `approved | review | rejected`
    - `compliance_score`: `0..100`
 
 Public distribution uses this score conservatively:
 - `/jobs/feed` exposes only visible jobs with `compliance_score >= 80`
+
+Current policy paths:
+- `remotive` ingestion uses policy v1 soft signals
+- `employer_ing` uses policy v3 signals with hard geo restriction detection (`geo_restriction_hard`)
 
 This approach keeps ingestion broad enough for auditability while keeping the public feed conservative.
 

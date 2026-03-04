@@ -2,197 +2,132 @@
 
 # OpenJobsEU
 
-Project website: https://openjobseu.org
+Project website: https://openjobseu.org  
 (Simple static frontend consuming the public job feed)
 
-OpenJobsEU is an open-source, compliance-first platform for aggregating **EU-focused, fully remote job offers**.
+OpenJobsEU is an open-source, compliance-first platform for aggregating EU-focused remote job offers.
 
-The project is built as a **backend-first, production-oriented system**, with a strong focus on:
-- clean domain modeling
+The project is backend-first and production-oriented, with focus on:
 - ingestion correctness
-- data lifecycle management
-- real cloud deployment
+- deterministic policy/compliance classification
+- lifecycle freshness and availability checks
+- cloud runtime operability
 
-It is **not** a consumer-facing job board.
-
----
-
-## Live runtime (Cloud Run)
-
-https://openjobseu-anobnjle6q-lz.a.run.app
+It is not a full consumer job board.
 
 ---
 
-## Public job feed
+## Current runtime snapshot
 
-OpenJobsEU exposes a stable, read-only JSON feed of visible job offers:
+OpenJobsEU runs as a tick-based pipeline:
 
-https://openjobseu-anobnjle6q-lz.a.run.app/jobs/feed
+1. Scheduler or operator triggers `POST /internal/tick`
+2. Ingestion runs for configured sources
+3. Canonical rows are upserted into PostgreSQL
+4. Compliance resolution computes `compliance_status` + `compliance_score`
+5. Post-ingestion workers run availability checks and lifecycle transitions
 
-The feed contains **EU-focused, fully remote roles** that pass compliance-score filtering and is intended for:
-- minimal frontends
-- external aggregators
-- automated consumers
+### Active ingestion sources in the default registry
+- `remotive` (public API)
+- `employer_ing` (curated employers table + Greenhouse ATS API)
 
-The contract is intentionally **minimal, cache-friendly, and read-only**.
-
----
-
-## High-level architecture
-
-At runtime, OpenJobsEU operates as a **tick-based ingestion system**:
-
-1. **Cloud Scheduler** triggers `/internal/tick`
-2. A **dispatcher** determines active ingestion sources
-3. Each source runs through:
-   - fetch-only adapter (external API / RSS)
-   - source-specific normalization
-   - idempotent persistence
-4. **Compliance resolution** computes `compliance_status` + `compliance_score`
-5. Post-ingestion workers handle:
-   - availability checks
-   - lifecycle transitions
-
-The system is designed so that **adding a new data source does not affect existing ones**.
+Adapters for `remoteok` and `weworkremotely` exist in codebase but are currently disabled in `app/workers/ingestion/registry.py`.
 
 ---
 
-## Goals
-- Aggregate only **legally accessible** job data
-- Focus on **EU-focused remote roles** (EU/EEA/UK signals)
-- Verify job availability and data freshness over time
-- Provide a transparent, inspectable alternative to closed job platforms
+## API surface
+
+Public/read-only:
+- `GET /health`
+- `GET /ready`
+- `GET /jobs`
+- `GET /jobs/feed`
+
+Internal/ops:
+- `POST /internal/tick`
+- `GET /internal/audit`
+- `GET /internal/audit/jobs`
+- `GET /internal/audit/filters`
+- `POST /internal/audit/tick-dev`
+
+Feed contract:
+- `/jobs/feed` returns only visible jobs (`new`, `active`)
+- feed applies `min_compliance_score=80`
+- feed response has `Cache-Control: public, max-age=300`
 
 ---
 
-## Explicit non-goals
-- Scraping closed or protected job boards
-- User accounts, profiles, or tracking
-- Advertising, ranking, or recommendation systems
-- Acting as a full-featured job board
+## Runtime configuration
+
+Database backend:
+- `DB_MODE=standard` with `DATABASE_URL=postgresql+psycopg://...`
+- or `DB_MODE=cloudsql` with `INSTANCE_CONNECTION_NAME`, `DB_NAME`, `DB_USER`
+
+Ingestion mode:
+- `INGESTION_MODE=local` -> local JSON source (`ingestion/sources/example_jobs.json`)
+- any other value (including `prod`, `dev`) -> pipeline mode with external handlers
+
+Optional source selection in pipeline mode:
+- `INGESTION_SOURCES=remotive,employer_ing`
+
+Log rendering:
+- `APP_RUNTIME=local` forces text logs/tick text output in `format=auto`
+- container/cloud runtime defaults to JSON logs
+
+### Internal tick formatting
+
+`POST /internal/tick?format=auto|text|json`:
+- `auto`: text on local runtime, JSON in container/cloud runtime
+- `text`: always tabular plain-text summary
+- `json`: always JSON payload
+
+Examples:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/internal/tick?format=text"
+curl -X POST "http://127.0.0.1:8000/internal/tick?format=json"
+```
 
 ---
 
-## Core features
-- Multiple ingestion sources with a unified dispatcher
-- Fetch-only adapters and explicit normalization layer
-- Canonical job data model
-- Idempotent storage and lifecycle tracking
-- SQLAlchemy-based PostgreSQL storage backend (`DB_MODE=standard` / `DB_MODE=cloudsql`)
-- Deterministic compliance classification and scoring (`approved` / `review` / `rejected`)
-- Availability verification via HTTP checks
-- Read-only Jobs API and public feed
-- Internal audit API and HTML audit panel (`/internal/audit`)
-- Structured ingestion logging
-- Infrastructure as Code (Terraform)
-- CI pipeline with automated tests
+## Testing
 
----
+Most tests expect PostgreSQL. CI starts `postgres:16` and uses:
+- `DB_MODE=standard`
+- `DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/testdb`
 
-## Current status
+Local pattern:
 
-OpenJobsEU is a **working early-stage system**, running in real cloud infrastructure.
+```bash
+# start postgres
+docker run --rm --name openjobspg -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=testdb -p 5432:5432 -d postgres:16
 
-### Implemented ingestion sources
-- **WeWorkRemotely** (RSS)
-- **Remotive** (public API)
-- **RemoteOK** (public API)
-
-### Implemented runtime components
-- Tick dispatcher with pluggable sources
-- Source-specific normalization
-- PostgreSQL persistence via SQLAlchemy engine abstraction
-- Availability checking
-- Lifecycle management (NEW → ACTIVE → STALE → EXPIRED)
-- Compliance bootstrap for existing DB rows at startup
-- Compliance resolution stage inside tick pipeline
-- Public `/jobs` and `/jobs/feed` endpoints
-- Feed filtering by compliance score threshold (`min_compliance_score=80`)
-- Internal audit endpoints (`/internal/audit`, `/internal/audit/jobs`)
-- Cloud Run + Cloud Scheduler runtime
-- CI with validation and normalization tests
-
-The system is intentionally conservative and correctness-oriented.
-
----
-
-## Documentation
-- `docs/ARCHITECTURE.md` – system design and ingestion flow
-- `docs/DATA_SOURCES.md` – details of supported sources
-- `docs/CANONICAL_MODEL.md` – canonical job schema
-- `docs/COMPLIANCE.md` – data access and legal considerations
-- `docs/JOB_LIFECYCLE.md` – lifecycle state transitions
-- `docs/ROADMAP.md` – planned evolution
+# run tests
+pytest -q
+```
 
 ---
 
 ## Infrastructure hint
 
+Terraform environments are split:
+
 ```bash
-cp infra/gcp/terraform.tfvars.example infra/gcp/terraform.tfvars
+cp infra/gcp/dev/terraform.tfvars.example infra/gcp/dev/terraform.tfvars
+cp infra/gcp/prod/terraform.tfvars.example infra/gcp/prod/terraform.tfvars
 ```
 
 ---
 
-## Runtime configuration (current)
+## Documentation
 
-Required database mode:
-
-- `DB_MODE=standard` with `DATABASE_URL=postgresql+psycopg://...`
-- or `DB_MODE=cloudsql` with `INSTANCE_CONNECTION_NAME`, `DB_NAME`, `DB_USER`
-
-## Testing 📦
-
-Most of the validator-level unit tests exercise real database logic, so they
-expect a PostgreSQL server to be available. The GitHub Actions workflow starts
-a `postgres:16` container and sets `DATABASE_URL` to
-`postgresql+psycopg://postgres:postgres@localhost:5432/testdb`; you can
-mimic that locally with your own container or an existing instance.
-
-A simple pattern to run tests in development:
-
-```bash
-# start a throw‑away postgres
-docker run --rm --name openjobspg -e POSTGRES_PASSWORD=postgres \
-    -e POSTGRES_DB=testdb -p 5432:5432 -d postgres:16
-
-# run pytest; conftest.py will default DATABASE_URL to
-# postgresql+psycopg://postgres:postgres@localhost:5432/testdb
-pytest -q
-```
-
-If the database is unreachable, the test suite will skip the SQL-heavy
-modules rather than failing outright, allowing you to edit code or run linters
-without a running backend.
-
-Ingestion runtime:
-
-- `INGESTION_MODE=prod` (default pipeline with external sources)
-- `INGESTION_MODE=local` (dev-only local JSON source)
-- optional: `INGESTION_SOURCES=remotive,remoteok,weworkremotely`
-
-### Internal tick endpoint
-
-Manual tick trigger:
-
-- `POST /internal/tick`
-- optional query param: `format=auto|text|json` (default: `auto`)
-
-Formatting behavior:
-
-- `format=auto`: text in local runtime, JSON in container/cloud runtime
-- `format=text`: forces the tabular text summary (same layout on localhost and Cloud Run)
-- `format=json`: forces JSON payload
-
-Examples:
-
-```bash
-# same human-readable tick summary everywhere (Cloud Run/local)
-curl -X POST "http://127.0.0.1:8000/internal/tick?format=text"
-
-# force JSON response
-curl -X POST "http://127.0.0.1:8000/internal/tick?format=json"
-```
+- `docs/ARCHITECTURE.md` - system design and ingestion flow
+- `docs/DATA_SOURCES.md` - source inventory and activation status
+- `docs/CANONICAL_MODEL.md` - canonical job schema
+- `docs/COMPLIANCE.md` - data access and legal boundaries
+- `docs/JOB_LIFECYCLE.md` - lifecycle status transitions
+- `docs/ROADMAP.md` - current roadmap
 
 ---
 

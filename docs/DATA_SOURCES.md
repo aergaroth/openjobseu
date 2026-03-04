@@ -1,144 +1,103 @@
 # Data Sources – OpenJobsEU
 
-OpenJobsEU integrates **only legally accessible, public job data sources**.
+OpenJobsEU integrates only legally accessible, read-only sources.
 
-All sources are accessed in a **read-only** manner and processed through dedicated
-ingestion adapters. Raw data is never exposed directly — every job offer must pass
-through explicit normalization and validation before being persisted.
-Final compliance status is assigned in a dedicated compliance-resolution stage.
-
----
-
-## Current data sources
-
-### WeWorkRemotely
-
-- **Type:** Public RSS feed
-- **Endpoint:** 
-  https://weworkremotely.com/categories/remote-programming-jobs.rss
-- **Access:** Public, unauthenticated
-- **Legal basis:** Publicly published job listings
-- **Scope:** Fully remote roles (EU-wide by project policy)
-
-Notes:
-- RSS entries are fetched as-is
-- Normalization applies a conservative company-name heuristic
-- Normalization uses source publication date when available (`published` / `updated`)
-- Source URL is sanitized before persistence
-- Jobs without required fields are skipped
+Every record goes through:
+- fetch adapter
+- source normalization
+- policy/classification signals
+- canonical upsert
+- compliance resolution
 
 ---
+
+## Active in Default Ingestion Registry
 
 ### Remotive
 
 - **Type:** Public JSON API
-- **Endpoint:**
-  https://remotive.com/api/remote-jobs
-- **Access:** Public, unauthenticated
-- **Legal basis:** Public API explicitly intended for reuse
-- **Scope:** EU-wide and Worldwide roles only
+- **Endpoint:** `https://remotive.com/api/remote-jobs`
+- **Handler key:** `remotive`
+- **Normalization:** `app/workers/normalization/remotive.py`
+- **Policy stage:** `policy v1` soft signals
 
-Notes:
-- Raw API payloads are fetched without modification
-- Normalization enforces source-level scope constraints:
-  - EU-wide or Worldwide only
-  - non-Europe / non-worldwide location labels are skipped
-- `publication_date` is used as `first_seen_at` when available
-- URL and location fields are sanitized during normalization
+Normalization rules include:
+- required field validation
+- location filter: Europe or Worldwide only
+- publication date fallback to ingestion timestamp
+- URL/location sanitization
 
 ---
 
-### RemoteOK
+### Employer ATS Ingestion (`employer_ing`)
 
-- **Type:** Public JSON API
-- **Endpoint:**
-  https://remoteok.com/api
-- **Access:** Public, unauthenticated
-- **Legal basis:** Public API with explicit reuse allowance
-- **Scope:** Remote-first roles, normalized into `EU-wide` or `worldwide`
+- **Type:** Curated company list + ATS API fetch
+- **Handler key:** `employer_ing`
+- **Current ATS support:** Greenhouse only
+- **Adapter:** `ingestion/adapters/greenhouse_api.py`
+- **Normalization:** `app/workers/normalization/greenhouse.py`
+- **Policy stage:** `policy v3`
 
-Notes:
-- The first API element (metadata/legal notice) is ignored
-- Remaining entries are treated as job offers
-- Normalization validates required fields and remote metadata
-- Source date (`date` / `epoch`) is used for `first_seen_at` when available
-- Source URL is sanitized before persistence
+Input set is loaded from `companies` table rows where:
+- `is_active = true`
+- `ats_provider IS NOT NULL`
+- `ats_slug IS NOT NULL`
 
----
+Current provider behavior:
+- `ats_provider=greenhouse` -> fetch and ingest supported
+- other providers -> skipped as unsupported
 
-## Development-only sources
-
-### Local JSON file
-
-- **Type:** Local JSON file
-- **Purpose:** Development and testing only
-- **Access:** No network access required
-- **Legal basis:** Synthetic example data
-
-Local ingestion is used exclusively when:
-
-```bash
-INGESTION_MODE=local
-```
-It is never enabled in production deployments.
+Policy v3 may hard-reject geo-restricted offers (`geo_restriction_hard`) before persistence.
 
 ---
 
-### Source integration principles
+## Present in Code, Disabled by Default
 
-Each data source follows the same strict integration model:
+These adapters/workers exist but are commented out in `app/workers/ingestion/registry.py`:
 
-### Adapters (fetch-only)
+- `remoteok` (`https://remoteok.com/api`)
+- `weworkremotely` (RSS feeds)
 
-Adapters are responsible only for:
-
-- fetching raw source data
-- handling source-specific formats
-- returning unmodified payloads
-
-Adapters must not:
-
-- apply heuristics
-- perform normalization
-- persist data
-- modify lifecycle state
+If `INGESTION_SOURCES` references a source not present in registry handlers, pipeline metrics mark it as `unknown`.
 
 ---
 
-## Normalization
+## Development-Only Source
 
-Normalization is handled separately and is responsible for:
+### Local JSON
 
-- validating required fields
-- enforcing source-specific structural and scope constraints
-- mapping raw payloads to the canonical job model
-- preparing records for downstream compliance scoring
+- **Path:** `ingestion/sources/example_jobs.json`
+- **Mode:** `INGESTION_MODE=local`
+- **Usage:** local development/testing only
 
-Compliance resolution (separate worker stage) is responsible for:
-- deriving `remote_class` and `geo_class`
-- computing `compliance_status` and `compliance_score`
-- enabling feed-quality filtering (`/jobs/feed` uses score threshold)
-
-Normalization logic is:
-- source-specific
-- deterministic
-- covered by automated tests
+In local mode the runtime uses `run_tick()` (local loader path) instead of pipeline handlers.
 
 ---
 
-## Planned sources
+## Source Integration Contract
 
-Future sources may include:
+Adapters:
+- fetch source payloads
+- handle network/transport concerns
+- do not persist data
 
-- additional public RSS feeds
-- public job APIs
-- company-provided feeds or submissions
+Normalization:
+- validates source records
+- maps to canonical fields
+- rejects malformed/out-of-scope records
 
-Each new source will be evaluated individually for:
+Downstream workers:
+- derive classes and compliance outcome
+- execute availability and lifecycle maintenance
 
-- legal accessibility
-- reuse permissions
-- data stability
-- alignment with OpenJobsEU scope
+---
 
-No scraping of closed or protected platforms is planned or permitted.
+## Onboarding Criteria for New Sources
+
+A source is enabled in default registry only after:
+- legal accessibility/reuse confirmation
+- stable payload quality
+- deterministic normalization and policy behavior
+- test coverage for normalization and pipeline integration
+
+Scraping closed/protected platforms remains out of scope.
