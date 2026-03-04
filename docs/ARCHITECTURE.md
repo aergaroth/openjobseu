@@ -34,19 +34,11 @@ Handler selection:
 - otherwise all handlers from `app/workers/ingestion/registry.py` are used
 
 Current active handlers in registry:
-- `remotive`
 - `employer_ing`
 
 ---
 
 ## Ingestion Layer
-
-### `remotive`
-
-Runtime path:
-- adapter: `ingestion/adapters/remotive_api.py`
-- normalization: `app/workers/normalization/remotive.py`
-- policy tagging: `app/workers/policy/v1.py`
 
 ### `employer_ing`
 
@@ -59,12 +51,8 @@ Runtime path:
 
 `employer_ing` can hard-skip records with `geo_restriction_hard` signals before DB upsert.
 
-### Present in code but disabled in registry
-
-- `remoteok`
-- `weworkremotely`
-
-Those adapters/workers exist but are commented out in the default ingestion registry.
+Legacy source-specific workers/adapters for `remotive`, `remoteok`, and
+`weworkremotely` were removed from the ingestion runtime.
 
 ---
 

@@ -15,9 +15,10 @@ Non-goals remain unchanged:
 
 ### Runtime and ingestion
 - [x] Tick-based runtime with local and pipeline modes
-- [x] Active handlers: `remotive`, `employer_ing`
+- [x] Active handler: `employer_ing`
 - [x] Curated employer ATS ingestion (Greenhouse)
 - [x] Source-specific normalization and policy signal stages
+- [x] Legacy source runtime modules (`remotive`, `remoteok`, `weworkremotely`) removed
 
 ### Data platform
 - [x] PostgreSQL schema with migration files (`jobs`, `companies`)

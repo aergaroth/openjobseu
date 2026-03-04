@@ -37,7 +37,6 @@ Public distribution uses this score conservatively:
 - `/jobs/feed` exposes only visible jobs with `compliance_score >= 80`
 
 Current policy paths:
-- `remotive` ingestion uses policy v1 soft signals
 - `employer_ing` uses policy v3 signals with hard geo restriction detection (`geo_restriction_hard`)
 
 This approach keeps ingestion broad enough for auditability while keeping the public feed conservative.

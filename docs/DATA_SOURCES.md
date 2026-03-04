@@ -13,22 +13,6 @@ Every record goes through:
 
 ## Active in Default Ingestion Registry
 
-### Remotive
-
-- **Type:** Public JSON API
-- **Endpoint:** `https://remotive.com/api/remote-jobs`
-- **Handler key:** `remotive`
-- **Normalization:** `app/workers/normalization/remotive.py`
-- **Policy stage:** `policy v1` soft signals
-
-Normalization rules include:
-- required field validation
-- location filter: Europe or Worldwide only
-- publication date fallback to ingestion timestamp
-- URL/location sanitization
-
----
-
 ### Employer ATS Ingestion (`employer_ing`)
 
 - **Type:** Curated company list + ATS API fetch
@@ -51,14 +35,15 @@ Policy v3 may hard-reject geo-restricted offers (`geo_restriction_hard`) before 
 
 ---
 
-## Present in Code, Disabled by Default
+## Removed Legacy Sources
 
-These adapters/workers exist but are commented out in `app/workers/ingestion/registry.py`:
+Legacy ingestion paths for:
+- `remotive`
+- `remoteok`
+- `weworkremotely`
 
-- `remoteok` (`https://remoteok.com/api`)
-- `weworkremotely` (RSS feeds)
-
-If `INGESTION_SOURCES` references a source not present in registry handlers, pipeline metrics mark it as `unknown`.
+were removed from adapter/normalization/policy runtime modules.
+If `INGESTION_SOURCES` references unknown values, pipeline metrics mark them as `unknown`.
 
 ---
 

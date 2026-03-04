@@ -28,10 +28,9 @@ OpenJobsEU runs as a tick-based pipeline:
 5. Post-ingestion workers run availability checks and lifecycle transitions
 
 ### Active ingestion sources in the default registry
-- `remotive` (public API)
 - `employer_ing` (curated employers table + Greenhouse ATS API)
 
-Adapters for `remoteok` and `weworkremotely` exist in codebase but are currently disabled in `app/workers/ingestion/registry.py`.
+Legacy integrations for `remotive`, `remoteok` and `weworkremotely` were removed from runtime ingestion code.
 
 ---
 
@@ -80,7 +79,7 @@ Ingestion mode:
 - any other value (including `prod`, `dev`) -> pipeline mode with external handlers
 
 Optional source selection in pipeline mode:
-- `INGESTION_SOURCES=remotive,employer_ing`
+- `INGESTION_SOURCES=employer_ing`
 
 Log rendering:
 - `APP_RUNTIME=local` forces text logs/tick text output in `format=auto`

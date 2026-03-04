@@ -2,9 +2,6 @@ import re
 import html
 
 
-SPAM_MARKER = "Please mention the word"
-
-
 def fix_encoding(text: str) -> str:
     """
     Attempts to fix common UTF-8 mis-decoded as latin1 issues.
@@ -19,20 +16,6 @@ def fix_encoding(text: str) -> str:
             return text.encode("latin1").decode("utf-8")
         except Exception:
             return text
-
-    return text
-
-
-def remove_remoteok_spam(text: str, source: str) -> str:
-    """
-    Removes RemoteOK anti-bot footer.
-    Safe deterministic rule: remove everything from SPAM_MARKER onward.
-    """
-    if source != "remoteok":
-        return text
-
-    if SPAM_MARKER in text:
-        return text.split(SPAM_MARKER)[0]
 
     return text
 
@@ -81,7 +64,6 @@ def clean_description(text: str, source: str) -> str:
         return text
 
     text = fix_encoding(text)
-    text = remove_remoteok_spam(text, source)
     text = clean_html(text)
     text = normalize_whitespace(text)
 
