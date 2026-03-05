@@ -2,14 +2,18 @@ import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 
-client = TestClient(app)
+
+@pytest.fixture
+def client():
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 def _is_text_response(response) -> bool:
     return response.headers.get("content-type", "").startswith("text/plain")
 
 
-def test_health_endpoint():
+def test_health_endpoint(client):
     resp = client.get("/health")
     assert resp.status_code == 200
 
@@ -18,13 +22,13 @@ def test_health_endpoint():
     assert "time" in data
 
 
-def test_ready_endpoint():
+def test_ready_endpoint(client):
     resp = client.get("/ready")
     assert resp.status_code == 200
     assert resp.json() == {"ready": True}
 
 
-def test_ready_endpoint_returns_503_when_not_bootstrapped():
+def test_ready_endpoint_returns_503_when_not_bootstrapped(client):
     previous_ready = getattr(app.state, "ready", False)
     app.state.ready = False
     try:
