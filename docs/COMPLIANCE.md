@@ -15,7 +15,7 @@ OpenJobsEU processes job data exclusively from sources that are:
 
 Current and planned source types include:
 - public APIs
-- open job feeds (JSON / RSS)
+- ATS-hosted job board APIs/endpoints
 - explicitly shared company submissions
 
 Each source is evaluated individually before integration.

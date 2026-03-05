@@ -1,5 +1,4 @@
 import logging
-import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -9,8 +8,6 @@ from fastapi.responses import HTMLResponse
 from app.audit_filter_registry import get_audit_filter_registry
 from app.logging import should_use_text_logs
 from app.utils.tick_formatting import format_tick_summary
-from app.workers.ingestion.registry import INGESTION_HANDLERS
-from app.workers.tick import run_tick
 from app.workers.tick_pipeline import run_tick_pipeline
 from storage.db_logic import (
     get_audit_company_compliance_stats,
@@ -25,6 +22,7 @@ router = APIRouter(prefix="/internal", tags=["internal"])
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 AUDIT_PANEL_PATH = REPO_ROOT / "audit_tool" / "offer_audit_panel.html"
+TICK_SOURCE = "employer_ing"
 
 
 @lru_cache(maxsize=1)
@@ -121,15 +119,8 @@ def manual_tick(
 
 
 def tick(*, response_format: str = "auto", force_text: bool = False):
-    ingestion_mode = os.getenv("INGESTION_MODE", "prod")
-
-    raw_sources = os.getenv("INGESTION_SOURCES")
-    if raw_sources:
-        ingestion_sources = [s.strip() for s in raw_sources.split(",")]
-    else:
-        ingestion_sources = list(INGESTION_HANDLERS.keys())
-
-    tick_sources = ["local"] if ingestion_mode == "local" else ingestion_sources
+    ingestion_mode = "prod"
+    tick_sources = [TICK_SOURCE]
 
     logger.info(
         "tick_start",
@@ -141,13 +132,7 @@ def tick(*, response_format: str = "auto", force_text: bool = False):
         },
     )
 
-    if ingestion_mode == "local":
-        result = run_tick()
-    else:
-        result = run_tick_pipeline(
-            ingestion_sources=ingestion_sources,
-            ingestion_handlers=INGESTION_HANDLERS,
-        )
+    result = run_tick_pipeline()
 
     payload = {
         "status": "ok",

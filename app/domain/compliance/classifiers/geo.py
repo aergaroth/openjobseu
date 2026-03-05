@@ -1,17 +1,26 @@
 import re
 from html import unescape
-from typing import Dict
 
 from app.domain.classification.enums import GeoClass
-from app.workers.policy.v3.geo_data_v3 import (
-    EU_MEMBER_STATES,
-    UK_KEYWORDS,
-    EU_REGION_CUSTOM,
-    NON_EU_REGION_CUSTOM,
+from app.domain.compliance.geo_data import (
+    APAC_STRONG_SIGNALS,
+    AUSTRALIA_STRONG_SIGNALS,
+    CANADA_STRONG_SIGNALS,
     COUNTRY_ALIASES,
+    EOG_COUNTRIES,
+    EU_MEMBER_STATES,
+    EU_REGION_CUSTOM,
+    EU_REGION_KEYWORDS,
+    INDIA_STRONG_SIGNALS,
+    LATAM_STRONG_SIGNALS,
+    NON_EU_RESTRICTED,
+    NON_EU_REGION_CUSTOM,
     NON_EU_SCOPE_TITLE_PHRASES,
     NON_EU_SCOPE_TOKENS,
-    # REGION_KEYWORDS
+    US_STATE_CODES,
+    US_STATE_SIGNAL_THRESHOLD,
+    US_STRONG_SIGNALS,
+    UK_KEYWORDS,
 )
 
 HTML_LOCALIZATION_SECTION_RE = re.compile(
@@ -22,6 +31,10 @@ LOCALIZATION_INLINE_RE = re.compile(r"(?im)^\s*(?:#{1,6}\s*)?locali[sz]ation\s*:
 LOCALIZATION_HEADING_RE = re.compile(r"^\s*(?:#{1,6}\s*)?locali[sz]ation\s*:?\s*$", re.IGNORECASE)
 MARKDOWN_HEADING_RE = re.compile(r"^\s*#{1,6}\s+\S")
 COLON_HEADING_RE = re.compile(r"^\s*[A-Za-z][A-Za-z0-9 /&()+-]{1,60}\s*:\s*$")
+US_STATE_CODES_RE = re.compile(
+    r"\b(?:" + "|".join(code.upper() for code in US_STATE_CODES) + r")\b",
+    re.IGNORECASE,
+)
 
 
 def _normalize_token(tok: str) -> str:
@@ -30,6 +43,11 @@ def _normalize_token(tok: str) -> str:
 
 def _contains_phrase(full_text: str, phrase: str) -> bool:
     return re.search(rf"(?<![a-z0-9]){re.escape(phrase)}(?![a-z0-9])", full_text) is not None
+
+
+def _count_us_state_signal_hits(full_text: str) -> int:
+    hits = {match.group(0).lower() for match in US_STATE_CODES_RE.finditer(full_text)}
+    return len(hits)
 
 
 def _extract_localization_section(description: str) -> str:
@@ -67,7 +85,7 @@ def _extract_localization_section(description: str) -> str:
     return ""
 
 
-def _classify_from_remote_scope(scope_l: str) -> Dict | None:
+def _classify_from_remote_scope(scope_l: str) -> dict | None:
     if not scope_l:
         return None
 
@@ -124,7 +142,7 @@ def _classify_from_remote_scope(scope_l: str) -> Dict | None:
     return None
 
 
-def _classify_from_localization_section(description: str) -> Dict | None:
+def _classify_from_localization_section(description: str) -> dict | None:
     localization_text = _extract_localization_section(description)
     if not localization_text:
         return None
@@ -149,22 +167,19 @@ def _classify_from_localization_section(description: str) -> Dict | None:
     return None
 
 
-def classify_geo_v3(
+def classify_geo(
     *,
     title: str,
     description: str,
     remote_scope: str,
-) -> Dict:
-
+) -> dict:
     title_l = (title or "").lower()
     desc_l = (description or "").lower()
     scope_l = (remote_scope or "").lower()
 
     full_text = f"{title_l} {desc_l} {scope_l}"
 
-    # ------------------------------------------------------------
     # 1 Hard non-EU regions (highest priority)
-    # ------------------------------------------------------------
     for kw in NON_EU_REGION_CUSTOM:
         if kw in scope_l or kw in title_l:
             return {"geo_class": GeoClass.NON_EU, "reason": kw}
@@ -172,35 +187,147 @@ def classify_geo_v3(
         if _contains_phrase(scope_l, kw) or _contains_phrase(title_l, kw):
             return {"geo_class": GeoClass.NON_EU, "reason": kw}
 
-    # ------------------------------------------------------------
     # 2 EU region custom keywords (EMEA, Nordics, Western Europe, UK&I)
-    # ------------------------------------------------------------
     for kw in EU_REGION_CUSTOM:
         if kw in scope_l or kw in title_l:
             return {"geo_class": GeoClass.EU_REGION, "reason": kw}
 
-    # ------------------------------------------------------------
     # 3 Structured parsing of remote_scope (most reliable source for countries)
-    # ------------------------------------------------------------
     scope_result = _classify_from_remote_scope(scope_l)
     if scope_result:
         return scope_result
 
-    # ------------------------------------------------------------
     # 4 Fallback to the "Localization" section from description only
-    # ------------------------------------------------------------
     localization_result = _classify_from_localization_section(description or "")
     if localization_result:
         return localization_result
 
-    # ------------------------------------------------------------
     # 5 UK fallback in generic text
-    # ------------------------------------------------------------
     for kw in UK_KEYWORDS:
         if _contains_phrase(full_text, kw):
             return {"geo_class": GeoClass.UK, "reason": kw}
 
-    # ------------------------------------------------------------
     # 6 Unknown
-    # ------------------------------------------------------------
     return {"geo_class": GeoClass.UNKNOWN, "reason": None}
+
+
+def classify_geo_v3(*, title: str, description: str, remote_scope: str) -> dict:
+    return classify_geo(
+        title=title,
+        description=description,
+        remote_scope=remote_scope,
+    )
+
+
+def classify_geo_scope(title: str, description: str) -> dict:
+    full_text = f"{title or ''} {description or ''}".lower()
+
+    # 1 Hard non-EU restrictions first
+    for kw in US_STRONG_SIGNALS:
+        if _contains_phrase(full_text, kw):
+            return {
+                "geo_class": GeoClass.NON_EU.value,
+                "matched_keyword": kw,
+            }
+
+    for kw in CANADA_STRONG_SIGNALS:
+        if _contains_phrase(full_text, kw):
+            return {
+                "geo_class": GeoClass.NON_EU.value,
+                "matched_keyword": kw,
+            }
+
+    for kw in APAC_STRONG_SIGNALS:
+        if _contains_phrase(full_text, kw):
+            return {
+                "geo_class": GeoClass.NON_EU.value,
+                "matched_keyword": kw,
+            }
+
+    for kw in AUSTRALIA_STRONG_SIGNALS:
+        if _contains_phrase(full_text, kw):
+            return {
+                "geo_class": GeoClass.NON_EU.value,
+                "matched_keyword": kw,
+            }
+
+    for kw in INDIA_STRONG_SIGNALS:
+        if _contains_phrase(full_text, kw):
+            return {
+                "geo_class": GeoClass.NON_EU.value,
+                "matched_keyword": kw,
+            }
+
+    for kw in LATAM_STRONG_SIGNALS:
+        if _contains_phrase(full_text, kw):
+            return {
+                "geo_class": GeoClass.NON_EU.value,
+                "matched_keyword": kw,
+            }
+
+    for kw in NON_EU_RESTRICTED:
+        if _contains_phrase(full_text, kw):
+            return {
+                "geo_class": GeoClass.NON_EU.value,
+                "matched_keyword": kw,
+            }
+
+    # 2) US states by abbreviation (>=3) => non-EU
+    us_state_hits = _count_us_state_signal_hits(full_text)
+    if us_state_hits >= US_STATE_SIGNAL_THRESHOLD:
+        return {
+            "geo_class": GeoClass.NON_EU.value,
+            "matched_keyword": f"us_state_codes>={US_STATE_SIGNAL_THRESHOLD}",
+        }
+
+    # 3) Explicit EU mention
+    if (
+        _contains_phrase(full_text, "eu only")
+        or _contains_phrase(full_text, "eu-only")
+        or _contains_phrase(full_text, "european union")
+    ):
+        return {
+            "geo_class": GeoClass.EU_EXPLICIT.value,
+            "matched_keyword": "eu",
+        }
+
+    # 4) EU member states
+    for country in EU_MEMBER_STATES:
+        if _contains_phrase(full_text, country):
+            return {
+                "geo_class": GeoClass.EU_MEMBER_STATE.value,
+                "matched_keyword": country,
+            }
+
+    # 5) EOG / EEA region
+    for country in EOG_COUNTRIES:
+        if _contains_phrase(full_text, country):
+            return {
+                "geo_class": GeoClass.EU_REGION.value,
+                "matched_keyword": country,
+            }
+    for kw in EU_REGION_KEYWORDS:
+        if _contains_phrase(full_text, kw):
+            return {
+                "geo_class": GeoClass.EU_REGION.value,
+                "matched_keyword": kw,
+            }
+
+    # 6) UK
+    for kw in UK_KEYWORDS:
+        if _contains_phrase(full_text, kw):
+            return {
+                "geo_class": GeoClass.UK.value,
+                "matched_keyword": kw,
+            }
+    if re.search(r"\buk\b", full_text):
+        return {
+            "geo_class": GeoClass.UK.value,
+            "matched_keyword": GeoClass.UK.value,
+        }
+
+    # 7) Fallback
+    return {
+        "geo_class": GeoClass.UNKNOWN.value,
+        "matched_keyword": None,
+    }

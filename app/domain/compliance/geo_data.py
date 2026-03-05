@@ -29,6 +29,81 @@ EU_MEMBER_STATES = (
     "sweden",
 )
 
+
+EU_REGION_CUSTOM = [
+    "emea",
+    "western europe",
+    "nordics",
+    "benelux",
+    "dach",
+    "uk&i",
+    "uk & ireland",
+    "uk and ireland",
+]
+
+UK_KEYWORDS = (
+    "united kingdom",
+    "uk only",
+    "uk-based",
+    "uk based",
+    "britain",
+    "london",
+    "england",
+    "scotland",
+    "wales",
+    "northern ireland",
+)
+
+
+COUNTRY_ALIASES = {
+    "deutschland": "germany",
+    "de": "germany",
+    "fr": "france",
+    "nl": "netherlands",
+    "niederlande": "netherlands",
+    "es": "spain",
+    "spanien": "spain",
+    "it": "italy",
+    "italien": "italy",
+    "ie": "ireland",
+    "irland": "ireland",
+    "pl": "poland",
+    "polen": "poland",
+    "pt": "portugal",
+    "belgia": "belgium",
+    "belgique": "belgium",
+    "belgien": "belgium",
+    "austria": "austria",
+    "österreich": "austria",
+    "at": "austria",
+    "cz": "czech republic",
+    "czechia": "czech republic",
+    "slovakia": "slovakia",
+    "slovensko": "slovakia",
+    "sk": "slovakia",
+}
+
+NON_EU_REGION_CUSTOM = (
+    "americas",
+    "north america",
+    "latam",
+    "apac",
+)
+
+NON_EU_SCOPE_TITLE_PHRASES = (
+    "united states",
+    "us only",
+    "u.s.",
+    "usa",
+    "canada",
+)
+
+NON_EU_SCOPE_TOKENS = {
+    "us",
+    "usa",
+    "canada",
+}
+
 EOG_COUNTRIES = (
     "norway",
     "iceland",
@@ -45,19 +120,6 @@ EU_REGION_KEYWORDS = (
     "europe only",
     "european economic area",
     "eea",
-)
-
-UK_KEYWORDS = (
-    "united kingdom",
-    "uk only",
-    "uk-based",
-    "uk based",
-    "britain",
-    "london",
-    "england",
-    "scotland",
-    "wales",
-    "northern ireland",
 )
 
 US_STRONG_SIGNALS = (
@@ -199,29 +261,3 @@ US_STATE_CODES = (
 )
 
 US_STATE_SIGNAL_THRESHOLD = 3
-
-
-COUNTRY_ALIASES = {
-    "italien": "it",
-    "italy": "it",
-    "deutschland": "de",
-    "germany": "de",
-    "niederlande": "nl",
-    "netherlands": "nl",
-    "spain": "es",
-    "spanien": "es",
-    "ireland": "ie",
-}
-
-
-COUNTRY_ALIASES = {
-    "italien": "it",
-    "italy": "it",
-    "deutschland": "de",
-    "germany": "de",
-    "niederlande": "nl",
-    "netherlands": "nl",
-    "spain": "es",
-    "spanien": "es",
-    "ireland": "ie",
-}

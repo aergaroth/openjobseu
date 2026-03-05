@@ -1,5 +1,5 @@
 from app.domain.classification.enums import RemoteClass
-from app.workers.policy.v2.remote_classifier import classify_remote_model
+from app.domain.compliance.classifiers.remote import classify_remote_model
 
 
 def test_detects_remote_only():

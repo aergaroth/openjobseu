@@ -5,14 +5,14 @@ from time import perf_counter
 import requests
 from sqlalchemy import text
 
+import app.ats  # noqa: F401
+from app.ats.registry import get_adapter
 from app.domain.classification.enums import RemoteClass
+from app.domain.compliance.engine import apply_policy
 from storage.db_engine import get_engine
 from storage.db_logic import upsert_job
 
-from ingestion.adapters.greenhouse_api import GreenhouseApiAdapter
 from app.workers.ingestion.log_helpers import log_ingestion
-from app.workers.normalization.greenhouse import normalize_greenhouse_job
-from app.workers.policy.v3.apply_policy_v3 import apply_policy_v3
 
 logger = logging.getLogger("openjobseu.ingestion.employer")
 SOURCE = "employer_ing"
@@ -51,7 +51,9 @@ def ingest_company(company: dict):
 
     provider = str(company.get("ats_provider") or "").strip().lower()
 
-    if provider != "greenhouse":
+    try:
+        adapter_cls = get_adapter(provider)
+    except ValueError:
         logger.warning(
             "employer ingestion skipped due to unsupported ats provider",
             extra={
@@ -68,9 +70,26 @@ def ingest_company(company: dict):
             "error": "unsupported_ats_provider",
         }
 
+    if not getattr(adapter_cls, "active", True):
+        logger.warning(
+            "employer ingestion skipped due to inactive ats adapter",
+            extra={
+                "company_id": company.get("company_id"),
+                "ats_provider": provider,
+                "ats_slug": company.get("ats_slug"),
+            },
+        )
+        return {
+            "fetched": 0,
+            "normalized_count": 0,
+            "accepted": 0,
+            "skipped": 0,
+            "error": "inactive_ats_adapter",
+        }
+
+    adapter = adapter_cls()
     try:
-        adapter = GreenhouseApiAdapter(company["ats_slug"])
-        raw_jobs = adapter.fetch()
+        raw_jobs = adapter.fetch(company)
     except requests.HTTPError as exc:
         status_code = getattr(getattr(exc, "response", None), "status_code", None)
         logger.warning(
@@ -153,17 +172,15 @@ def ingest_company(company: dict):
         with engine.begin() as conn:
             for raw in raw_jobs:
                 try:
-                    normalized = normalize_greenhouse_job(
-                        raw, adapter.board_token
-                    )
+                    normalized = adapter.normalize(raw)
                     if not normalized:
                         skipped += 1
                         continue
                     normalized_count += 1
 
-                    job, reason = apply_policy_v3(
+                    job, reason = apply_policy(
                         normalized,
-                        source=f"greenhouse:{adapter.board_token}",
+                        source=str(normalized.get("source") or provider),
                     )
 
                     metric_remote_model = _normalize_remote_model_for_metrics(

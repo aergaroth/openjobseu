@@ -3,86 +3,60 @@
 OpenJobsEU integrates only legally accessible, read-only sources.
 
 Every record goes through:
-- fetch adapter
-- source normalization
-- policy/classification signals
+- ATS adapter fetch
+- adapter-level normalization
+- compliance policy (`apply_policy`)
 - canonical upsert
-- compliance resolution
+- post-ingestion lifecycle and availability
 
 ---
 
-## Active in Default Ingestion Registry
+## Active Ingestion Path
 
 ### Employer ATS Ingestion (`employer_ing`)
 
 - **Type:** Curated company list + ATS API fetch
-- **Handler key:** `employer_ing`
-- **Current ATS support:** Greenhouse only
-- **Adapter:** `ingestion/adapters/greenhouse_api.py`
-- **Normalization:** `app/workers/normalization/greenhouse.py`
-- **Policy stage:** `policy v3`
+- **Worker:** `app/workers/ingestion/employer.py`
+- **Adapter registry:** `app/ats/registry.py`
+- **Current ATS support:** Greenhouse (Lever present but inactive)
 
-Input set is loaded from `companies` table rows where:
+Input set is loaded from `companies` rows where:
 - `is_active = true`
 - `ats_provider IS NOT NULL`
 - `ats_slug IS NOT NULL`
 
 Current provider behavior:
-- `ats_provider=greenhouse` -> fetch and ingest supported
-- other providers -> skipped as unsupported
+- supported provider -> fetch + normalize + policy + persist
+- unsupported/inactive provider -> skipped with ingestion metrics
 
-Policy v3 may hard-reject geo-restricted offers (`geo_restriction_hard`) before persistence.
-
----
-
-## Removed Legacy Sources
-
-Legacy ingestion paths for:
-- `remotive`
-- `remoteok`
-- `weworkremotely`
-
-were removed from adapter/normalization/policy runtime modules.
-If `INGESTION_SOURCES` references unknown values, pipeline metrics mark them as `unknown`.
-
----
-
-## Development-Only Source
-
-### Local JSON
-
-- **Path:** `ingestion/sources/example_jobs.json`
-- **Mode:** `INGESTION_MODE=local`
-- **Usage:** local development/testing only
-
-In local mode the runtime uses `run_tick()` (local loader path) instead of pipeline handlers.
+`geo_restriction_hard` offers are counted in metrics and skipped from persistence.
 
 ---
 
 ## Source Integration Contract
 
 Adapters:
-- fetch source payloads
-- handle network/transport concerns
-- do not persist data
+- fetch ATS payloads
+- normalize source records to canonical shape
+- do not persist data directly
 
-Normalization:
-- validates source records
-- maps to canonical fields
-- rejects malformed/out-of-scope records
+Ingestion worker:
+- runs policy engine
+- aggregates observability metrics
+- writes canonical records to DB
 
-Downstream workers:
-- derive classes and compliance outcome
-- execute availability and lifecycle maintenance
+Post-ingestion workers:
+- run availability checks
+- apply lifecycle transitions
 
 ---
 
-## Onboarding Criteria for New Sources
+## Onboarding Criteria for New ATS Providers
 
-A source is enabled in default registry only after:
+A provider is enabled only after:
 - legal accessibility/reuse confirmation
 - stable payload quality
 - deterministic normalization and policy behavior
-- test coverage for normalization and pipeline integration
+- test coverage for adapter + ingestion integration
 
 Scraping closed/protected platforms remains out of scope.

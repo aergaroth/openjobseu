@@ -1,7 +1,7 @@
 import datetime
 from app.domain.classification.enums import GeoClass, RemoteClass
 from app.domain.classification.mappers import normalize_geo_class, normalize_remote_class
-from app.workers.policy.v2.geo_classifier import classify_geo_scope
+from app.domain.compliance.classifiers.geo import classify_geo_scope
 
 
 def _make_job(job_id: str, first_seen_at: str) -> dict:

@@ -9,9 +9,9 @@ from datetime import datetime, timezone
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 from app.domain.classification.enums import GeoClass, RemoteClass
+from app.domain.compliance.classifiers.geo import classify_geo_scope
 from storage.db_engine import get_engine
 from app.domain.classification.mappers import normalize_geo_class, normalize_remote_class
-from app.workers.policy.v2.geo_classifier import classify_geo_scope
 
 engine = get_engine()
 MIGRATIONS_PATH = Path("storage/migrations")

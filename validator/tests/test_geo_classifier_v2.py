@@ -1,5 +1,5 @@
 from app.domain.classification.enums import GeoClass
-from app.workers.policy.v2.geo_classifier import classify_geo_scope
+from app.domain.compliance.classifiers.geo import classify_geo_scope
 
 
 def test_eu_explicit():

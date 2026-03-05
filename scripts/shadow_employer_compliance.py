@@ -10,8 +10,8 @@ from collections import Counter
 from sqlalchemy import text
 
 from storage.db_engine import get_engine
-from app.workers.policy.v3.geo_classifier_v3 import classify_geo_from_remote_scope
-from app.workers.policy.v2.remote_classifier import classify_remote_model
+from app.domain.compliance.classifiers.geo import classify_geo
+from app.domain.compliance.classifiers.remote import classify_remote_model
 
 
 def shadow_resolve(remote_model: str, geo_classification: str) -> tuple[str, int]:
@@ -58,9 +58,14 @@ def main():
     for row in rows:
         remote_model = row["remote_class"]
 
-        geo = classify_geo_from_remote_scope(
-            row["remote_scope"] or ""
-        )["classification"]
+        geo_result = classify_geo(
+            title=row["title"] or "",
+            description=row["description"] or "",
+            remote_scope=row["remote_scope"] or "",
+        )
+        geo = geo_result["geo_class"]
+        if hasattr(geo, "value"):
+            geo = geo.value
 
         status, score = shadow_resolve(remote_model, geo)
 

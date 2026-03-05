@@ -1,8 +1,7 @@
 import ast
 from pathlib import Path
 
-from app.domain.classification.enums import ComplianceStatus, GeoClass, RemoteClass
-from app.workers import availability, compliance_resolution, lifecycle
+from app.workers import availability, lifecycle
 
 
 class _NoopTx:
@@ -73,56 +72,6 @@ def test_availability_pipeline_uses_single_transaction_conn(monkeypatch):
     assert [item[0] for item in seen] == ["a", "b", "c"]
     assert all(item[3] is not None for item in seen)
     assert len({id(item[3]) for item in seen}) == 1
-
-
-def test_compliance_resolution_uses_single_transaction_conn(monkeypatch):
-    jobs = [
-        {
-            "job_id": "j1",
-            "remote_class": RemoteClass.REMOTE_ONLY.value,
-            "geo_class": GeoClass.EU_REGION.value,
-        },
-        {
-            "job_id": "j2",
-            "remote_class": RemoteClass.UNKNOWN.value,
-            "geo_class": GeoClass.UK.value,
-        },
-    ]
-    seen_conn_ids = []
-
-    monkeypatch.setattr(
-        compliance_resolution,
-        "get_jobs_for_compliance_resolution",
-        lambda limit, only_missing: jobs,
-    )
-    monkeypatch.setattr(
-        compliance_resolution,
-        "resolve_compliance",
-        lambda remote_class, geo_class: {
-            "compliance_status": "review",
-            "compliance_score": 65,
-        },
-    )
-    monkeypatch.setattr(compliance_resolution, "get_engine", lambda: _NoopEngine())
-
-    def _fake_update(*, updates, conn=None):
-        assert len(updates) == 2
-        assert all(item["compliance_status"] == ComplianceStatus.REVIEW.value for item in updates)
-        assert all(item["compliance_score"] == 65 for item in updates)
-        seen_conn_ids.extend([id(conn)] * len(updates))
-
-    monkeypatch.setattr(
-        compliance_resolution,
-        "update_jobs_compliance_resolution",
-        _fake_update,
-    )
-
-    summary = compliance_resolution.run_compliance_resolution(limit=10, only_missing=True)
-
-    assert summary["checked"] == 2
-    assert summary["updated"] == 2
-    assert summary["only_missing"] is True
-    assert len(set(seen_conn_ids)) == 1
 
 
 def test_lifecycle_pipeline_uses_single_transaction_conn(monkeypatch):

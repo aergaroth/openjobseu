@@ -1,7 +1,7 @@
 from app.domain.classification.enums import GeoClass
-from app.workers.compliance_resolver import resolve_compliance
-from app.workers.policy.v3.geo_v3 import classify_geo_v3
-from app.workers.policy.v3.remote_v3 import classify_remote_v3
+from app.domain.compliance.engine import apply_policy
+from app.domain.compliance.classifiers.geo import classify_geo_v3
+from app.domain.compliance.classifiers.remote import classify_remote_v3
 
 
 def test_geo_v3_uses_country_from_remote_scope_first():
@@ -80,7 +80,17 @@ def test_geo_v3_marks_remote_us_scope_as_non_eu_even_with_poland_in_description(
         description=description,
         remote_scope=remote_scope,
     )
-    compliance = resolve_compliance(remote["remote_model"], geo["geo_class"])
+    job, reason = apply_policy(
+        {
+            "title": title,
+            "description": description,
+            "remote_scope": remote_scope,
+        },
+        source="employer_ing",
+    )
 
     assert geo["geo_class"] == GeoClass.NON_EU
-    assert compliance["compliance_status"] == "rejected"
+    assert reason is None
+    assert remote["remote_model"] is not None
+    assert job is not None
+    assert job["_compliance"]["geo_class"] == GeoClass.NON_EU
