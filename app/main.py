@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, status
 from datetime import datetime, timezone
 import logging
 from contextlib import asynccontextmanager
@@ -18,6 +18,7 @@ logger.info("logging configured")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    app.state.ready = False
     engine = get_engine()
 
     # --- DB bootstrap ---
@@ -26,9 +27,14 @@ async def lifespan(app: FastAPI):
         db_healthcheck()
     except Exception:
         logger.exception("DB bootstrap failed")
+        raise
+
+    app.state.ready = True
+    logger.info("DB bootstrap completed")
     yield
 
     # --- Graceful shutdown ---
+    app.state.ready = False
     engine.dispose()
 
 
@@ -59,5 +65,8 @@ def health():
 
 
 @app.get("/ready")
-def ready():
-    return {"ready": True}
+def ready(response: Response):
+    is_ready = bool(getattr(app.state, "ready", False))
+    if not is_ready:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    return {"ready": is_ready}

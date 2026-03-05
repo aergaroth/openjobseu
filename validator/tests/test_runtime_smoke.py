@@ -24,6 +24,18 @@ def test_ready_endpoint():
     assert resp.json() == {"ready": True}
 
 
+def test_ready_endpoint_returns_503_when_not_bootstrapped():
+    previous_ready = getattr(app.state, "ready", False)
+    app.state.ready = False
+    try:
+        resp = client.get("/ready")
+    finally:
+        app.state.ready = previous_ready
+
+    assert resp.status_code == 503
+    assert resp.json() == {"ready": False}
+
+
 @pytest.fixture(autouse=True)
 def _mock_tick(monkeypatch):
     monkeypatch.setattr(
