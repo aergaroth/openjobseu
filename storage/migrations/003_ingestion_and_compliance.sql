@@ -1,10 +1,8 @@
 BEGIN;
 
 -- =========================================================
--- EXTENSION (required for UUID generation)
+-- UUID defaults (no extension required)
 -- =========================================================
-
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 
 -- =========================================================
@@ -12,7 +10,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS company_ats (
-    company_ats_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_ats_id UUID PRIMARY KEY DEFAULT (md5(random()::text || clock_timestamp()::text)::uuid),
 
     company_id UUID NOT NULL,
 
@@ -157,7 +155,7 @@ ON jobs USING GIN (source_payload);
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS compliance_reports (
-    report_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    report_id UUID PRIMARY KEY DEFAULT (md5(random()::text || clock_timestamp()::text)::uuid),
 
     job_id TEXT NOT NULL,
 

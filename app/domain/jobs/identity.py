@@ -36,7 +36,7 @@ def compute_job_fingerprint(
     fragment = description[:500]
 
     base = f"{company_id}|{company_name}|{title}|{location}|{fragment}"
-    return hashlib.sha256(base.encode("utf-8")).hexdigest()
+    return hashlib.md5(base.encode("utf-8")).hexdigest()
 
 
 def _schema_signature(value: Any) -> str:

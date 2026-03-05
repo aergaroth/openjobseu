@@ -80,25 +80,19 @@ $$;
 -- =========================================================
 
 UPDATE jobs
-SET job_fingerprint = encode(
-    digest(
-        CONCAT(
-            COALESCE(company_id::text, ''),
-            '|',
-            lower(regexp_replace(COALESCE(company_name, ''), '\s+', ' ', 'g')),
-            '|',
-            lower(regexp_replace(COALESCE(title, ''), '\s+', ' ', 'g')),
-            '|',
-            lower(regexp_replace(COALESCE(remote_scope, ''), '\s+', ' ', 'g')),
-            '|',
-            left(lower(regexp_replace(COALESCE(description, ''), '\s+', ' ', 'g')), 500)
-        ),
-        'sha256'
-    ),
-    'hex'
-)
-WHERE job_fingerprint IS NULL
-   OR btrim(job_fingerprint) = '';
+SET job_fingerprint = md5(
+    CONCAT(
+        COALESCE(company_id::text, ''),
+        '|',
+        lower(regexp_replace(COALESCE(company_name, ''), '\s+', ' ', 'g')),
+        '|',
+        lower(regexp_replace(COALESCE(title, ''), '\s+', ' ', 'g')),
+        '|',
+        lower(regexp_replace(COALESCE(remote_scope, ''), '\s+', ' ', 'g')),
+        '|',
+        left(lower(regexp_replace(COALESCE(description, ''), '\s+', ' ', 'g')), 500)
+    )
+);
 
 WITH duplicate_fingerprints AS (
     SELECT
@@ -111,7 +105,7 @@ WITH duplicate_fingerprints AS (
     FROM jobs
 )
 UPDATE jobs j
-SET job_fingerprint = encode(digest(j.job_fingerprint || '|' || j.job_id, 'sha256'), 'hex')
+SET job_fingerprint = md5(j.job_fingerprint || '|' || j.job_id)
 FROM duplicate_fingerprints d
 WHERE d.job_id = j.job_id
   AND d.row_num > 1;
