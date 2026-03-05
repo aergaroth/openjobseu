@@ -9,7 +9,13 @@ from datetime import datetime, timezone
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 from app.domain.classification.enums import GeoClass, RemoteClass
+from app.domain.compliance.engine import ENGINE_POLICY_VERSION
 from app.domain.compliance.classifiers.geo import classify_geo_scope
+from app.domain.jobs.identity import (
+    compute_job_fingerprint,
+    compute_job_uid,
+    compute_schema_hash,
+)
 from storage.db_engine import get_engine
 from app.domain.classification.mappers import normalize_geo_class, normalize_remote_class
 
@@ -94,6 +100,70 @@ def _derive_geo_class(job: dict) -> str:
     return GeoClass.UNKNOWN.value
 
 
+def _resolve_company_identity(company_id: str | None, job: dict) -> str:
+    if company_id:
+        return str(company_id)
+    embedded_company = job.get("company_id")
+    if embedded_company:
+        return str(embedded_company)
+    return ""
+
+
+def _derive_job_uid(job: dict, company_id: str | None) -> str:
+    explicit_job_uid = _string_like(job.get("job_uid"))
+    if explicit_job_uid:
+        return explicit_job_uid
+
+    return compute_job_uid(
+        company_id=_resolve_company_identity(company_id, job),
+        title=str(job.get("title") or ""),
+        location=str(job.get("remote_scope") or ""),
+        description=str(job.get("description") or ""),
+    )
+
+
+def _derive_job_fingerprint(job: dict) -> str:
+    explicit_fingerprint = _string_like(job.get("job_fingerprint"))
+    if explicit_fingerprint:
+        return explicit_fingerprint
+    return compute_job_fingerprint(str(job.get("description") or ""))
+
+
+def _derive_source_schema_hash(job: dict) -> str | None:
+    explicit_schema_hash = _string_like(job.get("source_schema_hash"))
+    if explicit_schema_hash:
+        return explicit_schema_hash
+
+    if "source_payload" not in job:
+        return None
+    source_payload = job.get("source_payload")
+    if source_payload is None:
+        return None
+    return compute_schema_hash(source_payload)
+
+
+def _derive_policy_version(job: dict) -> str:
+    explicit_policy_version = (_string_like(job.get("policy_version")) or "").strip()
+    if explicit_policy_version:
+        return explicit_policy_version
+
+    compliance = job.get("_compliance")
+    if isinstance(compliance, dict):
+        compliance_policy_version = (_string_like(compliance.get("policy_version")) or "").strip()
+        if compliance_policy_version:
+            if compliance_policy_version.lower().startswith("v"):
+                return compliance_policy_version
+            try:
+                numeric = float(compliance_policy_version)
+                if numeric.is_integer():
+                    return f"v{int(numeric)}"
+            except ValueError:
+                pass
+            return compliance_policy_version
+
+    return ENGINE_POLICY_VERSION.value
+
+
 def init_db():
     db_engine = get_engine()
 
@@ -166,6 +236,12 @@ def _upsert_job_in_conn(
     geo_class: str,
     company_id: str | None = None,
 ) -> None:
+    resolved_company_id = _resolve_company_identity(company_id, job) or None
+    resolved_job_uid = _derive_job_uid(job, resolved_company_id)
+    resolved_job_fingerprint = _derive_job_fingerprint(job)
+    resolved_source_schema_hash = _derive_source_schema_hash(job)
+    resolved_policy_version = _derive_policy_version(job)
+
     conn.execute(
         text("""
             INSERT INTO jobs (
@@ -183,7 +259,11 @@ def _upsert_job_in_conn(
                 last_seen_at,
                 remote_class,
                 geo_class,
-                company_id
+                company_id,
+                job_uid,
+                job_fingerprint,
+                source_schema_hash,
+                policy_version
             )
             VALUES (
                 :job_id,
@@ -200,7 +280,11 @@ def _upsert_job_in_conn(
                 :last_seen_at,
                 :remote_class,
                 :geo_class,
-                :company_id
+                :company_id,
+                :job_uid,
+                :job_fingerprint,
+                :source_schema_hash,
+                :policy_version
             )
             ON CONFLICT (job_id) DO UPDATE SET
                 source_url = excluded.source_url,
@@ -213,6 +297,10 @@ def _upsert_job_in_conn(
                 remote_class = excluded.remote_class,
                 geo_class = excluded.geo_class,
                 company_id = COALESCE(jobs.company_id, excluded.company_id),
+                job_uid = excluded.job_uid,
+                job_fingerprint = excluded.job_fingerprint,
+                source_schema_hash = excluded.source_schema_hash,
+                policy_version = excluded.policy_version,
                 first_seen_at = CASE
                     WHEN excluded.first_seen_at < jobs.first_seen_at
                     THEN excluded.first_seen_at
@@ -235,7 +323,11 @@ def _upsert_job_in_conn(
             "last_seen_at": now,
             "remote_class": remote_class,
             "geo_class": geo_class,
-            "company_id": company_id,
+            "company_id": resolved_company_id,
+            "job_uid": resolved_job_uid,
+            "job_fingerprint": resolved_job_fingerprint,
+            "source_schema_hash": resolved_source_schema_hash,
+            "policy_version": resolved_policy_version,
         },
     )
 

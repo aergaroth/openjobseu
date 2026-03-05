@@ -1,9 +1,18 @@
+from enum import Enum
+
 from app.domain.classification.enums import GeoClass, RemoteClass
 from app.domain.compliance.classifiers.geo import classify_geo
 from app.domain.compliance.classifiers.hard_geo import detect_hard_geo_restriction
 from app.domain.compliance.classifiers.remote import classify_remote
 
-ENGINE_VERSION = 3.0
+
+class PolicyVersion(str, Enum):
+    V3 = "v3"
+
+
+ENGINE_POLICY_VERSION = PolicyVersion.V3
+# Backward-compatible alias.
+ENGINE_VERSION = ENGINE_POLICY_VERSION.value
 
 
 def apply_policy(job: dict, source: str) -> tuple[dict | None, str | None]:
@@ -16,7 +25,7 @@ def apply_policy(job: dict, source: str) -> tuple[dict | None, str | None]:
     # 1 Hard geo restrictions
     if detect_hard_geo_restriction(combined):
         job["_compliance"] = {
-            "policy_version": ENGINE_VERSION,
+            "policy_version": ENGINE_POLICY_VERSION.value,
             "policy_reason": "geo_restriction_hard",
             "remote_model": RemoteClass.UNKNOWN,
             "geo_class": GeoClass.NON_EU,
@@ -38,7 +47,7 @@ def apply_policy(job: dict, source: str) -> tuple[dict | None, str | None]:
     )
 
     job["_compliance"] = {
-        "policy_version": ENGINE_VERSION,
+        "policy_version": ENGINE_POLICY_VERSION.value,
         "policy_reason": None,
         "remote_model": remote_result["remote_model"],
         "geo_class": geo_result["geo_class"],

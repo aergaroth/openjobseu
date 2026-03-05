@@ -8,7 +8,12 @@ from sqlalchemy import text
 import app.ats  # noqa: F401
 from app.ats.registry import get_adapter
 from app.domain.classification.enums import RemoteClass
-from app.domain.compliance.engine import apply_policy
+from app.domain.compliance.engine import ENGINE_POLICY_VERSION, apply_policy
+from app.domain.jobs.identity import (
+    compute_job_fingerprint,
+    compute_job_uid,
+    compute_schema_hash,
+)
 from storage.db_engine import get_engine
 from storage.db_logic import upsert_job
 
@@ -27,6 +32,24 @@ def _normalize_remote_model_for_metrics(remote_model: str | None) -> str:
     if model in {"office_first", "hybrid"}:
         return RemoteClass.NON_REMOTE.value
     return RemoteClass.UNKNOWN.value
+
+
+def normalize_job(adapter, raw_job: dict) -> dict | None:
+    return adapter.normalize(raw_job)
+
+
+def compute_job_identity(company_id: str | None, raw_job: dict, normalized_job: dict) -> dict:
+    normalized_job["job_uid"] = compute_job_uid(
+        company_id=company_id,
+        title=str(normalized_job.get("title") or ""),
+        location=str(normalized_job.get("remote_scope") or ""),
+        description=str(normalized_job.get("description") or ""),
+    )
+    normalized_job["job_fingerprint"] = compute_job_fingerprint(
+        str(normalized_job.get("description") or "")
+    )
+    normalized_job["source_schema_hash"] = compute_schema_hash(raw_job)
+    return normalized_job
 
 
 def load_active_ats_companies(conn):
@@ -172,10 +195,16 @@ def ingest_company(company: dict):
         with engine.begin() as conn:
             for raw in raw_jobs:
                 try:
-                    normalized = adapter.normalize(raw)
+                    normalized = normalize_job(adapter, raw)
                     if not normalized:
                         skipped += 1
                         continue
+
+                    normalized = compute_job_identity(
+                        company_id=str(company.get("company_id") or ""),
+                        raw_job=raw,
+                        normalized_job=normalized,
+                    )
                     normalized_count += 1
 
                     job, reason = apply_policy(
@@ -207,6 +236,17 @@ def ingest_company(company: dict):
                     if compliance_status and compliance_status != "approved":
                         skipped += 1
                         continue
+
+                    compliance_payload = job.get("_compliance")
+                    policy_version = None
+                    if isinstance(compliance_payload, dict):
+                        policy_version = compliance_payload.get("policy_version")
+
+                    if policy_version is None:
+                        policy_version = ENGINE_POLICY_VERSION.value
+
+                    policy_version_str = str(getattr(policy_version, "value", policy_version))
+                    job["policy_version"] = policy_version_str
 
                     upsert_job(
                         job,
