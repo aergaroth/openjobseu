@@ -5,6 +5,9 @@ def format_tick_summary(payload: dict) -> str:
     metrics = payload.get("metrics", {})
     ingestion = metrics.get("ingestion", {})
     per_source = ingestion.get("per_source", {})
+    if not per_source and ingestion:
+        source_name = str(ingestion.get("source") or "employer_ing")
+        per_source = {source_name: dict(ingestion)}
 
     lines = []
     lines.append(f"Tick finished ({payload.get('mode')})")
@@ -30,18 +33,26 @@ def format_tick_summary(payload: dict) -> str:
 
     for name, data in per_source.items():
         policy = data.get("policy", {})
-        reasons = policy.get("by_reason", {})
+        reasons = (
+            policy.get("by_reason")
+            or data.get("policy_rejected_by_reason")
+            or data.get("rejected_by_reason")
+            or {}
+        )
 
-        raw = data.get("raw_count", 0)
-        accepted = data.get("persisted_count", 0)
-        rejected = policy.get("rejected_total", 0)
+        raw = data.get("raw_count", data.get("fetched_count", 0))
+        accepted = data.get("persisted_count", data.get("accepted_count", 0))
+        rejected = policy.get(
+            "rejected_total",
+            data.get("policy_rejected_total", data.get("rejected_policy_count", 0)),
+        )
         non_remote = reasons.get(RemoteClass.NON_REMOTE.value, 0)
         geo_restriction = reasons.get("geo_restriction", 0)
         remote_model = data.get("remote_model") or data.get("remote_model_counts") or {}
         remote_only = remote_model.get(RemoteClass.REMOTE_ONLY.value, 0)
         remote_geo_restricted = remote_model.get("remote_but_geo_restricted", 0)
         remote_unknown = remote_model.get(RemoteClass.UNKNOWN.value, 0)
-        duration = data.get("duration_ms", 0)
+        duration = data.get("duration_ms", data.get("ingestion_loop_duration_ms", 0))
 
         rej_percent = (rejected / raw * 100) if raw else 0.0
 
@@ -65,9 +76,9 @@ def format_tick_summary(payload: dict) -> str:
     lines.append("TOTALS")
 
     totals_line = (
-        f"raw={ingestion.get('raw_count', 0)}  "
-        f"persisted={ingestion.get('persisted_count', 0)}  "
-        f"skipped={ingestion.get('skipped_count', 0)}  "
+        f"raw={ingestion.get('raw_count', ingestion.get('fetched_count', 0))}  "
+        f"persisted={ingestion.get('persisted_count', ingestion.get('accepted_count', 0))}  "
+        f"skipped={ingestion.get('skipped_count', ingestion.get('skipped', 0))}  "
         f"duration={metrics.get('tick_duration_ms', 0)} ms"
     )
 
