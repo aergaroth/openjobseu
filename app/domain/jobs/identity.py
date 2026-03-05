@@ -20,10 +20,23 @@ def compute_job_uid(company_id: str | None, title: str, location: str | None, de
     return hashlib.sha256(base.encode("utf-8")).hexdigest()
 
 
-def compute_job_fingerprint(description: str) -> str:
+def compute_job_fingerprint(
+    description: str,
+    *,
+    title: str = "",
+    location: str | None = None,
+    company_id: str | None = None,
+    company_name: str = "",
+) -> str:
+    title = normalize(title or "")
+    location = normalize(location or "")
+    company_id = normalize(company_id or "")
+    company_name = normalize(company_name or "")
     description = normalize(description or "")
     fragment = description[:500]
-    return hashlib.sha256(fragment.encode("utf-8")).hexdigest()
+
+    base = f"{company_id}|{company_name}|{title}|{location}|{fragment}"
+    return hashlib.sha256(base.encode("utf-8")).hexdigest()
 
 
 def _schema_signature(value: Any) -> str:

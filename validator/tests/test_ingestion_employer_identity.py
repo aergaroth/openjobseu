@@ -73,7 +73,11 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
             normalize_output["description"],
         )
         assert job["job_fingerprint"] == compute_job_fingerprint(
-            normalize_output["description"]
+            normalize_output["description"],
+            title=normalize_output["title"],
+            location=normalize_output["remote_scope"],
+            company_id="company-1",
+            company_name=normalize_output["company_name"],
         )
         assert job["source_schema_hash"] == compute_schema_hash(raw_job)
         job["_compliance"] = {

@@ -33,6 +33,25 @@ def test_compute_job_fingerprint_uses_first_500_chars():
     assert fingerprint_a == fingerprint_b
 
 
+def test_compute_job_fingerprint_includes_identity_context():
+    description = "Same description body"
+    fingerprint_a = compute_job_fingerprint(
+        description,
+        title="Backend Engineer",
+        location="Europe",
+        company_id="company-1",
+        company_name="Acme",
+    )
+    fingerprint_b = compute_job_fingerprint(
+        description,
+        title="Backend Engineer",
+        location="Europe",
+        company_id="company-2",
+        company_name="Acme",
+    )
+    assert fingerprint_a != fingerprint_b
+
+
 def test_compute_schema_hash_uses_schema_not_values():
     payload_a = {
         "id": 1,

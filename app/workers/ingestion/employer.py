@@ -39,14 +39,19 @@ def normalize_job(adapter, raw_job: dict) -> dict | None:
 
 
 def compute_job_identity(company_id: str | None, raw_job: dict, normalized_job: dict) -> dict:
+    resolved_company_id = str(company_id or normalized_job.get("company_id") or "")
     normalized_job["job_uid"] = compute_job_uid(
-        company_id=company_id,
+        company_id=resolved_company_id,
         title=str(normalized_job.get("title") or ""),
         location=str(normalized_job.get("remote_scope") or ""),
         description=str(normalized_job.get("description") or ""),
     )
     normalized_job["job_fingerprint"] = compute_job_fingerprint(
-        str(normalized_job.get("description") or "")
+        str(normalized_job.get("description") or ""),
+        title=str(normalized_job.get("title") or ""),
+        location=str(normalized_job.get("remote_scope") or ""),
+        company_id=resolved_company_id,
+        company_name=str(normalized_job.get("company_name") or ""),
     )
     normalized_job["source_schema_hash"] = compute_schema_hash(raw_job)
     return normalized_job

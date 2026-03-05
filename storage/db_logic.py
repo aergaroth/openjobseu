@@ -122,11 +122,18 @@ def _derive_job_uid(job: dict, company_id: str | None) -> str:
     )
 
 
-def _derive_job_fingerprint(job: dict) -> str:
+def _derive_job_fingerprint(job: dict, company_id: str | None) -> str:
     explicit_fingerprint = _string_like(job.get("job_fingerprint"))
     if explicit_fingerprint:
         return explicit_fingerprint
-    return compute_job_fingerprint(str(job.get("description") or ""))
+
+    return compute_job_fingerprint(
+        str(job.get("description") or ""),
+        title=str(job.get("title") or ""),
+        location=str(job.get("remote_scope") or ""),
+        company_id=_resolve_company_identity(company_id, job),
+        company_name=str(job.get("company_name") or ""),
+    )
 
 
 def _derive_source_schema_hash(job: dict) -> str | None:
@@ -164,6 +171,165 @@ def _derive_policy_version(job: dict) -> str:
     return ENGINE_POLICY_VERSION.value
 
 
+def _derive_source_fields(job: dict) -> tuple[str, str, str | None]:
+    source = (_string_like(job.get("source")) or "").strip()
+    source_job_id = (_string_like(job.get("source_job_id")) or "").strip()
+    source_url = _string_like(job.get("source_url"))
+
+    if not source:
+        raise ValueError("job.source is required")
+    if not source_job_id:
+        raise ValueError("job.source_job_id is required")
+
+    return source, source_job_id, source_url
+
+
+def _find_job_id_by_source_mapping(
+    conn: Connection, *, source: str, source_job_id: str
+) -> str | None:
+    row = conn.execute(
+        text("""
+            SELECT job_id
+            FROM job_sources
+            WHERE source = :source
+              AND source_job_id = :source_job_id
+            LIMIT 1
+        """),
+        {"source": source, "source_job_id": source_job_id},
+    ).fetchone()
+    if row and row[0]:
+        return str(row[0])
+
+    # Backward-compatible fallback while old rows are being backfilled.
+    legacy_row = conn.execute(
+        text("""
+            SELECT job_id
+            FROM jobs
+            WHERE source = :source
+              AND source_job_id = :source_job_id
+            LIMIT 1
+        """),
+        {"source": source, "source_job_id": source_job_id},
+    ).fetchone()
+    if legacy_row and legacy_row[0]:
+        return str(legacy_row[0])
+
+    return None
+
+
+def _find_job_id_by_fingerprint(conn: Connection, *, job_fingerprint: str) -> str | None:
+    row = conn.execute(
+        text("""
+            SELECT job_id
+            FROM jobs
+            WHERE job_fingerprint = :job_fingerprint
+            LIMIT 1
+        """),
+        {"job_fingerprint": job_fingerprint},
+    ).fetchone()
+    if row and row[0]:
+        return str(row[0])
+    return None
+
+
+def _job_exists(conn: Connection, *, job_id: str) -> bool:
+    row = conn.execute(
+        text("""
+            SELECT 1
+            FROM jobs
+            WHERE job_id = :job_id
+            LIMIT 1
+        """),
+        {"job_id": job_id},
+    ).fetchone()
+    return bool(row)
+
+
+def _resolve_canonical_job_id(
+    conn: Connection,
+    *,
+    incoming_job_id: str,
+    source: str,
+    source_job_id: str,
+    job_fingerprint: str,
+) -> str:
+    by_fingerprint = _find_job_id_by_fingerprint(
+        conn,
+        job_fingerprint=job_fingerprint,
+    )
+    if by_fingerprint:
+        return by_fingerprint
+
+    by_source_mapping = _find_job_id_by_source_mapping(
+        conn,
+        source=source,
+        source_job_id=source_job_id,
+    )
+    if by_source_mapping:
+        return by_source_mapping
+
+    if _job_exists(conn, job_id=incoming_job_id):
+        return incoming_job_id
+
+    return incoming_job_id
+
+
+def _upsert_job_source_mapping_in_conn(
+    conn: Connection,
+    *,
+    job_id: str,
+    source: str,
+    source_job_id: str,
+    source_url: str | None,
+    first_seen_at,
+    now,
+) -> None:
+    conn.execute(
+        text("""
+            INSERT INTO job_sources (
+                job_id,
+                source,
+                source_job_id,
+                source_url,
+                first_seen_at,
+                last_seen_at,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                :job_id,
+                :source,
+                :source_job_id,
+                :source_url,
+                :first_seen_at,
+                :last_seen_at,
+                :created_at,
+                :updated_at
+            )
+            ON CONFLICT (source, source_job_id) DO UPDATE SET
+                job_id = excluded.job_id,
+                source_url = COALESCE(excluded.source_url, job_sources.source_url),
+                first_seen_at = CASE
+                    WHEN excluded.first_seen_at < job_sources.first_seen_at
+                    THEN excluded.first_seen_at
+                    ELSE job_sources.first_seen_at
+                END,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = excluded.updated_at
+        """),
+        {
+            "job_id": job_id,
+            "source": source,
+            "source_job_id": source_job_id,
+            "source_url": source_url,
+            "first_seen_at": first_seen_at,
+            "last_seen_at": now,
+            "created_at": now,
+            "updated_at": now,
+        },
+    )
+
+
 def init_db():
     db_engine = get_engine()
 
@@ -190,6 +356,10 @@ def init_db():
             ).scalar_one_or_none()
 
             if existing_jobs and existing_companies:
+                # Legacy databases may already contain baseline tables but miss
+                # the migration ledger. Mark only baseline schema as applied so
+                # newer migrations still run.
+                baseline_versions = {1, 2} & migration_versions
                 now = datetime.now(timezone.utc)
                 conn.execute(
                     text("""
@@ -199,10 +369,10 @@ def init_db():
                     """),
                     [
                         {"version": version, "applied_at": now}
-                        for version in sorted(migration_versions)
+                        for version in sorted(baseline_versions)
                     ],
                 )
-                applied_versions = set(migration_versions)
+                applied_versions = set(baseline_versions)
 
         for migration_file in migration_files:
             version = int(migration_file.name.split("_")[0])
@@ -237,10 +407,18 @@ def _upsert_job_in_conn(
     company_id: str | None = None,
 ) -> None:
     resolved_company_id = _resolve_company_identity(company_id, job) or None
+    resolved_source, resolved_source_job_id, resolved_source_url = _derive_source_fields(job)
     resolved_job_uid = _derive_job_uid(job, resolved_company_id)
-    resolved_job_fingerprint = _derive_job_fingerprint(job)
+    resolved_job_fingerprint = _derive_job_fingerprint(job, resolved_company_id)
     resolved_source_schema_hash = _derive_source_schema_hash(job)
     resolved_policy_version = _derive_policy_version(job)
+    canonical_job_id = _resolve_canonical_job_id(
+        conn,
+        incoming_job_id=str(job["job_id"]),
+        source=resolved_source,
+        source_job_id=resolved_source_job_id,
+        job_fingerprint=resolved_job_fingerprint,
+    )
 
     conn.execute(
         text("""
@@ -287,7 +465,9 @@ def _upsert_job_in_conn(
                 :policy_version
             )
             ON CONFLICT (job_id) DO UPDATE SET
-                source_url = excluded.source_url,
+                source = COALESCE(jobs.source, excluded.source),
+                source_job_id = COALESCE(jobs.source_job_id, excluded.source_job_id),
+                source_url = COALESCE(jobs.source_url, excluded.source_url),
                 title = excluded.title,
                 company_name = excluded.company_name,
                 description = excluded.description,
@@ -309,10 +489,10 @@ def _upsert_job_in_conn(
                 last_seen_at = excluded.last_seen_at
         """),
         {
-            "job_id": job["job_id"],
-            "source": job["source"],
-            "source_job_id": job["source_job_id"],
-            "source_url": job["source_url"],
+            "job_id": canonical_job_id,
+            "source": resolved_source,
+            "source_job_id": resolved_source_job_id,
+            "source_url": resolved_source_url,
             "title": job["title"],
             "company_name": job["company_name"],
             "description": job["description"],
@@ -329,6 +509,16 @@ def _upsert_job_in_conn(
             "source_schema_hash": resolved_source_schema_hash,
             "policy_version": resolved_policy_version,
         },
+    )
+
+    _upsert_job_source_mapping_in_conn(
+        conn,
+        job_id=canonical_job_id,
+        source=resolved_source,
+        source_job_id=resolved_source_job_id,
+        source_url=resolved_source_url,
+        first_seen_at=first_seen_at,
+        now=now,
     )
 
 
@@ -609,7 +799,12 @@ def _build_jobs_audit_filter_clauses(
 
     if source:
         param_counter += 1
-        clauses.append(f"source = :p{param_counter}")
+        clauses.append(
+            "EXISTS ("
+            "SELECT 1 FROM job_sources js_filter "
+            f"WHERE js_filter.job_id = jobs.job_id AND js_filter.source = :p{param_counter}"
+            ")"
+        )
         params[f"p{param_counter}"] = source
 
     if company:
@@ -745,10 +940,14 @@ def get_jobs_audit(
 
         source_rows = conn.execute(
             text(f"""
-                SELECT COALESCE(source, 'null') AS label, COUNT(*) AS count
+                SELECT
+                    COALESCE(js.source, 'null') AS label,
+                    COUNT(DISTINCT jobs.job_id) AS count
                 FROM jobs
+                LEFT JOIN job_sources js
+                    ON js.job_id = jobs.job_id
                 {where_clause}
-                GROUP BY COALESCE(source, 'null')
+                GROUP BY COALESCE(js.source, 'null')
                 ORDER BY count DESC, label ASC
             """),
             params,
@@ -837,13 +1036,13 @@ def get_audit_source_filter_values() -> list[str]:
         rows = conn.execute(
             text("""
                 SELECT
-                    source,
+                    js.source,
                     COUNT(*) AS count
-                FROM jobs
-                WHERE source IS NOT NULL
-                  AND btrim(source) <> ''
-                GROUP BY source
-                ORDER BY count DESC, source ASC
+                FROM job_sources js
+                WHERE js.source IS NOT NULL
+                  AND btrim(js.source) <> ''
+                GROUP BY js.source
+                ORDER BY count DESC, js.source ASC
             """)
         ).mappings().all()
 
@@ -896,19 +1095,20 @@ def get_audit_source_compliance_stats_last_7d() -> list[dict]:
         rows = conn.execute(
             text("""
                 SELECT
-                    source,
-                    COUNT(*) AS total_jobs,
-                    COUNT(*) FILTER (WHERE compliance_status = 'approved') AS approved,
-                    COUNT(*) FILTER (WHERE compliance_status = 'rejected') AS rejected,
+                    js.source AS source,
+                    COUNT(DISTINCT j.job_id) AS total_jobs,
+                    COUNT(DISTINCT j.job_id) FILTER (WHERE j.compliance_status = 'approved') AS approved,
+                    COUNT(DISTINCT j.job_id) FILTER (WHERE j.compliance_status = 'rejected') AS rejected,
                     ROUND(
-                        COUNT(*) FILTER (WHERE compliance_status = 'approved')::numeric
-                        / NULLIF(COUNT(*), 0) * 100,
+                        COUNT(DISTINCT j.job_id) FILTER (WHERE j.compliance_status = 'approved')::numeric
+                        / NULLIF(COUNT(DISTINCT j.job_id), 0) * 100,
                         2
                     ) AS approved_ratio_pct
-                FROM jobs
-                WHERE first_seen_at > NOW() - INTERVAL '7 days'
-                GROUP BY source
-                ORDER BY approved_ratio_pct ASC NULLS FIRST, source ASC
+                FROM jobs j
+                JOIN job_sources js ON js.job_id = j.job_id
+                WHERE j.first_seen_at > NOW() - INTERVAL '7 days'
+                GROUP BY js.source
+                ORDER BY approved_ratio_pct ASC NULLS FIRST, js.source ASC
             """)
         ).mappings().all()
 
@@ -960,7 +1160,12 @@ def get_jobs(
 
     if source:
         param_counter += 1
-        clauses.append(f"source = :p{param_counter}")
+        clauses.append(
+            "EXISTS ("
+            "SELECT 1 FROM job_sources js_filter "
+            f"WHERE js_filter.job_id = jobs.job_id AND js_filter.source = :p{param_counter}"
+            ")"
+        )
         params[f"p{param_counter}"] = source
 
     if remote_scope:

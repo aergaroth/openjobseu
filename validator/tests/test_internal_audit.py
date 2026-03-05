@@ -31,7 +31,7 @@ def _make_job(
     return {
         "job_id": job_id,
         "source": source,
-        "source_job_id": job_id.split(":")[-1],
+        "source_job_id": job_id,
         "source_url": f"https://example.com/jobs/{job_id}",
         "title": title,
         "company_name": company,
