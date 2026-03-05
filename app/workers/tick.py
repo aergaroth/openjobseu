@@ -1,12 +1,22 @@
 from datetime import datetime, timezone
+import json
 import logging
+from pathlib import Path
 from time import perf_counter
 
 from app.domain.classification.enums import RemoteClass
-from ingestion.loaders.local_json import load_local_jobs
 from app.workers.post_ingestion import run_post_ingestion
 
 logger = logging.getLogger("openjobseu.tick")
+
+
+def load_local_jobs(path: str) -> list[dict]:
+    file_path = Path(path)
+    if not file_path.exists():
+        raise FileNotFoundError(f"Job source not found: {path}")
+
+    with file_path.open() as source_file:
+        return json.load(source_file)
 
 
 def run_tick():

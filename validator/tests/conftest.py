@@ -41,7 +41,9 @@ else:
 # if any modules create an engine at import time we want it pointed at the
 # right database; grab it now so the fixture below can reset state easily.
 from storage.db_engine import get_engine
-_engine = get_engine()
+from storage.db_logic import init_db
+
+_engine = None
 
 
 @pytest.fixture(autouse=True)
@@ -55,14 +57,18 @@ def clean_db():
     than hard-fail; that keeps the repository usable without a running
     backend (e.g. for linting or editing).
     """
+    global _engine
     try:
+        if _engine is None:
+            init_db()
+            _engine = get_engine()
         with _engine.begin() as conn:
-            conn.execute(text("TRUNCATE jobs CASCADE"))
+            conn.execute(text("TRUNCATE jobs, companies CASCADE"))
     except (OperationalError, InterfaceError) as exc:  # pragma: no cover - network/auth errors etc
         pytest.skip(f"database unavailable, skipping tests: {exc}")
     except ProgrammingError as exc:
         raise RuntimeError(
-            "test database schema is missing (e.g. table 'jobs'). "
+            "test database schema is missing (e.g. table 'jobs' or 'companies'). "
             "Run init_db() before pytest."
         ) from exc
     yield
