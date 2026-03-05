@@ -4,6 +4,7 @@ from app.main import app
 
 client = TestClient(app)
 
+
 def _is_text_response(response) -> bool:
     return response.headers.get("content-type", "").startswith("text/plain")
 
@@ -23,7 +24,6 @@ def test_ready_endpoint():
     assert resp.json() == {"ready": True}
 
 
-
 @pytest.fixture(autouse=True)
 def _mock_tick(monkeypatch):
     monkeypatch.setattr(
@@ -33,11 +33,3 @@ def _mock_tick(monkeypatch):
             "metrics": {"tick_duration_ms": 1},
         },
     )
-    monkeypatch.setattr(
-        "app.internal.run_tick",
-        lambda *args, **kwargs: {
-            "actions": ["local_smoke"],
-            "metrics": {"tick_duration_ms": 1},
-        },
-    )
-

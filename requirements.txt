@@ -2,7 +2,6 @@ pytest>=8.0.0
 requests>=2.31.0
 fastapi>=0.110
 uvicorn>=0.29
-feedparser
 httpx>=0.24
 sqlalchemy>=2.0
 psycopg[binary]>=3.1

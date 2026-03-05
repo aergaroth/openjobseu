@@ -14,57 +14,34 @@ The runtime is intentionally read-only on the public side and operationally expl
 
 Pipeline mode flow:
 
-External Sources -> Ingestion Handlers -> Source Normalization + Policy Signals -> DB Upsert -> Compliance Resolution -> Post-Ingestion Workers -> Read APIs
+ATS Adapters -> Employer Ingestion Worker -> Policy Signals -> DB Upsert -> Post-Ingestion Workers -> Read APIs
 
 ---
 
-## Runtime Modes
+## Runtime Orchestration
 
-- `INGESTION_MODE=local`
-  - runs `app.workers.tick.run_tick`
-  - reads `ingestion/sources/example_jobs.json`
-  - runs post-ingestion workers
-- any non-local mode (`prod`, `dev`, etc.)
-  - runs `app.workers.tick_pipeline.run_tick_pipeline`
-  - executes configured ingestion handlers
-  - runs compliance resolution + post-ingestion
-
-Handler selection:
-- if `INGESTION_SOURCES` is set, its comma-separated values are used
-- otherwise all handlers from `app/workers/ingestion/registry.py` are used
-
-Current active handlers in registry:
-- `remotive`
-- `employer_ing`
+- Runtime entrypoint: `app.workers.tick_pipeline.run_tick_pipeline`
+- Tick pipeline orchestration:
+  - runs `run_employer_ingestion()`
+  - runs `run_post_ingestion()`
+- Ingestion worker is single-source and ATS-backed (`employer_ing`)
 
 ---
 
 ## Ingestion Layer
 
-### `remotive`
-
-Runtime path:
-- adapter: `ingestion/adapters/remotive_api.py`
-- normalization: `app/workers/normalization/remotive.py`
-- policy tagging: `app/workers/policy/v1.py`
-
 ### `employer_ing`
 
 Runtime path:
 - loads active ATS companies from `companies` table (`is_active=true`, `ats_provider`, `ats_slug`)
-- currently supports `ats_provider=greenhouse`
-- adapter: `ingestion/adapters/greenhouse_api.py`
-- normalization: `app/workers/normalization/greenhouse.py`
-- policy tagging: `app/workers/policy/v3/apply_policy_v3.py`
+- adapters resolved via `app/ats/registry.py`
+- current adapter implementations:
+  - `app/ats/greenhouse.py`
+  - `app/ats/lever.py` (inactive)
+- normalization happens inside adapters (`normalize()`)
+- policy tagging uses `app/domain/compliance/engine.py` (`apply_policy`)
 
 `employer_ing` can hard-skip records with `geo_restriction_hard` signals before DB upsert.
-
-### Present in code but disabled in registry
-
-- `remoteok`
-- `weworkremotely`
-
-Those adapters/workers exist but are commented out in the default ingestion registry.
 
 ---
 
@@ -90,11 +67,7 @@ Core tables:
 
 At write-time, job rows are normalized to canonical classes (`remote_class`, `geo_class`) during upsert.
 
-After ingestion, compliance resolution (`app/workers/compliance_resolution.py`) computes:
-- `compliance_status`: `approved | review | rejected`
-- `compliance_score`: `0..100`
-
-On startup, missing class/compliance fields are backfilled in batches.
+Compliance policy is applied during ingestion before persistence.
 
 ---
 
@@ -146,9 +119,7 @@ Logging mode:
 - JSON formatter in container/cloud runtime
 
 Tick payload/summary includes:
-- per-source fetch/persist/skip counters
-- policy rejection counters
-- remote model counters
+- employer ingestion counters and policy metrics
 - timing metrics
 
 ---

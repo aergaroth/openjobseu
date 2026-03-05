@@ -1,109 +1,48 @@
-from app.workers import tick
-from app.domain.classification.enums import RemoteClass
+from app.workers import tick_pipeline
 
 
-def test_local_tick_returns_runtime_metrics(monkeypatch):
+def test_tick_pipeline_returns_runtime_metrics(monkeypatch):
     monkeypatch.setattr(
-        tick,
-        "load_local_jobs",
-        lambda _: [{"id": "1"}, {"id": "2"}, {"id": "3"}],
+        tick_pipeline,
+        "run_employer_ingestion",
+        lambda: {
+            "actions": ["employer_ingestion_completed"],
+            "metrics": {
+                "source": "employer_ing",
+                "status": "ok",
+                "raw_count": 3,
+                "persisted_count": 2,
+                "skipped_count": 1,
+            },
+        },
     )
-    monkeypatch.setattr(tick, "run_post_ingestion", lambda: None)
+    monkeypatch.setattr(tick_pipeline, "run_post_ingestion", lambda: None)
 
-    result = tick.run_tick()
+    result = tick_pipeline.run_tick_pipeline()
 
-    assert result["actions"] == ["local_ingested:3"]
+    assert result["actions"] == ["employer_ingestion_completed"]
     assert "metrics" in result
     assert result["metrics"]["tick_duration_ms"] >= 0
-    assert result["metrics"]["ingestion"]["sources_total"] == 1
-    assert result["metrics"]["ingestion"]["sources_ok"] == 1
+    assert result["metrics"]["ingestion"]["source"] == "employer_ing"
     assert result["metrics"]["ingestion"]["raw_count"] == 3
-    assert "remote_model_totals" in result["metrics"]["ingestion"]
-    totals = result["metrics"]["ingestion"]["remote_model_totals"]
-    for key in (
-        RemoteClass.REMOTE_ONLY.value,
-        "remote_but_geo_restricted",
-        RemoteClass.NON_REMOTE.value,
-        RemoteClass.UNKNOWN.value,
-    ):
-        assert key in totals
-        assert isinstance(totals[key], int)
-    assert result["metrics"]["ingestion"]["per_source"]["local"]["status"] == "ok"
-    assert "remote_model" in result["metrics"]["ingestion"]["per_source"]["local"]
-    rm = result["metrics"]["ingestion"]["per_source"]["local"]["remote_model"]
-    assert set(rm.keys()) == {
-        RemoteClass.REMOTE_ONLY.value,
-        "remote_but_geo_restricted",
-        RemoteClass.NON_REMOTE.value,
-        RemoteClass.UNKNOWN.value,
-    }
-    for key in rm:
-        assert isinstance(rm[key], int)
-    assert (
-        "remote_model_counts"
-        in result["metrics"]["ingestion"]["per_source"]["local"]
-    )
-    rm_counts = result["metrics"]["ingestion"]["per_source"]["local"]["remote_model_counts"]
-    assert set(rm_counts.keys()) == {
-        RemoteClass.REMOTE_ONLY.value,
-        "remote_but_geo_restricted",
-        RemoteClass.NON_REMOTE.value,
-        RemoteClass.UNKNOWN.value,
-    }
-    for key in rm_counts:
-        assert isinstance(rm_counts[key], int)
-    assert (
-        result["metrics"]["ingestion"]["per_source"]["local"]["policy"]["rejected_total"]
-        == 0
-    )
+    assert result["metrics"]["ingestion"]["persisted_count"] == 2
+    assert result["metrics"]["ingestion"]["skipped_count"] == 1
 
 
-def test_local_tick_reports_failed_ingestion_metrics(monkeypatch):
-    def broken_loader(_):
-        raise RuntimeError("broken")
+def test_tick_pipeline_runs_post_ingestion_on_ingestion_failure(monkeypatch):
+    post_calls = {"count": 0}
 
-    monkeypatch.setattr(tick, "load_local_jobs", broken_loader)
-    monkeypatch.setattr(tick, "run_post_ingestion", lambda: None)
+    def _broken_ingestion():
+        raise RuntimeError("boom")
 
-    result = tick.run_tick()
+    def _fake_post_ingestion():
+        post_calls["count"] += 1
 
-    assert result["actions"] == ["local_ingestion_failed"]
-    assert result["metrics"]["ingestion"]["sources_failed"] == 1
-    assert "remote_model_totals" in result["metrics"]["ingestion"]
-    totals = result["metrics"]["ingestion"]["remote_model_totals"]
-    for key in (
-        RemoteClass.REMOTE_ONLY.value,
-        "remote_but_geo_restricted",
-        RemoteClass.NON_REMOTE.value,
-        RemoteClass.UNKNOWN.value,
-    ):
-        assert key in totals
-        assert isinstance(totals[key], int)
-    assert result["metrics"]["ingestion"]["per_source"]["local"]["status"] == "failed"
-    assert "remote_model" in result["metrics"]["ingestion"]["per_source"]["local"]
-    rm = result["metrics"]["ingestion"]["per_source"]["local"]["remote_model"]
-    assert set(rm.keys()) == {
-        RemoteClass.REMOTE_ONLY.value,
-        "remote_but_geo_restricted",
-        RemoteClass.NON_REMOTE.value,
-        RemoteClass.UNKNOWN.value,
-    }
-    for key in rm:
-        assert isinstance(rm[key], int)
-    assert (
-        "remote_model_counts"
-        in result["metrics"]["ingestion"]["per_source"]["local"]
-    )
-    rm_counts = result["metrics"]["ingestion"]["per_source"]["local"]["remote_model_counts"]
-    assert set(rm_counts.keys()) == {
-        RemoteClass.REMOTE_ONLY.value,
-        "remote_but_geo_restricted",
-        RemoteClass.NON_REMOTE.value,
-        RemoteClass.UNKNOWN.value,
-    }
-    for key in rm_counts:
-        assert isinstance(rm_counts[key], int)
-    assert (
-        result["metrics"]["ingestion"]["per_source"]["local"]["policy"]["rejected_total"]
-        == 0
-    )
+    monkeypatch.setattr(tick_pipeline, "run_employer_ingestion", _broken_ingestion)
+    monkeypatch.setattr(tick_pipeline, "run_post_ingestion", _fake_post_ingestion)
+
+    result = tick_pipeline.run_tick_pipeline()
+
+    assert result["actions"] == []
+    assert result["metrics"]["ingestion"]["status"] == "failed"
+    assert post_calls["count"] == 1

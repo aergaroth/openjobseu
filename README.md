@@ -22,16 +22,13 @@ It is not a full consumer job board.
 OpenJobsEU runs as a tick-based pipeline:
 
 1. Scheduler or operator triggers `POST /internal/tick`
-2. Ingestion runs for configured sources
-3. Canonical rows are upserted into PostgreSQL
-4. Compliance resolution computes `compliance_status` + `compliance_score`
+2. Employer ATS ingestion runs (`employer_ing`)
+3. Adapters normalize data and policy is applied during ingestion
+4. Canonical rows are upserted into PostgreSQL
 5. Post-ingestion workers run availability checks and lifecycle transitions
 
-### Active ingestion sources in the default registry
-- `remotive` (public API)
+### Active ingestion source
 - `employer_ing` (curated employers table + Greenhouse ATS API)
-
-Adapters for `remoteok` and `weworkremotely` exist in codebase but are currently disabled in `app/workers/ingestion/registry.py`.
 
 ---
 
@@ -75,12 +72,9 @@ Database backend:
 - `DB_MODE=standard` with `DATABASE_URL=postgresql+psycopg://...`
 - or `DB_MODE=cloudsql` with `INSTANCE_CONNECTION_NAME`, `DB_NAME`, `DB_USER`
 
-Ingestion mode:
-- `INGESTION_MODE=local` -> local JSON source (`ingestion/sources/example_jobs.json`)
-- any other value (including `prod`, `dev`) -> pipeline mode with external handlers
-
-Optional source selection in pipeline mode:
-- `INGESTION_SOURCES=remotive,employer_ing`
+Ingestion orchestration:
+- `run_tick_pipeline()` is the single worker orchestrator
+- pipeline executes `run_employer_ingestion()` then `run_post_ingestion()`
 
 Log rendering:
 - `APP_RUNTIME=local` forces text logs/tick text output in `format=auto`

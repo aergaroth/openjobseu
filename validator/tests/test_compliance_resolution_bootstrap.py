@@ -1,104 +1,57 @@
-import os
-
-# the test suite now runs against a real PostgreSQL instance.  a
-# `DATABASE_URL` should be configured either in the environment or by the
-# session fixture in `conftest.py`.  conftest also guarantees that the
-# database is cleared between tests so everything here can assume a clean
-# slate.
-#
-# note: we still ensure DB_MODE is defined early on; conftest sets a default
-# but importing here guards against other modules that might access the
-# engine during import time.
-os.environ.setdefault("DB_MODE", "standard")
-
-from app.workers.compliance_resolution import run_compliance_resolution_for_existing_db
-from storage import db_logic
-from storage.db_logic import upsert_job
-from storage.db_engine import get_engine
-from sqlalchemy import text
-
-engine = get_engine()
-
-# use the real initialization logic provided by the application; the
-# migrations are designed for PostgreSQL and will create the jobs table along
-# with any others the test needs.
-init_db = db_logic.init_db
+from app.domain.classification.enums import GeoClass, RemoteClass
+from app.domain.compliance.engine import apply_policy
 
 
-def _make_job(job_id: str, remote_scope: str, *, remote_source_flag: bool = True) -> dict:
+def _job(*, title: str, description: str, remote_scope: str) -> dict:
     return {
-        "job_id": job_id,
-        "source": "remoteok",
-        "source_job_id": job_id.split(":")[-1],
-        "source_url": f"https://example.com/jobs/{job_id}",
-        "title": "Backend Engineer",
+        "job_id": "seed:1",
+        "source": "employer_ing",
+        "source_job_id": "1",
+        "source_url": "https://example.com/jobs/1",
+        "title": title,
         "company_name": "Acme",
-        "description": "Role description",
-        "remote_source_flag": remote_source_flag,
+        "description": description,
+        "remote_source_flag": True,
         "remote_scope": remote_scope,
         "status": "new",
         "first_seen_at": "2026-01-05T10:00:00+00:00",
     }
 
 
-def test_bootstrap_runs_for_existing_db_rows():
-    init_db()
+def test_apply_policy_sets_remote_and_geo_models_for_standard_remote_job():
+    job = _job(
+        title="Backend Engineer",
+        description="Build APIs for our distributed team.",
+        remote_scope="Poland",
+    )
 
-    approved = _make_job("seed:approved", "EU-wide")
-    review = _make_job("seed:review", "Poland", remote_source_flag=False)
-    rejected = _make_job("seed:rejected", "USA only")
+    result, reason = apply_policy(job, source="employer_ing")
 
-    with engine.begin() as conn:
-        upsert_job(approved, conn=conn)
-        upsert_job(review, conn=conn)
-        upsert_job(rejected, conn=conn)
+    assert reason is None
+    assert result is not None
+    assert result["_compliance"]["policy_reason"] is None
+    assert result["_compliance"]["remote_model"] in {
+        RemoteClass.REMOTE_ONLY,
+        RemoteClass.REMOTE_REGION_LOCKED,
+        RemoteClass.UNKNOWN,
+    }
+    assert result["_compliance"]["geo_class"] in {
+        GeoClass.EU_MEMBER_STATE,
+        GeoClass.EU_REGION,
+        GeoClass.UNKNOWN,
+    }
 
-    with engine.begin() as conn:
-        conn.execute(
-            text("""
-                UPDATE jobs
-                SET
-                    remote_class = NULL,
-                    geo_class = NULL,
-                    compliance_status = NULL,
-                    compliance_score = NULL
-                WHERE job_id IN (:id1, :id2, :id3)
-            """),
-            {
-                "id1": approved["job_id"],
-                "id2": review["job_id"],
-                "id3": rejected["job_id"],
-            },
-        )
 
-    summary = run_compliance_resolution_for_existing_db(batch_size=2, max_batches=10)
+def test_apply_policy_hard_geo_restriction_sets_rejection_reason():
+    job = _job(
+        title="Backend Engineer",
+        description="Candidates outside the US will not be considered.",
+        remote_scope="",
+    )
 
-    assert summary["initial_missing"] >= 3
-    assert summary["remaining_missing"] == 0
-    assert summary["updated"] >= 3
+    result, reason = apply_policy(job, source="employer_ing")
 
-    with engine.begin() as conn:
-        approved_row = conn.execute(
-            text("SELECT compliance_status, compliance_score FROM jobs WHERE job_id = :job_id"),
-            {"job_id": approved["job_id"]},
-        ).fetchone()
-        review_row = conn.execute(
-            text("SELECT compliance_status, compliance_score FROM jobs WHERE job_id = :job_id"),
-            {"job_id": review["job_id"]},
-        ).fetchone()
-        rejected_row = conn.execute(
-            text("SELECT compliance_status, compliance_score FROM jobs WHERE job_id = :job_id"),
-            {"job_id": rejected["job_id"]},
-        ).fetchone()
-
-    assert approved_row is not None
-    assert approved_row[0] == "approved"
-    assert approved_row[1] >= 80
-
-    assert review_row is not None
-    assert review_row[0] == "review"
-    assert 50 <= review_row[1] <= 79
-
-    assert rejected_row is not None
-    assert rejected_row[0] == "rejected"
-    assert rejected_row[1] == 0
+    assert result is not None
+    assert reason == "geo_restriction_hard"
+    assert result["_compliance"]["policy_reason"] == "geo_restriction_hard"
+    assert result["_compliance"]["geo_class"] == GeoClass.NON_EU

@@ -7,13 +7,13 @@ The canonical model is the persisted shape of job offers in `jobs` table after n
 ## Core Identifiers (implemented)
 
 - **job_id**: globally unique identifier, source-scoped
-- **source**: source identifier (examples: `remotive`, `greenhouse:{board_token}`)
+- **source**: source identifier (example: `greenhouse:{board_token}`)
 - **source_job_id**: source-native identifier
 - **source_url**: source posting URL (sanitized)
 
 Notes:
-- historical rows may also contain `remoteok` or `weworkremotely` source values
-- current default ingestion registry runs `remotive` and `employer_ing` only
+- historical rows may also contain `remotive`, `remoteok`, or `weworkremotely` source values
+- current default ingestion registry runs `employer_ing` only
 
 ---
 

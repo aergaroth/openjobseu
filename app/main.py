@@ -3,13 +3,9 @@ from datetime import datetime, timezone
 import logging
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
 
 from storage.db_engine import get_engine, db_healthcheck
 from storage.db_logic import init_db
-from app.workers.compliance_resolution import (
-    run_compliance_resolution_for_existing_db,
-)
 from app.internal import router as internal_router
 from app.api.jobs import router as jobs_router
 from app.logging import configure_logging
@@ -28,15 +24,8 @@ async def lifespan(app: FastAPI):
     try:
         init_db()
         db_healthcheck()
-    except Exception as e:
-        logger.exception("DB bootstrap failed")
-
-
-    try:
-        run_compliance_resolution_for_existing_db()
     except Exception:
-        logger.exception("initial compliance bootstrap failed")
-
+        logger.exception("DB bootstrap failed")
     yield
 
     # --- Graceful shutdown ---

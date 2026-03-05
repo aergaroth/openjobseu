@@ -1,4 +1,4 @@
-from app.workers.normalization.cleaning import clean_description
+from app.utils.cleaning import clean_description
 
 
 def test_non_remoteok_keeps_spam_phrase():
