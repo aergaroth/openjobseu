@@ -1,7 +1,87 @@
 from app.domain.classification.enums import GeoClass
-from app.domain.compliance.engine import apply_policy
-from app.domain.compliance.classifiers.geo import classify_geo_v3
+from app.domain.compliance.classifiers.geo import classify_geo_scope, classify_geo_v3
 from app.domain.compliance.classifiers.remote import classify_remote_v3
+from app.domain.compliance.engine import apply_policy
+
+
+def test_geo_scope_eu_explicit():
+    result = classify_geo_scope(
+        "Backend Engineer",
+        "Remote within European Union only",
+    )
+    assert result["geo_class"] == GeoClass.EU_EXPLICIT.value
+
+
+def test_geo_scope_eu_member_state():
+    result = classify_geo_scope(
+        "Backend Engineer",
+        "This role is remote in Poland",
+    )
+    assert result["geo_class"] == GeoClass.EU_MEMBER_STATE.value
+
+
+def test_geo_scope_non_eu():
+    result = classify_geo_scope(
+        "Backend Engineer",
+        "Remote - USA only",
+    )
+    assert result["geo_class"] == GeoClass.NON_EU.value
+
+
+def test_geo_scope_us_hard_phrases_non_eu():
+    result = classify_geo_scope(
+        "Backend Engineer",
+        "Remote US, must live in the US, US-based only",
+    )
+    assert result["geo_class"] == GeoClass.NON_EU.value
+
+
+def test_geo_scope_canada_hard_signal_non_eu():
+    result = classify_geo_scope(
+        "Backend Engineer",
+        "Remote in Canada only",
+    )
+    assert result["geo_class"] == GeoClass.NON_EU.value
+
+
+def test_geo_scope_apac_signal_non_eu():
+    result = classify_geo_scope(
+        "Backend Engineer",
+        "Open to APAC candidates",
+    )
+    assert result["geo_class"] == GeoClass.NON_EU.value
+
+
+def test_geo_scope_us_states_three_abbreviations_non_eu():
+    result = classify_geo_scope(
+        "Backend Engineer",
+        "Applicants can be based in CA, NY, TX",
+    )
+    assert result["geo_class"] == GeoClass.NON_EU.value
+
+
+def test_geo_scope_worldwide_is_unknown():
+    result = classify_geo_scope(
+        "Backend Engineer",
+        "Fully remote worldwide",
+    )
+    assert result["geo_class"] == GeoClass.UNKNOWN.value
+
+
+def test_geo_scope_uk():
+    result = classify_geo_scope(
+        "Backend Engineer",
+        "London office",
+    )
+    assert result["geo_class"] == GeoClass.UK.value
+
+
+def test_geo_scope_unknown():
+    result = classify_geo_scope(
+        "Backend Engineer",
+        "Some vague description without geo info",
+    )
+    assert result["geo_class"] == GeoClass.UNKNOWN.value
 
 
 def test_geo_v3_uses_country_from_remote_scope_first():
