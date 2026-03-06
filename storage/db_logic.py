@@ -4,6 +4,7 @@ but retains the same function signatures and overall structure
 as before to minimize impact on other parts of the codebase. 
 '''
 
+import json
 from pathlib import Path
 from datetime import datetime, timezone
 from sqlalchemy import text
@@ -585,11 +586,13 @@ def insert_compliance_report(
             "geo_class": geo_class,
             "hard_geo_flag": hard_geo_flag,
             "base_score": base_score,
-            "penalties": penalties,
-            "bonuses": bonuses,
+            "penalties": json.dumps(penalties, default=str) if penalties is not None else None,
+            "bonuses": json.dumps(bonuses, default=str) if bonuses is not None else None,
             "final_score": final_score,
             "final_status": final_status,
-            "decision_vector": decision_vector,
+            "decision_vector": json.dumps(decision_vector, default=str)
+            if decision_vector is not None
+            else None,
         },
     )
 
