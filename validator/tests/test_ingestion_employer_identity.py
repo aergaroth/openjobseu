@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from app.domain.classification.enums import RemoteClass
+from app.domain.classification.enums import GeoClass, RemoteClass
 from app.domain.jobs.identity import (
     compute_job_fingerprint,
     compute_job_uid,
@@ -91,6 +91,7 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
             "policy_version": "v9",
             "policy_reason": None,
             "remote_model": RemoteClass.REMOTE_ONLY.value,
+            "geo_class": GeoClass.EU_EXPLICIT.value,
         }
         return job, None
 
@@ -101,8 +102,14 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
         assert conn is not None
         assert company_id == "company-1"
         persisted_jobs.append(dict(job))
+        return job["job_id"]
 
     monkeypatch.setattr(employer, "upsert_job", _fake_upsert)
+    monkeypatch.setattr(
+        employer,
+        "insert_compliance_report",
+        lambda *args, **kwargs: call_order.append("insert_report"),
+    )
     monkeypatch.setattr(
         employer,
         "_mark_ats_synced",
@@ -115,7 +122,7 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
     assert result["normalized_count"] == 1
     assert result["accepted"] == 1
     assert result["skipped"] == 0
-    assert call_order == ["normalize", "apply_policy", "upsert"]
+    assert call_order == ["normalize", "apply_policy", "upsert", "insert_report"]
     assert len(persisted_jobs) == 1
     assert persisted_jobs[0]["job_uid"]
     assert persisted_jobs[0]["job_fingerprint"]

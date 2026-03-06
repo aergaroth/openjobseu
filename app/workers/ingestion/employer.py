@@ -9,13 +9,14 @@ import app.ats  # noqa: F401
 from app.ats.registry import get_adapter
 from app.domain.classification.enums import RemoteClass
 from app.domain.compliance.engine import ENGINE_POLICY_VERSION, apply_policy
+from app.domain.compliance.resolver import resolve_compliance
 from app.domain.jobs.identity import (
     compute_job_fingerprint,
     compute_job_uid,
     compute_schema_hash,
 )
 from storage.db_engine import get_engine
-from storage.db_logic import upsert_job
+from storage.db_logic import insert_compliance_report, upsert_job
 
 from app.workers.ingestion.log_helpers import log_ingestion
 
@@ -276,10 +277,35 @@ def ingest_company(company: dict):
                     policy_version_str = str(getattr(policy_version, "value", policy_version))
                     job["policy_version"] = policy_version_str
 
-                    upsert_job(
+                    # Resolve compliance score and status
+                    remote_class = compliance_payload.get("remote_model")
+                    geo_class = compliance_payload.get("geo_class")
+                    resolved = resolve_compliance(remote_class, geo_class)
+                    job["compliance_status"] = resolved["compliance_status"]
+                    job["compliance_score"] = resolved["compliance_score"]
+
+                    canonical_job_id = upsert_job(
                         job,
                         conn=conn,
                         company_id=company["company_id"],
+                    )
+
+                    # Insert compliance report
+                    insert_compliance_report(
+                        conn,
+                        job_id=canonical_job_id,
+                        policy_version=policy_version_str,
+                        remote_class=remote_class,
+                        geo_class=geo_class,
+                        hard_geo_flag=bool(
+                            compliance_payload.get("policy_reason") == "geo_restriction_hard"
+                        ),
+                        base_score=resolved["compliance_score"],
+                        penalties=None,
+                        bonuses=None,
+                        final_score=resolved["compliance_score"],
+                        final_status=resolved["compliance_status"],
+                        decision_vector=compliance_payload,
                     )
 
                     accepted += 1

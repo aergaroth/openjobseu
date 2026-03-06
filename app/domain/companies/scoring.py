@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 from typing import Optional
 
@@ -50,7 +50,7 @@ class CompanyScoringService:
 
     def recompute_and_persist(self, company: Company) -> int:
         new_score = self.recompute_score(company)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         self.repository.update_signal_score(
             company.company_id,

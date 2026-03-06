@@ -405,7 +405,7 @@ def _upsert_job_in_conn(
     remote_class: str,
     geo_class: str,
     company_id: str | None = None,
-) -> None:
+) -> str:
     resolved_company_id = _resolve_company_identity(company_id, job) or None
     resolved_source, resolved_source_job_id, resolved_source_url = _derive_source_fields(job)
     resolved_job_uid = _derive_job_uid(job, resolved_company_id)
@@ -441,7 +441,9 @@ def _upsert_job_in_conn(
                 job_uid,
                 job_fingerprint,
                 source_schema_hash,
-                policy_version
+                policy_version,
+                compliance_status,
+                compliance_score
             )
             VALUES (
                 :job_id,
@@ -462,7 +464,9 @@ def _upsert_job_in_conn(
                 :job_uid,
                 :job_fingerprint,
                 :source_schema_hash,
-                :policy_version
+                :policy_version,
+                :compliance_status,
+                :compliance_score
             )
             ON CONFLICT (job_id) DO UPDATE SET
                 source = COALESCE(jobs.source, excluded.source),
@@ -481,6 +485,8 @@ def _upsert_job_in_conn(
                 job_fingerprint = excluded.job_fingerprint,
                 source_schema_hash = excluded.source_schema_hash,
                 policy_version = excluded.policy_version,
+                compliance_status = excluded.compliance_status,
+                compliance_score = excluded.compliance_score,
                 first_seen_at = CASE
                     WHEN excluded.first_seen_at < jobs.first_seen_at
                     THEN excluded.first_seen_at
@@ -508,6 +514,8 @@ def _upsert_job_in_conn(
             "job_fingerprint": resolved_job_fingerprint,
             "source_schema_hash": resolved_source_schema_hash,
             "policy_version": resolved_policy_version,
+            "compliance_status": job.get("compliance_status"),
+            "compliance_score": job.get("compliance_score"),
         },
     )
 
@@ -520,16 +528,17 @@ def _upsert_job_in_conn(
         first_seen_at=first_seen_at,
         now=now,
     )
+    return canonical_job_id
 
 
-def upsert_job(job: dict, conn: Connection | None = None, *, company_id: str | None = None):
+def upsert_job(job: dict, conn: Connection | None = None, *, company_id: str | None = None) -> str:
     now = datetime.now(timezone.utc)
     first_seen_at = job.get("first_seen_at") or now
     remote_class = _derive_remote_class(job)
     geo_class = _derive_geo_class(job)
-    
+
     target_conn = _require_open_conn(conn, op_name="upsert_job")
-    _upsert_job_in_conn(
+    return _upsert_job_in_conn(
         target_conn,
         job=job,
         first_seen_at=first_seen_at,
@@ -538,6 +547,52 @@ def upsert_job(job: dict, conn: Connection | None = None, *, company_id: str | N
         geo_class=geo_class,
         company_id=company_id,
     )
+
+
+def insert_compliance_report(
+    conn: Connection,
+    *,
+    job_id: str,
+    policy_version: str,
+    remote_class: str | None,
+    geo_class: str | None,
+    hard_geo_flag: bool,
+    base_score: int,
+    penalties: dict | None = None,
+    bonuses: dict | None = None,
+    final_score: int,
+    final_status: str,
+    decision_vector: dict | None = None,
+) -> None:
+    """Insert a compliance report for a job."""
+    conn.execute(
+        text("""
+            INSERT INTO compliance_reports (
+                job_id, policy_version, remote_class, geo_class,
+                hard_geo_flag, base_score, penalties, bonuses,
+                final_score, final_status, decision_vector, created_at
+            )
+            VALUES (
+                :job_id, :policy_version, :remote_class, :geo_class,
+                :hard_geo_flag, :base_score, :penalties, :bonuses,
+                :final_score, :final_status, :decision_vector, NOW()
+            )
+        """),
+        {
+            "job_id": job_id,
+            "policy_version": policy_version,
+            "remote_class": remote_class,
+            "geo_class": geo_class,
+            "hard_geo_flag": hard_geo_flag,
+            "base_score": base_score,
+            "penalties": penalties,
+            "bonuses": bonuses,
+            "final_score": final_score,
+            "final_status": final_status,
+            "decision_vector": decision_vector,
+        },
+    )
+
 
 def get_jobs_for_verification(limit: int = 20) -> list[dict]:
     with engine.connect() as conn:
