@@ -103,6 +103,9 @@ def _to_utc_datetime(raw_value: Any) -> datetime | None:
 class GreenhouseAdapter(BaseATSAdapter):
     provider = "greenhouse"
     active = True
+    # INCREMENTAL_FETCH determines whether the adapter should only process
+    # records updated since the last sync. When False, all jobs are processed.
+    INCREMENTAL_FETCH = False
     API_URL_TEMPLATE = (
         "https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs?content=true"
     )
@@ -139,15 +142,17 @@ class GreenhouseAdapter(BaseATSAdapter):
 
         if isinstance(payload, list):
             jobs = payload
+        elif isinstance(payload, dict):
+            jobs = payload.get("jobs", [])
+            if not isinstance(jobs, list):
+                raise ValueError("Greenhouse API payload does not contain a jobs list")
+        else:
+            raise ValueError("Greenhouse API did not return a list or dict payload")
+
+        if self.INCREMENTAL_FETCH:
             return self._filter_incremental_jobs(jobs, updated_since)
-        if not isinstance(payload, dict):
-            raise ValueError("Greenhouse API did not return a dict payload")
 
-        jobs = payload.get("jobs", [])
-        if not isinstance(jobs, list):
-            raise ValueError("Greenhouse API payload does not contain a jobs list")
-
-        return self._filter_incremental_jobs(jobs, updated_since)
+        return jobs
 
     @staticmethod
     def _filter_incremental_jobs(jobs: list[dict], updated_since: Any) -> list[dict]:
