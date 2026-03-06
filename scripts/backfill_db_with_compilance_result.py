@@ -37,7 +37,7 @@ def backfill():
     # We fetch only necessary fields to minimize memory usage
     query = text("""
         SELECT 
-            job_id, title, description, remote_scope, source,
+            job_id, job_uid, title, description, remote_scope, source,
             remote_class, geo_class, compliance_status, compliance_score, policy_version
         FROM jobs
         WHERE compliance_status IS NULL 
@@ -87,15 +87,13 @@ def backfill():
                 geo_class = compliance_payload.get("geo_class")
                 policy_version = compliance_payload.get("policy_version") or ENGINE_POLICY_VERSION.value
                 
-                # Resolve compliance score and status
-                resolved = resolve_compliance(remote_class, geo_class)
-                
                 # Extract values for DB
                 remote_class_val = str(getattr(remote_class, "value", remote_class))
                 geo_class_val = str(getattr(geo_class, "value", geo_class))
                 policy_version_val = str(getattr(policy_version, "value", policy_version))
-                compliance_status = resolved["compliance_status"]
-                compliance_score = resolved["compliance_score"]
+                compliance_status = compliance_payload.get("compliance_status")
+                compliance_score = compliance_payload.get("compliance_score")
+                decision_trace = compliance_payload.get("decision_trace")
                 
                 # Add to update list
                 job_updates.append({
@@ -111,6 +109,7 @@ def backfill():
                 # Prepare compliance report entry
                 report_entries.append({
                     "job_id": job_id,
+                    "job_uid": job_data["job_uid"],
                     "policy_version": policy_version_val,
                     "remote_class": remote_class_val,
                     "geo_class": geo_class_val,
@@ -118,7 +117,7 @@ def backfill():
                     "base_score": compliance_score,
                     "final_score": compliance_score,
                     "final_status": compliance_status,
-                    "decision_vector": compliance_payload
+                    "decision_vector": decision_trace
                 })
                 
             except Exception as e:
@@ -150,6 +149,7 @@ def backfill():
                         insert_compliance_report(
                             conn,
                             job_id=entry["job_id"],
+                            job_uid=entry["job_uid"],
                             policy_version=entry["policy_version"],
                             remote_class=entry["remote_class"],
                             geo_class=entry["geo_class"],

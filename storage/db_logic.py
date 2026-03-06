@@ -554,6 +554,7 @@ def insert_compliance_report(
     conn: Connection,
     *,
     job_id: str,
+    job_uid: str,
     policy_version: str,
     remote_class: str | None,
     geo_class: str | None,
@@ -569,18 +570,31 @@ def insert_compliance_report(
     conn.execute(
         text("""
             INSERT INTO compliance_reports (
-                job_id, policy_version, remote_class, geo_class,
+                job_id, job_uid, policy_version, remote_class, geo_class,
                 hard_geo_flag, base_score, penalties, bonuses,
                 final_score, final_status, decision_vector, created_at
             )
             VALUES (
-                :job_id, :policy_version, :remote_class, :geo_class,
+                :job_id, :job_uid, :policy_version, :remote_class, :geo_class,
                 :hard_geo_flag, :base_score, :penalties, :bonuses,
                 :final_score, :final_status, :decision_vector, NOW()
             )
+            ON CONFLICT (job_uid, policy_version) DO UPDATE SET
+                job_id = EXCLUDED.job_id,
+                remote_class = EXCLUDED.remote_class,
+                geo_class = EXCLUDED.geo_class,
+                hard_geo_flag = EXCLUDED.hard_geo_flag,
+                base_score = EXCLUDED.base_score,
+                penalties = EXCLUDED.penalties,
+                bonuses = EXCLUDED.bonuses,
+                final_score = EXCLUDED.final_score,
+                final_status = EXCLUDED.final_status,
+                decision_vector = EXCLUDED.decision_vector,
+                created_at = NOW()
         """),
         {
             "job_id": job_id,
+            "job_uid": job_uid,
             "policy_version": policy_version,
             "remote_class": remote_class,
             "geo_class": geo_class,

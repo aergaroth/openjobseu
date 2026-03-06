@@ -92,6 +92,9 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
             "policy_reason": None,
             "remote_model": RemoteClass.REMOTE_ONLY.value,
             "geo_class": GeoClass.EU_EXPLICIT.value,
+            "compliance_status": "approved",
+            "compliance_score": 100,
+            "decision_trace": [],
         }
         return job, None
 

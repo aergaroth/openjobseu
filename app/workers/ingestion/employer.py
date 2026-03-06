@@ -277,12 +277,15 @@ def ingest_company(company: dict):
                     policy_version_str = str(getattr(policy_version, "value", policy_version))
                     job["policy_version"] = policy_version_str
 
-                    # Resolve compliance score and status
+                    # Resolve compliance score and status (already resolved in apply_policy)
                     remote_class = compliance_payload.get("remote_model")
                     geo_class = compliance_payload.get("geo_class")
-                    resolved = resolve_compliance(remote_class, geo_class)
-                    job["compliance_status"] = resolved["compliance_status"]
-                    job["compliance_score"] = resolved["compliance_score"]
+                    compliance_status = compliance_payload.get("compliance_status")
+                    compliance_score = compliance_payload.get("compliance_score")
+                    decision_trace = compliance_payload.get("decision_trace")
+
+                    job["compliance_status"] = compliance_status
+                    job["compliance_score"] = compliance_score
 
                     canonical_job_id = upsert_job(
                         job,
@@ -294,18 +297,19 @@ def ingest_company(company: dict):
                     insert_compliance_report(
                         conn,
                         job_id=canonical_job_id,
+                        job_uid=str(job.get("job_uid") or ""),
                         policy_version=policy_version_str,
                         remote_class=remote_class,
                         geo_class=geo_class,
                         hard_geo_flag=bool(
                             compliance_payload.get("policy_reason") == "geo_restriction_hard"
                         ),
-                        base_score=resolved["compliance_score"],
+                        base_score=compliance_score,
                         penalties=None,
                         bonuses=None,
-                        final_score=resolved["compliance_score"],
-                        final_status=resolved["compliance_status"],
-                        decision_vector=compliance_payload,
+                        final_score=compliance_score,
+                        final_status=compliance_status,
+                        decision_vector=decision_trace,
                     )
 
                     accepted += 1
