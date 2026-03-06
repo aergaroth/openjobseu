@@ -16,7 +16,12 @@ from app.domain.jobs.identity import (
     compute_schema_hash,
 )
 from storage.db_engine import get_engine
-from storage.db_logic import insert_compliance_report, upsert_job
+from storage.db_logic import (
+    insert_compliance_report,
+    load_active_ats_companies,
+    mark_ats_synced,
+    upsert_job,
+)
 
 from app.workers.ingestion.log_helpers import log_ingestion
 
@@ -39,63 +44,39 @@ def normalize_job(adapter, raw_job: dict) -> dict | None:
     return adapter.normalize(raw_job)
 
 
-def compute_job_identity(company_id: str | None, raw_job: dict, normalized_job: dict) -> dict:
-    resolved_company_id = str(company_id or normalized_job.get("company_id") or "")
+def compute_job_identity(
+    company_id: str | None,
+    raw_job: dict,
+    normalized_job: dict,
+) -> dict:
+
+    resolved_company_id = company_id or normalized_job.get("company_id")
+    if not resolved_company_id:
+        raise ValueError("Missing company_id for job identity")
+
+    title = (normalized_job.get("title") or "").strip()
+    location = (normalized_job.get("remote_scope") or "").strip()
+    description = (normalized_job.get("description") or "").strip()
+
+    # Stable identity (must not change when job text changes)
     normalized_job["job_uid"] = compute_job_uid(
         company_id=resolved_company_id,
-        title=str(normalized_job.get("title") or ""),
-        location=str(normalized_job.get("remote_scope") or ""),
-        description=str(normalized_job.get("description") or ""),
+        title=title,
+        location=location,
     )
+
+    # Content fingerprint (detects edits in job description)
     normalized_job["job_fingerprint"] = compute_job_fingerprint(
-        str(normalized_job.get("description") or ""),
-        title=str(normalized_job.get("title") or ""),
-        location=str(normalized_job.get("remote_scope") or ""),
+        description,
+        title=title,
+        location=location,
         company_id=resolved_company_id,
-        company_name=str(normalized_job.get("company_name") or ""),
     )
+
+    # Detect ATS schema changes
     normalized_job["source_schema_hash"] = compute_schema_hash(raw_job)
+
     return normalized_job
-
-
-def load_active_ats_companies(conn):
-    rows = conn.execute(
-        text("""
-            SELECT
-                ca.company_ats_id,
-                ca.company_id,
-                c.legal_name,
-                ca.provider AS ats_provider,
-                ca.ats_slug,
-                ca.ats_api_url,
-                ca.careers_url,
-                ca.last_sync_at
-            FROM company_ats ca
-            JOIN companies c ON c.company_id = ca.company_id
-            WHERE c.is_active = TRUE
-              AND ca.is_active = TRUE
-              AND ca.provider IS NOT NULL
-              AND ca.ats_slug IS NOT NULL
-        """)
-    ).mappings().all()
-
-    return [dict(row) for row in rows]
-
-
-def _mark_ats_synced(conn, company_ats_id: str | None) -> None:
-    if not company_ats_id:
-        return
-
-    conn.execute(
-        text("""
-            UPDATE company_ats
-            SET
-                last_sync_at = NOW(),
-                updated_at = NOW()
-            WHERE company_ats_id = :company_ats_id
-        """),
-        {"company_ats_id": str(company_ats_id)},
-    )
 
 
 def ingest_company(company: dict):
@@ -320,7 +301,7 @@ def ingest_company(company: dict):
                     skipped += 1
                     continue
 
-            _mark_ats_synced(conn, company.get("company_ats_id"))
+            mark_ats_synced(conn, company.get("company_ats_id"))
 
     except Exception:
         return {
