@@ -17,6 +17,16 @@ ENGINE_VERSION = ENGINE_POLICY_VERSION.value
 
 
 def apply_policy(job: dict, source: str) -> tuple[dict | None, str | None]:
+    # Ensure _compliance is always initialized
+    if "_compliance" not in job:
+        job["_compliance"] = {
+            "policy_version": ENGINE_POLICY_VERSION.value,
+            "policy_reason": "initialization_failure",
+            "remote_model": RemoteClass.UNKNOWN,
+            "geo_class": GeoClass.UNKNOWN,
+            "source": source,
+        }
+
     title = str(job.get("title") or "")
     description = str(job.get("description") or "")
     remote_scope = str(job.get("remote_scope") or "")

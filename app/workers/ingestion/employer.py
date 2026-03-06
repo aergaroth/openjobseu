@@ -266,10 +266,12 @@ def ingest_company(company: dict):
                         skipped += 1
                         continue
 
-                    compliance_payload = job.get("_compliance")
+                    compliance_payload = job.get("_compliance") or {}
+                    if not isinstance(compliance_payload, dict):
+                        compliance_payload = {}
+
                     policy_version = None
-                    if isinstance(compliance_payload, dict):
-                        policy_version = compliance_payload.get("policy_version")
+                    policy_version = compliance_payload.get("policy_version")
 
                     if policy_version is None:
                         policy_version = ENGINE_POLICY_VERSION.value
