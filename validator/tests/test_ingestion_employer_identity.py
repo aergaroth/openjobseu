@@ -115,7 +115,7 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
     )
     monkeypatch.setattr(
         employer,
-        "_mark_ats_synced",
+        "mark_ats_synced",
         lambda _conn, company_ats_id: sync_markers.append(company_ats_id),
     )
 
