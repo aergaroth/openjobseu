@@ -6,7 +6,7 @@ class LeverAdapter(BaseATSAdapter):
     provider = "lever"
     active = False
 
-    def fetch(self, company):
+    def fetch(self, company, updated_since=None):
         raise NotImplementedError("Lever adapter is not implemented yet")
 
     def normalize(self, raw_job):

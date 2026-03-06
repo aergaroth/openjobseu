@@ -2,7 +2,7 @@ class BaseATSAdapter:
     provider = None
     active = True
 
-    def fetch(self, company):
+    def fetch(self, company, updated_since=None):
         raise NotImplementedError
 
     def normalize(self, raw_job):

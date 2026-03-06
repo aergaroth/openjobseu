@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from app.domain.classification.enums import RemoteClass
 from app.domain.jobs.identity import (
     compute_job_fingerprint,
@@ -21,10 +23,13 @@ class _NoopEngine:
 
 
 def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch):
+    last_sync_at = datetime(2026, 1, 10, 12, 0, tzinfo=timezone.utc)
     company = {
+        "company_ats_id": "company-ats-1",
         "company_id": "company-1",
         "ats_provider": "greenhouse",
         "ats_slug": "acme",
+        "last_sync_at": last_sync_at,
     }
     raw_job = {
         "id": 123,
@@ -49,11 +54,13 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
 
     call_order: list[str] = []
     persisted_jobs: list[dict] = []
+    sync_markers: list[str] = []
 
     class _FakeAdapter:
         active = True
 
-        def fetch(self, _company):
+        def fetch(self, _company, updated_since=None):
+            assert updated_since == last_sync_at
             return [raw_job]
 
         def normalize(self, _raw_job):
@@ -96,6 +103,11 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
         persisted_jobs.append(dict(job))
 
     monkeypatch.setattr(employer, "upsert_job", _fake_upsert)
+    monkeypatch.setattr(
+        employer,
+        "_mark_ats_synced",
+        lambda _conn, company_ats_id: sync_markers.append(company_ats_id),
+    )
 
     result = employer.ingest_company(company)
 
@@ -109,3 +121,4 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
     assert persisted_jobs[0]["job_fingerprint"]
     assert persisted_jobs[0]["source_schema_hash"]
     assert persisted_jobs[0]["policy_version"] == "v9"
+    assert sync_markers == ["company-ats-1"]

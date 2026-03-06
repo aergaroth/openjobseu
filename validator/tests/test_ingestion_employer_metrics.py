@@ -80,6 +80,7 @@ def test_run_employer_ingestion_reports_standardized_metrics(monkeypatch):
     assert metrics["companies_processed"] == 2
     assert metrics["companies_failed"] == 1
     assert metrics["companies_invalid_slug"] == 1
+    assert metrics["synced_ats_count"] == 1
     assert metrics["accepted_jobs"] == 3
     assert metrics["hard_geo_rejected_count"] == 0
 
@@ -105,6 +106,7 @@ def test_run_employer_ingestion_reports_standardized_metrics(monkeypatch):
     assert summary["companies_processed"] == 2
     assert summary["companies_failed"] == 1
     assert summary["companies_invalid_slug"] == 1
+    assert summary["synced_ats_count"] == 1
     assert summary["hard_geo_rejected_count"] == 0
     assert summary["companies_load_duration_ms"] >= 0
     assert summary["ingestion_loop_duration_ms"] >= 0

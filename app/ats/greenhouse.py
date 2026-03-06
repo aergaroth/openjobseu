@@ -93,6 +93,13 @@ def _normalize_source_datetime(raw_value: Any) -> str | None:
     return dt.astimezone(timezone.utc).isoformat()
 
 
+def _to_utc_datetime(raw_value: Any) -> datetime | None:
+    normalized = _normalize_source_datetime(raw_value)
+    if not normalized:
+        return None
+    return datetime.fromisoformat(normalized)
+
+
 class GreenhouseAdapter(BaseATSAdapter):
     provider = "greenhouse"
     active = True
@@ -114,7 +121,7 @@ class GreenhouseAdapter(BaseATSAdapter):
     def _fallback_company_name(board_token: str) -> str:
         return board_token.replace("-", " ").replace("_", " ").strip() or "unknown"
 
-    def fetch(self, company: dict) -> list[dict]:
+    def fetch(self, company: dict, updated_since: Any = None) -> list[dict]:
         board_token = self._resolve_board_token(company)
         self._board_token = board_token
         api_url = self.API_URL_TEMPLATE.format(board_token=board_token)
@@ -131,7 +138,8 @@ class GreenhouseAdapter(BaseATSAdapter):
         payload = resp.json()
 
         if isinstance(payload, list):
-            return payload
+            jobs = payload
+            return self._filter_incremental_jobs(jobs, updated_since)
         if not isinstance(payload, dict):
             raise ValueError("Greenhouse API did not return a dict payload")
 
@@ -139,7 +147,31 @@ class GreenhouseAdapter(BaseATSAdapter):
         if not isinstance(jobs, list):
             raise ValueError("Greenhouse API payload does not contain a jobs list")
 
-        return jobs
+        return self._filter_incremental_jobs(jobs, updated_since)
+
+    @staticmethod
+    def _filter_incremental_jobs(jobs: list[dict], updated_since: Any) -> list[dict]:
+        if updated_since in (None, ""):
+            return jobs
+
+        cutoff = _to_utc_datetime(updated_since)
+        if cutoff is None:
+            return jobs
+
+        filtered_jobs: list[dict] = []
+        for job in jobs:
+            if not isinstance(job, dict):
+                filtered_jobs.append(job)
+                continue
+
+            source_updated_at = _to_utc_datetime(job.get("updated_at"))
+            if source_updated_at is None:
+                source_updated_at = _to_utc_datetime(job.get("pubDate"))
+
+            if source_updated_at is None or source_updated_at >= cutoff:
+                filtered_jobs.append(job)
+
+        return filtered_jobs
 
     def normalize(self, raw_job: dict) -> dict | None:
         board_token = self._board_token

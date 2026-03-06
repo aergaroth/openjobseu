@@ -61,23 +61,46 @@ def load_active_ats_companies(conn):
     rows = conn.execute(
         text("""
             SELECT
-                company_id,
-                legal_name,
-                ats_provider,
-                ats_slug
-            FROM companies
-            WHERE is_active = TRUE
-              AND ats_provider IS NOT NULL
-              AND ats_slug IS NOT NULL
+                ca.company_ats_id,
+                ca.company_id,
+                c.legal_name,
+                ca.provider AS ats_provider,
+                ca.ats_slug,
+                ca.ats_api_url,
+                ca.careers_url,
+                ca.last_sync_at
+            FROM company_ats ca
+            JOIN companies c ON c.company_id = ca.company_id
+            WHERE c.is_active = TRUE
+              AND ca.is_active = TRUE
+              AND ca.provider IS NOT NULL
+              AND ca.ats_slug IS NOT NULL
         """)
     ).mappings().all()
 
     return [dict(row) for row in rows]
 
 
+def _mark_ats_synced(conn, company_ats_id: str | None) -> None:
+    if not company_ats_id:
+        return
+
+    conn.execute(
+        text("""
+            UPDATE company_ats
+            SET
+                last_sync_at = NOW(),
+                updated_at = NOW()
+            WHERE company_ats_id = :company_ats_id
+        """),
+        {"company_ats_id": str(company_ats_id)},
+    )
+
+
 def ingest_company(company: dict):
 
     provider = str(company.get("ats_provider") or "").strip().lower()
+    updated_since = company.get("last_sync_at")
 
     try:
         adapter_cls = get_adapter(provider)
@@ -117,7 +140,7 @@ def ingest_company(company: dict):
 
     adapter = adapter_cls()
     try:
-        raw_jobs = adapter.fetch(company)
+        raw_jobs = adapter.fetch(company, updated_since=updated_since)
     except requests.HTTPError as exc:
         status_code = getattr(getattr(exc, "response", None), "status_code", None)
         logger.warning(
@@ -265,6 +288,8 @@ def ingest_company(company: dict):
                     skipped += 1
                     continue
 
+            _mark_ats_synced(conn, company.get("company_ats_id"))
+
     except Exception:
         return {
             "fetched": len(raw_jobs),
@@ -296,6 +321,7 @@ def run_employer_ingestion() -> dict:
     total_companies = 0
     companies_failed = 0
     companies_invalid_slug = 0
+    synced_ats_count = 0
     total_fetched = 0
     total_normalized = 0
     total_skipped = 0
@@ -339,6 +365,7 @@ def run_employer_ingestion() -> dict:
                         companies_invalid_slug += 1
                     continue
 
+                synced_ats_count += 1
                 total_fetched += int(result.get("fetched", 0) or 0)
                 total_normalized += int(result.get("normalized_count", 0) or 0)
                 total_accepted += result["accepted"]
@@ -375,6 +402,7 @@ def run_employer_ingestion() -> dict:
             companies_processed=total_companies,
             companies_failed=companies_failed,
             companies_invalid_slug=companies_invalid_slug,
+            synced_ats_count=synced_ats_count,
             hard_geo_rejected_count=total_hard_geo_rejected,
             companies_load_duration_ms=companies_load_duration_ms,
             ingestion_loop_duration_ms=ingestion_loop_duration_ms,
@@ -397,6 +425,7 @@ def run_employer_ingestion() -> dict:
         companies_processed=total_companies,
         companies_failed=companies_failed,
         companies_invalid_slug=companies_invalid_slug,
+        synced_ats_count=synced_ats_count,
         hard_geo_rejected_count=total_hard_geo_rejected,
         companies_load_duration_ms=companies_load_duration_ms,
         ingestion_loop_duration_ms=ingestion_loop_duration_ms,
@@ -421,6 +450,7 @@ def run_employer_ingestion() -> dict:
             "companies_processed": total_companies,
             "companies_failed": companies_failed,
             "companies_invalid_slug": companies_invalid_slug,
+            "synced_ats_count": synced_ats_count,
             "accepted_jobs": total_accepted,
             "hard_geo_rejected_count": total_hard_geo_rejected,
             "duration_ms": duration_ms,
