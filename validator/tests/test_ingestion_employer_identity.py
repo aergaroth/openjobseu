@@ -77,7 +77,6 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
             "company-1",
             normalize_output["title"],
             normalize_output["remote_scope"],
-            normalize_output["description"],
         )
         assert job["job_fingerprint"] == compute_job_fingerprint(
             normalize_output["description"],

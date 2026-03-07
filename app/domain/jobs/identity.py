@@ -10,13 +10,11 @@ def normalize(text: str) -> str:
     return text
 
 
-def compute_job_uid(company_id: str | None, title: str, location: str | None, description: str) -> str:
+def compute_job_uid(company_id: str | None, title: str, location: str | None) -> str:
     title = normalize(title or "")
     location = normalize(location or "")
-    description = normalize(description or "")
-    description_fragment = description[:200]
 
-    base = f"{company_id or ''}|{title}|{location}|{description_fragment}"
+    base = f"{company_id or ''}|{title}|{location}"
     return hashlib.sha256(base.encode("utf-8")).hexdigest()
 
 

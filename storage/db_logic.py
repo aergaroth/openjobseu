@@ -119,7 +119,6 @@ def _derive_job_uid(job: dict, company_id: str | None) -> str:
         company_id=_resolve_company_identity(company_id, job),
         title=str(job.get("title") or ""),
         location=str(job.get("remote_scope") or ""),
-        description=str(job.get("description") or ""),
     )
 
 

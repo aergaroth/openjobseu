@@ -15,13 +15,11 @@ def test_compute_job_uid_is_stable_for_equivalent_text():
         "company-1",
         " Senior Backend Engineer ",
         " Remote   EU ",
-        "Build APIs.\nWork with data.",
     )
     uid_b = compute_job_uid(
         "company-1",
         "senior backend engineer",
         "remote eu",
-        "Build APIs.   Work with data.",
     )
     assert uid_a == uid_b
 

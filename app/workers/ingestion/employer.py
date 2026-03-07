@@ -71,6 +71,7 @@ def compute_job_identity(
         title=title,
         location=location,
         company_id=resolved_company_id,
+        company_name=(normalized_job.get("company_name") or "").strip(),
     )
 
     # Detect ATS schema changes
