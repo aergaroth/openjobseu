@@ -8,6 +8,7 @@ from sqlalchemy import text
 import app.ats  # noqa: F401
 from app.ats.registry import get_adapter
 from app.domain.classification.enums import RemoteClass
+from app.domain.classification.taxonomy import classify_taxonomy
 from app.domain.compliance.engine import ENGINE_POLICY_VERSION, apply_policy
 from app.domain.compliance.resolver import resolve_compliance
 from app.domain.jobs.identity import (
@@ -15,6 +16,7 @@ from app.domain.jobs.identity import (
     compute_job_uid,
     compute_schema_hash,
 )
+from app.domain.jobs.quality_score import compute_job_quality_score
 from storage.db_engine import get_engine
 from storage.db_logic import (
     insert_compliance_report,
@@ -270,6 +272,20 @@ def ingest_company(company: dict):
 
                     job["compliance_status"] = compliance_status
                     job["compliance_score"] = compliance_score
+
+                    # Enrich job with taxonomy and quality score
+                    taxonomy = classify_taxonomy(job.get("title", ""))
+                    job["job_family"] = taxonomy.get("job_family")
+                    job["job_role"] = taxonomy.get("job_role")
+                    job["seniority"] = taxonomy.get("seniority")
+                    job["specialization"] = taxonomy.get("specialization")
+
+                    # Enrich with remote_class and geo_class from compliance
+                    job["remote_class"] = remote_class
+                    job["geo_class"] = geo_class
+
+                    # Compute quality score
+                    job["job_quality_score"] = compute_job_quality_score(job)
 
                     canonical_job_id = upsert_job(
                         job,

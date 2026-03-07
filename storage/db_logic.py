@@ -11,7 +11,6 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 from app.domain.classification.enums import GeoClass, RemoteClass
 from app.domain.compliance.engine import ENGINE_POLICY_VERSION
-from app.domain.compliance.classifiers.geo import classify_geo_scope
 from app.domain.jobs.identity import (
     compute_job_fingerprint,
     compute_job_uid,
@@ -22,7 +21,6 @@ from app.domain.classification.mappers import normalize_geo_class, normalize_rem
 
 engine = get_engine()
 MIGRATIONS_PATH = Path("storage/migrations")
-
 
 def _string_like(value: object | None) -> str | None:
     if value is None:
@@ -36,70 +34,36 @@ def _string_like(value: object | None) -> str | None:
 
     return str(value)
 
-
 def _derive_remote_class(job: dict) -> str:
-    compliance = job.get("_compliance")
-    if not isinstance(compliance, dict):
-        return (
-            RemoteClass.REMOTE_ONLY.value
-            if bool(job.get("remote_source_flag"))
-            else RemoteClass.UNKNOWN.value
-        )
-
-    policy_reason = (_string_like(compliance.get("policy_reason")) or "").strip().lower()
-    remote_model = _string_like(compliance.get("remote_model"))
-
-    if policy_reason == RemoteClass.NON_REMOTE.value:
-        return RemoteClass.NON_REMOTE.value
-
-    return normalize_remote_class(remote_model).value
-
+    """Read remote_class from job dict (set by pipeline)."""
+    explicit_remote = job.get("remote_class")
+    if explicit_remote:
+        return normalize_remote_class(_string_like(explicit_remote)).value
+    
+    # Fallback for backward compatibility
+    return RemoteClass.UNKNOWN.value
 
 def _normalize_geo_class_value(value: object | None) -> str:
     return normalize_geo_class(_string_like(value)).value
 
-
 def _derive_geo_class(job: dict) -> str:
-    
+    """Read geo_class from job dict (set by pipeline)."""
     explicit_geo = job.get("geo_class")
     if explicit_geo:
-        normalized_explicit_geo = _normalize_geo_class_value(explicit_geo)
-        if normalized_explicit_geo != GeoClass.UNKNOWN.value:
-            return normalized_explicit_geo
-
-    compliance = job.get("_compliance")
-    policy_reason = ""
-    explicit_geo_class = None
-
-    if isinstance(compliance, dict):
-        policy_reason = (_string_like(compliance.get("policy_reason")) or "").strip().lower()
-        explicit_geo_class = compliance.get("geo_class")
-
-    if explicit_geo_class:
-        normalized = _normalize_geo_class_value(explicit_geo_class)
-        if normalized != GeoClass.UNKNOWN.value:
-            return normalized
-
-    if policy_reason in {"geo_restriction", "geo_restriction_hard"}:
-        return GeoClass.NON_EU.value
-
-    classifier_result = classify_geo_scope(
-        str(job.get("title") or ""),
-        str(job.get("description") or ""),
-    )
-    normalized_classifier_geo = _normalize_geo_class_value(classifier_result.get("geo_class"))
-    if normalized_classifier_geo != GeoClass.UNKNOWN.value:
-        return normalized_classifier_geo
-
-    remote_scope = str(job.get("remote_scope") or "").strip()
-    if remote_scope:
-        remote_scope_result = classify_geo_scope(remote_scope, "")
-        normalized_remote_scope_geo = _normalize_geo_class_value(remote_scope_result.get("geo_class"))
-        if normalized_remote_scope_geo != GeoClass.UNKNOWN.value:
-            return normalized_remote_scope_geo
-
+        return normalize_geo_class(_string_like(explicit_geo)).value
+    
+    # Fallback for backward compatibility
     return GeoClass.UNKNOWN.value
 
+def _derive_taxonomy(job: dict) -> dict[str, str]:
+    """Derive taxonomy classification from job dict."""
+    from app.domain.classification.taxonomy import classify_taxonomy
+    
+    title = job.get("title")
+    if not title:
+        title = ""
+    
+    return classify_taxonomy(str(title))
 
 def _resolve_company_identity(company_id: str | None, job: dict) -> str:
     if company_id:
@@ -108,7 +72,6 @@ def _resolve_company_identity(company_id: str | None, job: dict) -> str:
     if embedded_company:
         return str(embedded_company)
     return ""
-
 
 def _derive_job_uid(job: dict, company_id: str | None) -> str:
     explicit_job_uid = _string_like(job.get("job_uid"))
@@ -120,7 +83,6 @@ def _derive_job_uid(job: dict, company_id: str | None) -> str:
         title=str(job.get("title") or ""),
         location=str(job.get("remote_scope") or ""),
     )
-
 
 def _derive_job_fingerprint(job: dict, company_id: str | None) -> str:
     explicit_fingerprint = _string_like(job.get("job_fingerprint"))
@@ -135,7 +97,6 @@ def _derive_job_fingerprint(job: dict, company_id: str | None) -> str:
         company_name=str(job.get("company_name") or ""),
     )
 
-
 def _derive_source_schema_hash(job: dict) -> str | None:
     explicit_schema_hash = _string_like(job.get("source_schema_hash"))
     if explicit_schema_hash:
@@ -147,7 +108,6 @@ def _derive_source_schema_hash(job: dict) -> str | None:
     if source_payload is None:
         return None
     return compute_schema_hash(source_payload)
-
 
 def _derive_policy_version(job: dict) -> str:
     explicit_policy_version = (_string_like(job.get("policy_version")) or "").strip()
@@ -170,7 +130,6 @@ def _derive_policy_version(job: dict) -> str:
 
     return ENGINE_POLICY_VERSION.value
 
-
 def _derive_source_fields(job: dict) -> tuple[str, str, str | None]:
     source = (_string_like(job.get("source")) or "").strip()
     source_job_id = (_string_like(job.get("source_job_id")) or "").strip()
@@ -182,7 +141,6 @@ def _derive_source_fields(job: dict) -> tuple[str, str, str | None]:
         raise ValueError("job.source_job_id is required")
 
     return source, source_job_id, source_url
-
 
 def _find_job_id_by_source_mapping(
     conn: Connection, *, source: str, source_job_id: str
@@ -216,7 +174,6 @@ def _find_job_id_by_source_mapping(
 
     return None
 
-
 def _find_job_id_by_fingerprint(conn: Connection, *, job_fingerprint: str) -> str | None:
     row = conn.execute(
         text("""
@@ -231,7 +188,6 @@ def _find_job_id_by_fingerprint(conn: Connection, *, job_fingerprint: str) -> st
         return str(row[0])
     return None
 
-
 def _job_exists(conn: Connection, *, job_id: str) -> bool:
     row = conn.execute(
         text("""
@@ -243,7 +199,6 @@ def _job_exists(conn: Connection, *, job_id: str) -> bool:
         {"job_id": job_id},
     ).fetchone()
     return bool(row)
-
 
 def _resolve_canonical_job_id(
     conn: Connection,
@@ -272,7 +227,6 @@ def _resolve_canonical_job_id(
         return incoming_job_id
 
     return incoming_job_id
-
 
 def _upsert_job_source_mapping_in_conn(
     conn: Connection,
@@ -328,7 +282,6 @@ def _upsert_job_source_mapping_in_conn(
             "updated_at": now,
         },
     )
-
 
 def init_db():
     db_engine = get_engine()
@@ -389,12 +342,10 @@ def init_db():
                 {"version": version, "applied_at": datetime.now(timezone.utc)},
             )
 
-
 def _require_open_conn(conn: Connection | None, *, op_name: str) -> Connection:
     if conn is None:
         raise ValueError(f"{op_name} requires an explicit open transaction connection (conn).")
     return conn
-
 
 def _upsert_job_in_conn(
     conn: Connection,
@@ -407,6 +358,11 @@ def _upsert_job_in_conn(
     company_id: str | None = None,
 ) -> str:
     resolved_company_id = _resolve_company_identity(company_id, job) or None
+    # Read taxonomy from job dict (set by pipeline)
+    job_family = job.get("job_family")
+    job_role = job.get("job_role")
+    seniority = job.get("seniority")
+    
     resolved_source, resolved_source_job_id, resolved_source_url = _derive_source_fields(job)
     resolved_job_uid = _derive_job_uid(job, resolved_company_id)
     resolved_job_fingerprint = _derive_job_fingerprint(job, resolved_company_id)
@@ -443,7 +399,12 @@ def _upsert_job_in_conn(
                 source_schema_hash,
                 policy_version,
                 compliance_status,
-                compliance_score
+                compliance_score,
+                job_family,
+                job_role,
+                seniority,
+                specialization,
+                job_quality_score
             )
             VALUES (
                 :job_id,
@@ -466,7 +427,12 @@ def _upsert_job_in_conn(
                 :source_schema_hash,
                 :policy_version,
                 :compliance_status,
-                :compliance_score
+                :compliance_score,
+                :job_family,
+                :job_role,
+                :seniority,
+                :specialization,
+                :job_quality_score
             )
             ON CONFLICT (job_id) DO UPDATE SET
                 source = COALESCE(jobs.source, excluded.source),
@@ -487,6 +453,11 @@ def _upsert_job_in_conn(
                 policy_version = excluded.policy_version,
                 compliance_status = excluded.compliance_status,
                 compliance_score = excluded.compliance_score,
+                job_family = excluded.job_family,
+                job_role = excluded.job_role,
+                seniority = excluded.seniority,
+                specialization = excluded.specialization,
+                job_quality_score = excluded.job_quality_score,
                 first_seen_at = CASE
                     WHEN excluded.first_seen_at < jobs.first_seen_at
                     THEN excluded.first_seen_at
@@ -516,6 +487,11 @@ def _upsert_job_in_conn(
             "policy_version": resolved_policy_version,
             "compliance_status": job.get("compliance_status"),
             "compliance_score": job.get("compliance_score"),
+            "job_family": job_family,
+            "job_role": job_role,
+            "seniority": seniority,
+            "specialization": job.get("specialization"),
+            "job_quality_score": job.get("job_quality_score"),
         },
     )
 
@@ -529,7 +505,6 @@ def _upsert_job_in_conn(
         now=now,
     )
     return canonical_job_id
-
 
 def upsert_job(job: dict, conn: Connection | None = None, *, company_id: str | None = None) -> str:
     now = datetime.now(timezone.utc)
@@ -547,7 +522,6 @@ def upsert_job(job: dict, conn: Connection | None = None, *, company_id: str | N
         geo_class=geo_class,
         company_id=company_id,
     )
-
 
 def insert_compliance_report(
     conn: Connection,
@@ -609,7 +583,6 @@ def insert_compliance_report(
         },
     )
 
-
 def load_active_ats_companies(conn: Connection) -> list[dict]:
     """Load active ATS configurations for companies."""
     rows = conn.execute(
@@ -634,7 +607,6 @@ def load_active_ats_companies(conn: Connection) -> list[dict]:
 
     return [dict(row) for row in rows]
 
-
 def mark_ats_synced(conn: Connection, company_ats_id: str | None) -> None:
     """Update the last sync timestamp for an ATS configuration."""
     if not company_ats_id:
@@ -650,7 +622,6 @@ def mark_ats_synced(conn: Connection, company_ats_id: str | None) -> None:
         """),
         {"company_ats_id": str(company_ats_id)},
     )
-
 
 def get_jobs_for_verification(limit: int = 20) -> list[dict]:
     with engine.connect() as conn:
@@ -671,7 +642,6 @@ def get_jobs_for_verification(limit: int = 20) -> list[dict]:
             {"limit": limit},
         ).mappings().all()
     return [dict(row) for row in rows]
-
 
 def update_job_availability(
     job_id: str,
@@ -694,7 +664,6 @@ def update_job_availability(
         ],
         conn=conn,
     )
-
 
 def update_jobs_availability(
     updates: list[dict],
@@ -733,7 +702,6 @@ def update_jobs_availability(
         normalized_updates,
     )
 
-
 def count_jobs_missing_compliance() -> int:
     with engine.connect() as conn:
         row = conn.execute(
@@ -744,7 +712,6 @@ def count_jobs_missing_compliance() -> int:
             """)
         ).fetchone()
     return int(row[0]) if row else 0
-
 
 def backfill_missing_compliance_classes(limit: int = 1000) -> int:
     with engine.connect() as conn:
@@ -807,7 +774,6 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
 
     return len(rows)
 
-
 def get_jobs_for_compliance_resolution(
     limit: int = 500,
     only_missing: bool = False,
@@ -835,7 +801,6 @@ def get_jobs_for_compliance_resolution(
     
     return [dict(row) for row in rows]
 
-
 def update_job_compliance_resolution(
     job_id: str,
     compliance_status: str,
@@ -854,7 +819,6 @@ def update_job_compliance_resolution(
         ],
         conn=conn,
     )
-
 
 def update_jobs_compliance_resolution(
     updates: list[dict],
@@ -886,7 +850,6 @@ def update_jobs_compliance_resolution(
         """),
         normalized_updates,
     )
-
 
 def _build_jobs_audit_filter_clauses(
     *,
@@ -962,14 +925,12 @@ def _build_jobs_audit_filter_clauses(
 
     return clauses, params
 
-
 def _rows_to_count_map(rows: list) -> dict[str, int]:
     result: dict[str, int] = {}
     for row in rows:
         key = str(row["label"])
         result[key] = int(row["count"])
     return result
-
 
 def get_jobs_audit(
     *,
@@ -1113,7 +1074,6 @@ def get_jobs_audit(
         },
     }
 
-
 def get_compliance_stats_last_7d() -> dict:
     with engine.connect() as conn:
         row = conn.execute(
@@ -1143,7 +1103,6 @@ def get_compliance_stats_last_7d() -> dict:
         "approved_ratio_pct": float(ratio) if ratio is not None else None,
     }
 
-
 def get_audit_source_filter_values() -> list[str]:
     with engine.connect() as conn:
         rows = conn.execute(
@@ -1160,7 +1119,6 @@ def get_audit_source_filter_values() -> list[str]:
         ).mappings().all()
 
     return [str(row["source"]) for row in rows]
-
 
 def get_audit_company_compliance_stats(
     *,
@@ -1202,7 +1160,6 @@ def get_audit_company_compliance_stats(
         )
     return result
 
-
 def get_audit_source_compliance_stats_last_7d() -> list[dict]:
     with engine.connect() as conn:
         rows = conn.execute(
@@ -1238,7 +1195,6 @@ def get_audit_source_compliance_stats_last_7d() -> list[dict]:
             }
         )
     return result
-
 
 def get_jobs(
     status: str | None = None,
