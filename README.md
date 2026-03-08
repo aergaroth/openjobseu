@@ -1,4 +1,4 @@
-[![Tests](https://github.com/aergaroth/openjobseu/actions/workflows/tests.yml/badge.svg)](https://github.com/aergaroth/openjobseu/actions/workflows/tests.yml)
+[![Dev Flow](https://github.com/aergaroth/openjobseu/actions/workflows/dev_flow.yml/badge.svg)](https://github.com/aergaroth/openjobseu/actions/workflows/dev_flow.yml)
 
 # OpenJobsEU
 
