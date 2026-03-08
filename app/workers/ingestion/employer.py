@@ -124,7 +124,7 @@ def ingest_company(company: dict):
         }
 
     try:
-        raw_jobs = adapter.fetch(company, updated_since=updated_since)
+        raw_jobs = list(adapter.fetch(company, updated_since=updated_since))
     except requests.HTTPError as exc:
         status_code = getattr(getattr(exc, "response", None), "status_code", None)
         logger.warning(
@@ -177,7 +177,17 @@ def ingest_company(company: dict):
             "skipped": 0,
             "error": "fetch_failed",
         }
-    except Exception:
+    except Exception as exc:
+        logger.error(
+            "employer ingestion fetch failed with unhandled exception",
+            extra={
+                "company_id": company.get("company_id"),
+                "ats_provider": provider,
+                "ats_slug": company.get("ats_slug"),
+                "error": str(exc),
+                "error_type": type(exc).__name__,
+            },
+        )
         return {
             "fetched": 0,
             "normalized_count": 0,
