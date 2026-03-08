@@ -25,9 +25,11 @@ class ATSAdapter(ABC):
        
     """
     def __init__(self):
-       self.session = requests.Session()
-
-    
+        self.session = requests.Session()
+        self.session.headers.update({
+            "User-Agent": "OpenJobsEU/1.0 (https://openjobseu.org)",
+            "Accept": "application/json",
+        })
     source_name: str
     
     # Backward compatibility: allow access via 'provider' attribute
