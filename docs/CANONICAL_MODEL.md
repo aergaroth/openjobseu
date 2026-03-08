@@ -51,6 +51,12 @@ Historical alias still present in some data paths/metrics:
 - **compliance_score**:
   integer `0..100`
 
+- **job_family**: `software_development | data_science | design | ...`
+- **job_role**: `engineer | developer | product_manager | ...`
+- **seniority**: `junior | senior | staff | manager | ...`
+- **specialization**: `backend | frontend | devops | ...`
+- **job_quality_score**: integer `0..100`
+
 Feed usage:
 - `/jobs/feed` returns visible jobs with `compliance_score >= 80`
 
@@ -100,7 +106,7 @@ Usage:
 ## Intentionally Deferred Fields
 
 The runtime does not currently persist enriched fields such as:
-- employment type / seniority / role category
+- employment type (contract/perm)
 - compensation ranges
 - timezone or detailed country restrictions
 

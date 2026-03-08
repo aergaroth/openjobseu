@@ -52,7 +52,6 @@ Non-goals remain unchanged:
 ## Next Priorities
 
 ### P1 – Source strategy
-- [ ] Re-enable additional public sources only after current quality gate criteria are met
 - [ ] Finalize explicit activation policy for adapters present in code but disabled in registry
 
 ### P2 – Company data maturity

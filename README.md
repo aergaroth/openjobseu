@@ -1,4 +1,4 @@
-[![Tests](https://github.com/aergaroth/openjobseu/actions/workflows/tests.yml/badge.svg)](https://github.com/aergaroth/openjobseu/actions/workflows/tests.yml)
+[![Dev Flow](https://github.com/aergaroth/openjobseu/actions/workflows/prod_flow.yml/badge.svg)](https://github.com/aergaroth/openjobseu/actions/workflows/dev_flow.yml)
 
 # OpenJobsEU
 
@@ -23,12 +23,12 @@ OpenJobsEU runs as a tick-based pipeline:
 
 1. Scheduler or operator triggers `POST /internal/tick`
 2. Employer ATS ingestion runs (`employer_ing`)
-3. Adapters normalize data and policy is applied during ingestion
+3. Adapters normalize data, policy is applied, and taxonomy is classified
 4. Canonical rows are upserted into PostgreSQL
 5. Post-ingestion workers run availability checks and lifecycle transitions
 
 ### Active ingestion source
-- `employer_ing` (curated employers table + Greenhouse ATS API)
+- `employer_ing` (curated employers table + ATS APIs)
 
 ---
 

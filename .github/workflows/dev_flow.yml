@@ -1,0 +1,118 @@
+name: Dev Flow
+
+on:
+  push:
+    branches-ignore:
+      - main
+    paths-ignore:
+      - "README.md"
+      - "docs/**"
+  pull_request:
+    paths-ignore:
+      - "README.md"
+      - "docs/**"
+  workflow_dispatch:
+
+env:
+  DB_MODE: standard
+  DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/testdb
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Wait for Postgres
+        run: |
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            sleep 1
+          done
+
+      - name: Initialize schema
+        run: |
+          python -c "from storage.db_logic import init_db; init_db()"
+
+      - name: Run tests
+        run: pytest -q
+
+  build-deploy-dev:
+    needs: pytest
+    if: github.ref == 'refs/heads/develop' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_DEV }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker europe-north1-docker.pkg.dev
+
+      - name: Build & push image (DEV)
+        env:
+          PROJECT_ID: dev-openjobseu
+          SHA: ${{ github.sha }}
+        run: |
+          IMAGE=europe-north1-docker.pkg.dev/$PROJECT_ID/$PROJECT_ID/$PROJECT_ID
+          docker build -t $IMAGE:$SHA .
+          docker push $IMAGE:$SHA
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Terraform Apply (DEV)
+        working-directory: infra/gcp/dev
+        run: |
+          terraform init -input=false
+          terraform apply -auto-approve \
+            -var="project_id=dev-openjobseu" \
+            -var="image=europe-north1-docker.pkg.dev/dev-openjobseu/dev-openjobseu/dev-openjobseu:${{ github.sha }}"
+
+      - name: Show deployed revision
+        run: |
+          gcloud run services describe dev-openjobseu \
+            --project dev-openjobseu \
+            --region europe-north1 \
+            --format="value(status.latestReadyRevisionName)"

@@ -67,7 +67,7 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
             call_order.append("normalize")
             return dict(normalize_output)
 
-    monkeypatch.setattr(employer, "get_adapter", lambda _provider: _FakeAdapter)
+    monkeypatch.setattr(employer, "get_adapter", lambda _provider: _FakeAdapter())
     monkeypatch.setattr(employer, "get_engine", lambda: _NoopEngine())
 
     def _fake_apply_policy(job, source):
