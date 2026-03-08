@@ -88,7 +88,7 @@ def ingest_company(company: dict):
     updated_since = company.get("last_sync_at")
 
     try:
-        adapter_cls = get_adapter(provider)
+        adapter = get_adapter(provider)
     except ValueError:
         logger.warning(
             "employer ingestion skipped due to unsupported ats provider",
@@ -106,7 +106,7 @@ def ingest_company(company: dict):
             "error": "unsupported_ats_provider",
         }
 
-    if not getattr(adapter_cls, "active", True):
+    if not getattr(adapter, "active", True):
         logger.warning(
             "employer ingestion skipped due to inactive ats adapter",
             extra={
@@ -123,7 +123,6 @@ def ingest_company(company: dict):
             "error": "inactive_ats_adapter",
         }
 
-    adapter = adapter_cls()
     try:
         raw_jobs = adapter.fetch(company, updated_since=updated_since)
     except requests.HTTPError as exc:
@@ -314,7 +313,17 @@ def ingest_company(company: dict):
 
                     accepted += 1
 
-                except Exception:
+                except Exception as exc:
+                    logger.warning(
+                        "employer ingestion job processing failed",
+                        extra={
+                            "company_id": company.get("company_id"),
+                            "ats_provider": provider,
+                            "source_job_id": raw.get("id") if isinstance(raw, dict) else None,
+                            "error": str(exc),
+                            "type": type(exc).__name__,
+                        },
+                    )
                     skipped += 1
                     continue
 
@@ -398,7 +407,7 @@ def run_employer_ingestion() -> dict:
                 synced_ats_count += 1
                 total_fetched += int(result.get("fetched", 0) or 0)
                 total_normalized += int(result.get("normalized_count", 0) or 0)
-                total_accepted += result["accepted"]
+                total_accepted += int(result.get("accepted", 0) or 0)
                 total_skipped += int(result.get("skipped", 0) or 0)
                 total_rejected_policy += int(result.get("rejected_policy_count", 0) or 0)
                 source_reasons = result.get("rejected_by_reason", {}) or {}
