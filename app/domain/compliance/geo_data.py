@@ -120,6 +120,8 @@ EU_REGION_KEYWORDS = (
     "europe only",
     "european economic area",
     "eea",
+    "european union",
+    "iberia",
 )
 
 US_STRONG_SIGNALS = (

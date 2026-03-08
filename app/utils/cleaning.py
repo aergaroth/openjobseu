@@ -37,6 +37,26 @@ def normalize_whitespace(text: str) -> str:
     return text.strip()
 
 
+def normalize_remote_scope(value: str | None) -> str:
+    """
+    Normalize remote/location strings across ATS providers.
+    """
+    if not value:
+        return ""
+
+    value = value.lower().strip()
+
+    replacements = {
+        "remote - europe": "europe",
+        "remote europe": "europe",
+        "eu remote": "europe",
+        "remote eu": "europe",
+        "remote (eu)": "europe",
+        "remote worldwide": "worldwide",
+    }
+
+    return replacements.get(value, value)
+
 def clean_description(text: str, source: str) -> str:
     if not text:
         return text

@@ -4,18 +4,23 @@ but retains the same function signatures and overall structure
 as before to minimize impact on other parts of the codebase. 
 '''
 
+import json
 from pathlib import Path
 from datetime import datetime, timezone
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 from app.domain.classification.enums import GeoClass, RemoteClass
-from app.domain.compliance.classifiers.geo import classify_geo_scope
+from app.domain.compliance.engine import ENGINE_POLICY_VERSION
+from app.domain.jobs.identity import (
+    compute_job_fingerprint,
+    compute_job_uid,
+    compute_schema_hash,
+)
 from storage.db_engine import get_engine
 from app.domain.classification.mappers import normalize_geo_class, normalize_remote_class
 
 engine = get_engine()
 MIGRATIONS_PATH = Path("storage/migrations")
-
 
 def _string_like(value: object | None) -> str | None:
     if value is None:
@@ -29,70 +34,254 @@ def _string_like(value: object | None) -> str | None:
 
     return str(value)
 
-
 def _derive_remote_class(job: dict) -> str:
-    compliance = job.get("_compliance")
-    if not isinstance(compliance, dict):
-        return (
-            RemoteClass.REMOTE_ONLY.value
-            if bool(job.get("remote_source_flag"))
-            else RemoteClass.UNKNOWN.value
-        )
-
-    policy_reason = (_string_like(compliance.get("policy_reason")) or "").strip().lower()
-    remote_model = _string_like(compliance.get("remote_model"))
-
-    if policy_reason == RemoteClass.NON_REMOTE.value:
-        return RemoteClass.NON_REMOTE.value
-
-    return normalize_remote_class(remote_model).value
-
+    """Read remote_class from job dict (set by pipeline)."""
+    explicit_remote = job.get("remote_class")
+    if explicit_remote:
+        return normalize_remote_class(_string_like(explicit_remote)).value
+    
+    # Fallback for backward compatibility
+    return RemoteClass.UNKNOWN.value
 
 def _normalize_geo_class_value(value: object | None) -> str:
     return normalize_geo_class(_string_like(value)).value
 
-
 def _derive_geo_class(job: dict) -> str:
-    
+    """Read geo_class from job dict (set by pipeline)."""
     explicit_geo = job.get("geo_class")
     if explicit_geo:
-        normalized_explicit_geo = _normalize_geo_class_value(explicit_geo)
-        if normalized_explicit_geo != GeoClass.UNKNOWN.value:
-            return normalized_explicit_geo
-
-    compliance = job.get("_compliance")
-    policy_reason = ""
-    explicit_geo_class = None
-
-    if isinstance(compliance, dict):
-        policy_reason = (_string_like(compliance.get("policy_reason")) or "").strip().lower()
-        explicit_geo_class = compliance.get("geo_class")
-
-    if explicit_geo_class:
-        normalized = _normalize_geo_class_value(explicit_geo_class)
-        if normalized != GeoClass.UNKNOWN.value:
-            return normalized
-
-    if policy_reason in {"geo_restriction", "geo_restriction_hard"}:
-        return GeoClass.NON_EU.value
-
-    classifier_result = classify_geo_scope(
-        str(job.get("title") or ""),
-        str(job.get("description") or ""),
-    )
-    normalized_classifier_geo = _normalize_geo_class_value(classifier_result.get("geo_class"))
-    if normalized_classifier_geo != GeoClass.UNKNOWN.value:
-        return normalized_classifier_geo
-
-    remote_scope = str(job.get("remote_scope") or "").strip()
-    if remote_scope:
-        remote_scope_result = classify_geo_scope(remote_scope, "")
-        normalized_remote_scope_geo = _normalize_geo_class_value(remote_scope_result.get("geo_class"))
-        if normalized_remote_scope_geo != GeoClass.UNKNOWN.value:
-            return normalized_remote_scope_geo
-
+        return normalize_geo_class(_string_like(explicit_geo)).value
+    
+    # Fallback for backward compatibility
     return GeoClass.UNKNOWN.value
 
+def _derive_taxonomy(job: dict) -> dict[str, str]:
+    """Derive taxonomy classification from job dict."""
+    from app.domain.classification.taxonomy import classify_taxonomy
+    
+    title = job.get("title")
+    if not title:
+        title = ""
+    
+    return classify_taxonomy(str(title))
+
+def _resolve_company_identity(company_id: str | None, job: dict) -> str:
+    if company_id:
+        return str(company_id)
+    embedded_company = job.get("company_id")
+    if embedded_company:
+        return str(embedded_company)
+    return ""
+
+def _derive_job_uid(job: dict, company_id: str | None) -> str:
+    explicit_job_uid = _string_like(job.get("job_uid"))
+    if explicit_job_uid:
+        return explicit_job_uid
+
+    return compute_job_uid(
+        company_id=_resolve_company_identity(company_id, job),
+        title=str(job.get("title") or ""),
+        location=str(job.get("remote_scope") or ""),
+    )
+
+def _derive_job_fingerprint(job: dict, company_id: str | None) -> str:
+    explicit_fingerprint = _string_like(job.get("job_fingerprint"))
+    if explicit_fingerprint:
+        return explicit_fingerprint
+
+    return compute_job_fingerprint(
+        str(job.get("description") or ""),
+        title=str(job.get("title") or ""),
+        location=str(job.get("remote_scope") or ""),
+        company_id=_resolve_company_identity(company_id, job),
+        company_name=str(job.get("company_name") or ""),
+    )
+
+def _derive_source_schema_hash(job: dict) -> str | None:
+    explicit_schema_hash = _string_like(job.get("source_schema_hash"))
+    if explicit_schema_hash:
+        return explicit_schema_hash
+
+    if "source_payload" not in job:
+        return None
+    source_payload = job.get("source_payload")
+    if source_payload is None:
+        return None
+    return compute_schema_hash(source_payload)
+
+def _derive_policy_version(job: dict) -> str:
+    explicit_policy_version = (_string_like(job.get("policy_version")) or "").strip()
+    if explicit_policy_version:
+        return explicit_policy_version
+
+    compliance = job.get("_compliance")
+    if isinstance(compliance, dict):
+        compliance_policy_version = (_string_like(compliance.get("policy_version")) or "").strip()
+        if compliance_policy_version:
+            if compliance_policy_version.lower().startswith("v"):
+                return compliance_policy_version
+            try:
+                numeric = float(compliance_policy_version)
+                if numeric.is_integer():
+                    return f"v{int(numeric)}"
+            except ValueError:
+                pass
+            return compliance_policy_version
+
+    return ENGINE_POLICY_VERSION.value
+
+def _derive_source_fields(job: dict) -> tuple[str, str, str | None]:
+    source = (_string_like(job.get("source")) or "").strip()
+    source_job_id = (_string_like(job.get("source_job_id")) or "").strip()
+    source_url = _string_like(job.get("source_url"))
+
+    if not source:
+        raise ValueError("job.source is required")
+    if not source_job_id:
+        raise ValueError("job.source_job_id is required")
+
+    return source, source_job_id, source_url
+
+def _find_job_id_by_source_mapping(
+    conn: Connection, *, source: str, source_job_id: str
+) -> str | None:
+    row = conn.execute(
+        text("""
+            SELECT job_id
+            FROM job_sources
+            WHERE source = :source
+              AND source_job_id = :source_job_id
+            LIMIT 1
+        """),
+        {"source": source, "source_job_id": source_job_id},
+    ).fetchone()
+    if row and row[0]:
+        return str(row[0])
+
+    # Backward-compatible fallback while old rows are being backfilled.
+    legacy_row = conn.execute(
+        text("""
+            SELECT job_id
+            FROM jobs
+            WHERE source = :source
+              AND source_job_id = :source_job_id
+            LIMIT 1
+        """),
+        {"source": source, "source_job_id": source_job_id},
+    ).fetchone()
+    if legacy_row and legacy_row[0]:
+        return str(legacy_row[0])
+
+    return None
+
+def _find_job_id_by_fingerprint(conn: Connection, *, job_fingerprint: str) -> str | None:
+    row = conn.execute(
+        text("""
+            SELECT job_id
+            FROM jobs
+            WHERE job_fingerprint = :job_fingerprint
+            LIMIT 1
+        """),
+        {"job_fingerprint": job_fingerprint},
+    ).fetchone()
+    if row and row[0]:
+        return str(row[0])
+    return None
+
+def _job_exists(conn: Connection, *, job_id: str) -> bool:
+    row = conn.execute(
+        text("""
+            SELECT 1
+            FROM jobs
+            WHERE job_id = :job_id
+            LIMIT 1
+        """),
+        {"job_id": job_id},
+    ).fetchone()
+    return bool(row)
+
+def _resolve_canonical_job_id(
+    conn: Connection,
+    *,
+    incoming_job_id: str,
+    source: str,
+    source_job_id: str,
+    job_fingerprint: str,
+) -> str:
+    by_fingerprint = _find_job_id_by_fingerprint(
+        conn,
+        job_fingerprint=job_fingerprint,
+    )
+    if by_fingerprint:
+        return by_fingerprint
+
+    by_source_mapping = _find_job_id_by_source_mapping(
+        conn,
+        source=source,
+        source_job_id=source_job_id,
+    )
+    if by_source_mapping:
+        return by_source_mapping
+
+    if _job_exists(conn, job_id=incoming_job_id):
+        return incoming_job_id
+
+    return incoming_job_id
+
+def _upsert_job_source_mapping_in_conn(
+    conn: Connection,
+    *,
+    job_id: str,
+    source: str,
+    source_job_id: str,
+    source_url: str | None,
+    first_seen_at,
+    now,
+) -> None:
+    conn.execute(
+        text("""
+            INSERT INTO job_sources (
+                job_id,
+                source,
+                source_job_id,
+                source_url,
+                first_seen_at,
+                last_seen_at,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                :job_id,
+                :source,
+                :source_job_id,
+                :source_url,
+                :first_seen_at,
+                :last_seen_at,
+                :created_at,
+                :updated_at
+            )
+            ON CONFLICT (source, source_job_id) DO UPDATE SET
+                job_id = excluded.job_id,
+                source_url = COALESCE(excluded.source_url, job_sources.source_url),
+                first_seen_at = CASE
+                    WHEN excluded.first_seen_at < job_sources.first_seen_at
+                    THEN excluded.first_seen_at
+                    ELSE job_sources.first_seen_at
+                END,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = excluded.updated_at
+        """),
+        {
+            "job_id": job_id,
+            "source": source,
+            "source_job_id": source_job_id,
+            "source_url": source_url,
+            "first_seen_at": first_seen_at,
+            "last_seen_at": now,
+            "created_at": now,
+            "updated_at": now,
+        },
+    )
 
 def init_db():
     db_engine = get_engine()
@@ -120,6 +309,10 @@ def init_db():
             ).scalar_one_or_none()
 
             if existing_jobs and existing_companies:
+                # Legacy databases may already contain baseline tables but miss
+                # the migration ledger. Mark only baseline schema as applied so
+                # newer migrations still run.
+                baseline_versions = {1, 2} & migration_versions
                 now = datetime.now(timezone.utc)
                 conn.execute(
                     text("""
@@ -129,10 +322,10 @@ def init_db():
                     """),
                     [
                         {"version": version, "applied_at": now}
-                        for version in sorted(migration_versions)
+                        for version in sorted(baseline_versions)
                     ],
                 )
-                applied_versions = set(migration_versions)
+                applied_versions = set(baseline_versions)
 
         for migration_file in migration_files:
             version = int(migration_file.name.split("_")[0])
@@ -149,12 +342,10 @@ def init_db():
                 {"version": version, "applied_at": datetime.now(timezone.utc)},
             )
 
-
 def _require_open_conn(conn: Connection | None, *, op_name: str) -> Connection:
     if conn is None:
         raise ValueError(f"{op_name} requires an explicit open transaction connection (conn).")
     return conn
-
 
 def _upsert_job_in_conn(
     conn: Connection,
@@ -165,7 +356,26 @@ def _upsert_job_in_conn(
     remote_class: str,
     geo_class: str,
     company_id: str | None = None,
-) -> None:
+) -> str:
+    resolved_company_id = _resolve_company_identity(company_id, job) or None
+    # Read taxonomy from job dict (set by pipeline)
+    job_family = job.get("job_family")
+    job_role = job.get("job_role")
+    seniority = job.get("seniority")
+    
+    resolved_source, resolved_source_job_id, resolved_source_url = _derive_source_fields(job)
+    resolved_job_uid = _derive_job_uid(job, resolved_company_id)
+    resolved_job_fingerprint = _derive_job_fingerprint(job, resolved_company_id)
+    resolved_source_schema_hash = _derive_source_schema_hash(job)
+    resolved_policy_version = _derive_policy_version(job)
+    canonical_job_id = _resolve_canonical_job_id(
+        conn,
+        incoming_job_id=str(job["job_id"]),
+        source=resolved_source,
+        source_job_id=resolved_source_job_id,
+        job_fingerprint=resolved_job_fingerprint,
+    )
+
     conn.execute(
         text("""
             INSERT INTO jobs (
@@ -183,7 +393,18 @@ def _upsert_job_in_conn(
                 last_seen_at,
                 remote_class,
                 geo_class,
-                company_id
+                company_id,
+                job_uid,
+                job_fingerprint,
+                source_schema_hash,
+                policy_version,
+                compliance_status,
+                compliance_score,
+                job_family,
+                job_role,
+                seniority,
+                specialization,
+                job_quality_score
             )
             VALUES (
                 :job_id,
@@ -200,10 +421,23 @@ def _upsert_job_in_conn(
                 :last_seen_at,
                 :remote_class,
                 :geo_class,
-                :company_id
+                :company_id,
+                :job_uid,
+                :job_fingerprint,
+                :source_schema_hash,
+                :policy_version,
+                :compliance_status,
+                :compliance_score,
+                :job_family,
+                :job_role,
+                :seniority,
+                :specialization,
+                :job_quality_score
             )
             ON CONFLICT (job_id) DO UPDATE SET
-                source_url = excluded.source_url,
+                source = COALESCE(jobs.source, excluded.source),
+                source_job_id = COALESCE(jobs.source_job_id, excluded.source_job_id),
+                source_url = COALESCE(jobs.source_url, excluded.source_url),
                 title = excluded.title,
                 company_name = excluded.company_name,
                 description = excluded.description,
@@ -213,6 +447,17 @@ def _upsert_job_in_conn(
                 remote_class = excluded.remote_class,
                 geo_class = excluded.geo_class,
                 company_id = COALESCE(jobs.company_id, excluded.company_id),
+                job_uid = excluded.job_uid,
+                job_fingerprint = excluded.job_fingerprint,
+                source_schema_hash = excluded.source_schema_hash,
+                policy_version = excluded.policy_version,
+                compliance_status = excluded.compliance_status,
+                compliance_score = excluded.compliance_score,
+                job_family = excluded.job_family,
+                job_role = excluded.job_role,
+                seniority = excluded.seniority,
+                specialization = excluded.specialization,
+                job_quality_score = excluded.job_quality_score,
                 first_seen_at = CASE
                     WHEN excluded.first_seen_at < jobs.first_seen_at
                     THEN excluded.first_seen_at
@@ -221,10 +466,10 @@ def _upsert_job_in_conn(
                 last_seen_at = excluded.last_seen_at
         """),
         {
-            "job_id": job["job_id"],
-            "source": job["source"],
-            "source_job_id": job["source_job_id"],
-            "source_url": job["source_url"],
+            "job_id": canonical_job_id,
+            "source": resolved_source,
+            "source_job_id": resolved_source_job_id,
+            "source_url": resolved_source_url,
             "title": job["title"],
             "company_name": job["company_name"],
             "description": job["description"],
@@ -235,19 +480,40 @@ def _upsert_job_in_conn(
             "last_seen_at": now,
             "remote_class": remote_class,
             "geo_class": geo_class,
-            "company_id": company_id,
+            "company_id": resolved_company_id,
+            "job_uid": resolved_job_uid,
+            "job_fingerprint": resolved_job_fingerprint,
+            "source_schema_hash": resolved_source_schema_hash,
+            "policy_version": resolved_policy_version,
+            "compliance_status": job.get("compliance_status"),
+            "compliance_score": job.get("compliance_score"),
+            "job_family": job_family,
+            "job_role": job_role,
+            "seniority": seniority,
+            "specialization": job.get("specialization"),
+            "job_quality_score": job.get("job_quality_score"),
         },
     )
 
+    _upsert_job_source_mapping_in_conn(
+        conn,
+        job_id=canonical_job_id,
+        source=resolved_source,
+        source_job_id=resolved_source_job_id,
+        source_url=resolved_source_url,
+        first_seen_at=first_seen_at,
+        now=now,
+    )
+    return canonical_job_id
 
-def upsert_job(job: dict, conn: Connection | None = None, *, company_id: str | None = None):
+def upsert_job(job: dict, conn: Connection | None = None, *, company_id: str | None = None) -> str:
     now = datetime.now(timezone.utc)
     first_seen_at = job.get("first_seen_at") or now
     remote_class = _derive_remote_class(job)
     geo_class = _derive_geo_class(job)
-    
+
     target_conn = _require_open_conn(conn, op_name="upsert_job")
-    _upsert_job_in_conn(
+    return _upsert_job_in_conn(
         target_conn,
         job=job,
         first_seen_at=first_seen_at,
@@ -255,6 +521,106 @@ def upsert_job(job: dict, conn: Connection | None = None, *, company_id: str | N
         remote_class=remote_class,
         geo_class=geo_class,
         company_id=company_id,
+    )
+
+def insert_compliance_report(
+    conn: Connection,
+    *,
+    job_id: str,
+    job_uid: str,
+    policy_version: str,
+    remote_class: str | None,
+    geo_class: str | None,
+    hard_geo_flag: bool,
+    base_score: int,
+    penalties: dict | None = None,
+    bonuses: dict | None = None,
+    final_score: int,
+    final_status: str,
+    decision_vector: dict | None = None,
+) -> None:
+    """Insert a compliance report for a job."""
+    conn.execute(
+        text("""
+            INSERT INTO compliance_reports (
+                job_id, job_uid, policy_version, remote_class, geo_class,
+                hard_geo_flag, base_score, penalties, bonuses,
+                final_score, final_status, decision_vector, created_at
+            )
+            VALUES (
+                :job_id, :job_uid, :policy_version, :remote_class, :geo_class,
+                :hard_geo_flag, :base_score, :penalties, :bonuses,
+                :final_score, :final_status, :decision_vector, NOW()
+            )
+            ON CONFLICT (job_uid, policy_version) DO UPDATE SET
+                job_id = EXCLUDED.job_id,
+                remote_class = EXCLUDED.remote_class,
+                geo_class = EXCLUDED.geo_class,
+                hard_geo_flag = EXCLUDED.hard_geo_flag,
+                base_score = EXCLUDED.base_score,
+                penalties = EXCLUDED.penalties,
+                bonuses = EXCLUDED.bonuses,
+                final_score = EXCLUDED.final_score,
+                final_status = EXCLUDED.final_status,
+                decision_vector = EXCLUDED.decision_vector,
+                created_at = NOW()
+        """),
+        {
+            "job_id": job_id,
+            "job_uid": job_uid,
+            "policy_version": policy_version,
+            "remote_class": remote_class,
+            "geo_class": geo_class,
+            "hard_geo_flag": hard_geo_flag,
+            "base_score": base_score,
+            "penalties": json.dumps(penalties, default=str) if penalties is not None else None,
+            "bonuses": json.dumps(bonuses, default=str) if bonuses is not None else None,
+            "final_score": final_score,
+            "final_status": final_status,
+            "decision_vector": json.dumps(decision_vector, default=str)
+            if decision_vector is not None
+            else None,
+        },
+    )
+
+def load_active_ats_companies(conn: Connection) -> list[dict]:
+    """Load active ATS configurations for companies."""
+    rows = conn.execute(
+        text("""
+            SELECT
+                ca.company_ats_id,
+                ca.company_id,
+                c.legal_name,
+                ca.provider AS ats_provider,
+                ca.ats_slug,
+                ca.ats_api_url,
+                ca.careers_url,
+                ca.last_sync_at
+            FROM company_ats ca
+            JOIN companies c ON c.company_id = ca.company_id
+            WHERE c.is_active = TRUE
+              AND ca.is_active = TRUE
+              AND ca.provider IS NOT NULL
+              AND ca.ats_slug IS NOT NULL
+        """)
+    ).mappings().all()
+
+    return [dict(row) for row in rows]
+
+def mark_ats_synced(conn: Connection, company_ats_id: str | None) -> None:
+    """Update the last sync timestamp for an ATS configuration."""
+    if not company_ats_id:
+        return
+
+    conn.execute(
+        text("""
+            UPDATE company_ats
+            SET
+                last_sync_at = NOW(),
+                updated_at = NOW()
+            WHERE company_ats_id = :company_ats_id
+        """),
+        {"company_ats_id": str(company_ats_id)},
     )
 
 def get_jobs_for_verification(limit: int = 20) -> list[dict]:
@@ -277,7 +643,6 @@ def get_jobs_for_verification(limit: int = 20) -> list[dict]:
         ).mappings().all()
     return [dict(row) for row in rows]
 
-
 def update_job_availability(
     job_id: str,
     status: str,
@@ -299,7 +664,6 @@ def update_job_availability(
         ],
         conn=conn,
     )
-
 
 def update_jobs_availability(
     updates: list[dict],
@@ -338,7 +702,6 @@ def update_jobs_availability(
         normalized_updates,
     )
 
-
 def count_jobs_missing_compliance() -> int:
     with engine.connect() as conn:
         row = conn.execute(
@@ -349,7 +712,6 @@ def count_jobs_missing_compliance() -> int:
             """)
         ).fetchone()
     return int(row[0]) if row else 0
-
 
 def backfill_missing_compliance_classes(limit: int = 1000) -> int:
     with engine.connect() as conn:
@@ -412,7 +774,6 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
 
     return len(rows)
 
-
 def get_jobs_for_compliance_resolution(
     limit: int = 500,
     only_missing: bool = False,
@@ -440,7 +801,6 @@ def get_jobs_for_compliance_resolution(
     
     return [dict(row) for row in rows]
 
-
 def update_job_compliance_resolution(
     job_id: str,
     compliance_status: str,
@@ -459,7 +819,6 @@ def update_job_compliance_resolution(
         ],
         conn=conn,
     )
-
 
 def update_jobs_compliance_resolution(
     updates: list[dict],
@@ -492,7 +851,6 @@ def update_jobs_compliance_resolution(
         normalized_updates,
     )
 
-
 def _build_jobs_audit_filter_clauses(
     *,
     status: str | None = None,
@@ -517,7 +875,12 @@ def _build_jobs_audit_filter_clauses(
 
     if source:
         param_counter += 1
-        clauses.append(f"source = :p{param_counter}")
+        clauses.append(
+            "EXISTS ("
+            "SELECT 1 FROM job_sources js_filter "
+            f"WHERE js_filter.job_id = jobs.job_id AND js_filter.source = :p{param_counter}"
+            ")"
+        )
         params[f"p{param_counter}"] = source
 
     if company:
@@ -562,14 +925,12 @@ def _build_jobs_audit_filter_clauses(
 
     return clauses, params
 
-
 def _rows_to_count_map(rows: list) -> dict[str, int]:
     result: dict[str, int] = {}
     for row in rows:
         key = str(row["label"])
         result[key] = int(row["count"])
     return result
-
 
 def get_jobs_audit(
     *,
@@ -653,10 +1014,14 @@ def get_jobs_audit(
 
         source_rows = conn.execute(
             text(f"""
-                SELECT COALESCE(source, 'null') AS label, COUNT(*) AS count
+                SELECT
+                    COALESCE(js.source, 'null') AS label,
+                    COUNT(DISTINCT jobs.job_id) AS count
                 FROM jobs
+                LEFT JOIN job_sources js
+                    ON js.job_id = jobs.job_id
                 {where_clause}
-                GROUP BY COALESCE(source, 'null')
+                GROUP BY COALESCE(js.source, 'null')
                 ORDER BY count DESC, label ASC
             """),
             params,
@@ -709,7 +1074,6 @@ def get_jobs_audit(
         },
     }
 
-
 def get_compliance_stats_last_7d() -> dict:
     with engine.connect() as conn:
         row = conn.execute(
@@ -739,24 +1103,22 @@ def get_compliance_stats_last_7d() -> dict:
         "approved_ratio_pct": float(ratio) if ratio is not None else None,
     }
 
-
 def get_audit_source_filter_values() -> list[str]:
     with engine.connect() as conn:
         rows = conn.execute(
             text("""
                 SELECT
-                    source,
+                    js.source,
                     COUNT(*) AS count
-                FROM jobs
-                WHERE source IS NOT NULL
-                  AND btrim(source) <> ''
-                GROUP BY source
-                ORDER BY count DESC, source ASC
+                FROM job_sources js
+                WHERE js.source IS NOT NULL
+                  AND btrim(js.source) <> ''
+                GROUP BY js.source
+                ORDER BY count DESC, js.source ASC
             """)
         ).mappings().all()
 
     return [str(row["source"]) for row in rows]
-
 
 def get_audit_company_compliance_stats(
     *,
@@ -798,25 +1160,25 @@ def get_audit_company_compliance_stats(
         )
     return result
 
-
 def get_audit_source_compliance_stats_last_7d() -> list[dict]:
     with engine.connect() as conn:
         rows = conn.execute(
             text("""
                 SELECT
-                    source,
-                    COUNT(*) AS total_jobs,
-                    COUNT(*) FILTER (WHERE compliance_status = 'approved') AS approved,
-                    COUNT(*) FILTER (WHERE compliance_status = 'rejected') AS rejected,
+                    js.source AS source,
+                    COUNT(DISTINCT j.job_id) AS total_jobs,
+                    COUNT(DISTINCT j.job_id) FILTER (WHERE j.compliance_status = 'approved') AS approved,
+                    COUNT(DISTINCT j.job_id) FILTER (WHERE j.compliance_status = 'rejected') AS rejected,
                     ROUND(
-                        COUNT(*) FILTER (WHERE compliance_status = 'approved')::numeric
-                        / NULLIF(COUNT(*), 0) * 100,
+                        COUNT(DISTINCT j.job_id) FILTER (WHERE j.compliance_status = 'approved')::numeric
+                        / NULLIF(COUNT(DISTINCT j.job_id), 0) * 100,
                         2
                     ) AS approved_ratio_pct
-                FROM jobs
-                WHERE first_seen_at > NOW() - INTERVAL '7 days'
-                GROUP BY source
-                ORDER BY approved_ratio_pct ASC NULLS FIRST, source ASC
+                FROM jobs j
+                JOIN job_sources js ON js.job_id = j.job_id
+                WHERE j.first_seen_at > NOW() - INTERVAL '7 days'
+                GROUP BY js.source
+                ORDER BY approved_ratio_pct ASC NULLS FIRST, js.source ASC
             """)
         ).mappings().all()
 
@@ -833,7 +1195,6 @@ def get_audit_source_compliance_stats_last_7d() -> list[dict]:
             }
         )
     return result
-
 
 def get_jobs(
     status: str | None = None,
@@ -868,7 +1229,12 @@ def get_jobs(
 
     if source:
         param_counter += 1
-        clauses.append(f"source = :p{param_counter}")
+        clauses.append(
+            "EXISTS ("
+            "SELECT 1 FROM job_sources js_filter "
+            f"WHERE js_filter.job_id = jobs.job_id AND js_filter.source = :p{param_counter}"
+            ")"
+        )
         params[f"p{param_counter}"] = source
 
     if remote_scope:

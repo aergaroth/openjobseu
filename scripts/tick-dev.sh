@@ -37,9 +37,27 @@ append_candidate "$FIXED_CLOUD_RUN_URL"
 append_candidate "$LOCAL_URL"
 
 for base_url in $CANDIDATES; do
-  if curl -fsS -X POST "${base_url}/internal/tick?format=text"; then
+  ready_body="$(mktemp)"
+  ready_status="$(curl -sS -o "$ready_body" -w "%{http_code}" "${base_url}/ready" || true)"
+  if [ "${ready_status:-000}" != "200" ]; then
+    echo "tick-dev.sh: ${base_url}/ready -> ${ready_status:-000}" >&2
+    cat "$ready_body" >&2 || true
+    rm -f "$ready_body"
+    continue
+  fi
+  rm -f "$ready_body"
+
+  tick_body="$(mktemp)"
+  tick_status="$(curl -sS -X POST -o "$tick_body" -w "%{http_code}" "${base_url}/internal/tick?format=text" || true)"
+  if [ "${tick_status:-000}" -ge 200 ] && [ "${tick_status:-000}" -lt 300 ]; then
+    cat "$tick_body"
+    rm -f "$tick_body"
     exit 0
   fi
+
+  echo "tick-dev.sh: ${base_url}/internal/tick?format=text -> ${tick_status:-000}" >&2
+  cat "$tick_body" >&2 || true
+  rm -f "$tick_body"
 done
 
 echo "tick-dev.sh: all tick endpoints failed:${CANDIDATES}" >&2
