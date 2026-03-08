@@ -36,16 +36,10 @@ class GreenhouseAdapter(ATSAdapter):
     def fetch(self, company: dict, updated_since: Any = None) -> list[dict]:
         board_token = self._resolve_board_token(company)
         api_url = self.API_URL_TEMPLATE.format(board_token=board_token)
-
-        resp = requests.get(
-            api_url,
-            headers={
-                "User-Agent": "OpenJobsEU/1.0 (https://openjobseu.org)",
-                "Accept": "application/json",
-            },
-            timeout=15,
-        )
+        
+        resp = self.session.get(api_url, timeout=15)
         resp.raise_for_status()
+
         payload = resp.json()
 
         if isinstance(payload, list):
