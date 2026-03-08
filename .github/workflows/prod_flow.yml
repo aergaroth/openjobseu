@@ -1,11 +1,8 @@
-name: Tests
+name: Prod Flow
 
 on:
   push:
-    paths-ignore:
-      - "README.md"
-      - "docs/**"
-  pull_request:
+    branches: [main]
     paths-ignore:
       - "README.md"
       - "docs/**"
@@ -66,3 +63,43 @@ jobs:
 
       - name: Run tests
         run: pytest -q
+
+  build-deploy-prod:
+    needs: pytest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_PROD }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker europe-north1-docker.pkg.dev
+
+      - name: Build & push image (PROD)
+        env:
+          PROJECT_ID: openjobseu
+          SHA: ${{ github.sha }}
+        run: |
+          IMAGE=europe-north1-docker.pkg.dev/$PROJECT_ID/$PROJECT_ID/$PROJECT_ID
+          docker build -t $IMAGE:$SHA .
+          docker push $IMAGE:$SHA
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Terraform Apply (PROD)
+        working-directory: infra/gcp/prod
+        run: |
+          terraform init -input=false
+          terraform apply -auto-approve \
+            -var="project_id=openjobseu" \
+            -var="image=europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu:${{ github.sha }}"
