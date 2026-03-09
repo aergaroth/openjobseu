@@ -117,7 +117,7 @@ def is_reasonable_salary(min_val: float, max_val: float, period: str) -> bool:
         multiplier = 250.0 # approx working days per year
 
     yearly_min = min_val * multiplier if min_val else 0
-    yearly_max = max_val * multiplier if max_max else 0
+    yearly_max = max_val * multiplier if max_val else 0
 
     # Reasonable yearly range: 15k - 500k EUR/USD equivalent
     # Note: These are rough estimates and might need fine-tuning
@@ -303,4 +303,3 @@ def extract_salary(description: str, title: Optional[str] = None) -> Dict[str, a
         }
 
     return None
-
