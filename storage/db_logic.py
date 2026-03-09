@@ -5,6 +5,7 @@ as before to minimize impact on other parts of the codebase.
 '''
 
 import json
+import logging
 from pathlib import Path
 from datetime import datetime, timezone
 from sqlalchemy import text
@@ -18,9 +19,13 @@ from app.domain.jobs.identity import (
 )
 from storage.db_engine import get_engine
 from app.domain.classification.mappers import normalize_geo_class, normalize_remote_class
+from app.utils.salary_extraction import extract_salary
+from app.utils.salary_structured import extract_structured_salary
+from app.utils.salary_transparency import detect_salary_transparency
 
 engine = get_engine()
 MIGRATIONS_PATH = Path("storage/migrations")
+logger = logging.getLogger(__name__)
 
 def _string_like(value: object | None) -> str | None:
     if value is None:
@@ -129,6 +134,35 @@ def _derive_policy_version(job: dict) -> str:
             return compliance_policy_version
 
     return ENGINE_POLICY_VERSION.value
+
+def _derive_salary(job: dict) -> dict:
+    """Derive salary info from job dict or extract from description."""
+    # 1. If pipeline provided explicit salary (highest priority), use it
+    if job.get("salary_min") or job.get("salary_max"):
+        return {
+            "salary_min": job.get("salary_min"),
+            "salary_max": job.get("salary_max"),
+            "salary_currency": job.get("salary_currency"),
+            "salary_period": job.get("salary_period"),
+            "salary_source": job.get("salary_source"),
+            "salary_min_eur": job.get("salary_min_eur"),
+            "salary_max_eur": job.get("salary_max_eur"),
+        }
+
+    # 2. Attempt extraction from structured ATS fields
+    structured = extract_structured_salary(job)
+    if structured:
+        logger.info("salary_structured_detected", extra={"job_id": job.get("job_id")})
+        return structured
+
+    # 3. Fallback to regex extraction from description
+    regex_salary = extract_salary(job.get("description") or "")
+    if regex_salary:
+        logger.info("salary_regex_detected", extra={"job_id": job.get("job_id")})
+        return regex_salary
+
+    logger.info("salary_missing", extra={"job_id": job.get("job_id")})
+    return {}
 
 def _derive_source_fields(job: dict) -> tuple[str, str, str | None]:
     source = (_string_like(job.get("source")) or "").strip()
@@ -376,6 +410,19 @@ def _upsert_job_in_conn(
         job_fingerprint=resolved_job_fingerprint,
     )
 
+    salary = _derive_salary(job)
+    
+    salary_detected = bool(
+        salary.get("salary_min") is not None or 
+        salary.get("salary_max") is not None or
+        salary.get("salary_min_eur") is not None
+    )
+    
+    transparency_status = detect_salary_transparency(
+        job.get("description") or "",
+        salary_detected
+    )
+
     conn.execute(
         text("""
             INSERT INTO jobs (
@@ -404,7 +451,15 @@ def _upsert_job_in_conn(
                 job_role,
                 seniority,
                 specialization,
-                job_quality_score
+                job_quality_score,
+                salary_min,
+                salary_max,
+                salary_currency,
+                salary_period,
+                salary_source,
+                salary_min_eur,
+                salary_max_eur,
+                salary_transparency_status
             )
             VALUES (
                 :job_id,
@@ -432,7 +487,15 @@ def _upsert_job_in_conn(
                 :job_role,
                 :seniority,
                 :specialization,
-                :job_quality_score
+                :job_quality_score,
+                :salary_min,
+                :salary_max,
+                :salary_currency,
+                :salary_period,
+                :salary_source,
+                :salary_min_eur,
+                :salary_max_eur,
+                :salary_transparency_status
             )
             ON CONFLICT (job_id) DO UPDATE SET
                 source = COALESCE(jobs.source, excluded.source),
@@ -458,6 +521,14 @@ def _upsert_job_in_conn(
                 seniority = excluded.seniority,
                 specialization = excluded.specialization,
                 job_quality_score = excluded.job_quality_score,
+                salary_min = excluded.salary_min,
+                salary_max = excluded.salary_max,
+                salary_currency = excluded.salary_currency,
+                salary_period = excluded.salary_period,
+                salary_source = excluded.salary_source,
+                salary_min_eur = excluded.salary_min_eur,
+                salary_max_eur = excluded.salary_max_eur,
+                salary_transparency_status = excluded.salary_transparency_status,
                 first_seen_at = CASE
                     WHEN excluded.first_seen_at < jobs.first_seen_at
                     THEN excluded.first_seen_at
@@ -492,6 +563,14 @@ def _upsert_job_in_conn(
             "seniority": seniority,
             "specialization": job.get("specialization"),
             "job_quality_score": job.get("job_quality_score"),
+            "salary_min": salary.get("salary_min"),
+            "salary_max": salary.get("salary_max"),
+            "salary_currency": salary.get("salary_currency"),
+            "salary_period": salary.get("salary_period"),
+            "salary_source": salary.get("salary_source"),
+            "salary_min_eur": salary.get("salary_min_eur"),
+            "salary_max_eur": salary.get("salary_max_eur"),
+            "salary_transparency_status": transparency_status,
         },
     )
 
@@ -504,6 +583,15 @@ def _upsert_job_in_conn(
         first_seen_at=first_seen_at,
         now=now,
     )
+
+    # Log metrics for dataset analysis
+    if transparency_status == "disclosed":
+        logger.info("salary_disclosed", extra={"job_id": canonical_job_id})
+    elif transparency_status == "transparent_statement":
+        logger.info("salary_transparent_statement", extra={"job_id": canonical_job_id})
+    elif transparency_status == "not_disclosed":
+        logger.info("salary_not_disclosed", extra={"job_id": canonical_job_id})
+
     return canonical_job_id
 
 def upsert_job(job: dict, conn: Connection | None = None, *, company_id: str | None = None) -> str:
@@ -634,7 +722,9 @@ def get_jobs_for_verification(limit: int = 20) -> list[dict]:
                     last_verified_at,
                     verification_failures
                 FROM jobs
-                WHERE status IN ('active', 'stale', 'unreachable')
+                WHERE
+                    status IN ('active', 'stale')
+                    AND (last_verified_at IS NULL OR last_verified_at < NOW() - INTERVAL '6 hours')
                 ORDER BY
                     COALESCE(last_verified_at, '1970-01-01T00:00:00+00:00') ASC
                 LIMIT :limit

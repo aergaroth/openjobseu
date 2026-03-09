@@ -94,6 +94,28 @@ Usage:
 
 ---
 
+## Salary and Compensation (implemented)
+
+- **salary_min**: integer
+- **salary_max**: integer
+- **salary_currency**: `EUR | USD | GBP | PLN`
+- **salary_period**: `year | month | hour | day`
+- **salary_source**: `structured | regex_v3`
+- **salary_min_eur**: integer (normalized to EUR)
+- **salary_max_eur**: integer (normalized to EUR)
+- **salary_transparency_status**: `disclosed | transparent_statement | not_disclosed | unknown`
+
+`salary_source` indicates the extraction method:
+- `structured`: Extracted from dedicated ATS fields (e.g., `salary_range` object).
+- `regex_v3`: Extracted from the job description text using regular expressions.
+
+`salary_transparency_status` indicates the level of salary disclosure:
+- `disclosed`: Salary figures detected.
+- `transparent_statement`: No figures, but text promises disclosure.
+- `not_disclosed`: No salary information found.
+
+---
+
 ## Persistence Notes
 
 - earliest `first_seen_at` is preserved on conflict upsert
@@ -108,7 +130,6 @@ Usage:
 
 The runtime does not currently persist enriched fields such as:
 - employment type (contract/perm)
-- compensation ranges
 - timezone or detailed country restrictions
 
 These can be added in later model revisions once source reliability and policy contracts are defined.
