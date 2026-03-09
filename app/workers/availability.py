@@ -115,7 +115,7 @@ def run_availability_pipeline() -> dict:
         updates.append(
             {
                 "job_id": job["job_id"],
-                "status": status,
+                "availability_status": status,
                 "verified_at": now,
                 "failure": status == "unreachable",
                 "updated_at": now,

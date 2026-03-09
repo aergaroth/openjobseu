@@ -636,7 +636,7 @@ def get_jobs_for_verification(limit: int = 20) -> list[dict]:
                 FROM jobs
                 WHERE status IN ('active', 'stale', 'unreachable')
                 ORDER BY
-                    COALESCE(last_seen_at, '1970-01-01T00:00:00+00:00')
+                    COALESCE(last_verified_at, '1970-01-01T00:00:00+00:00') ASC
                 LIMIT :limit
             """),
             {"limit": limit},
@@ -656,7 +656,7 @@ def update_job_availability(
         updates=[
             {
                 "job_id": job_id,
-                "status": status,
+                "availability_status": status,
                 "verified_at": verified_at,
                 "failure": bool(failure),
                 "updated_at": verified_at,
@@ -678,7 +678,7 @@ def update_jobs_availability(
         normalized_updates.append(
             {
                 "job_id": item["job_id"],
-                "status": item["status"],
+                "availability_status": item["availability_status"],
                 "verified_at": verified_at,
                 "failure": bool(item.get("failure", False)),
                 "updated_at": item.get("updated_at") or verified_at,
@@ -690,7 +690,7 @@ def update_jobs_availability(
         text("""
             UPDATE jobs
             SET
-                status = :status,
+                availability_status = :availability_status,
                 last_verified_at = :verified_at,
                 verification_failures = CASE
                     WHEN :failure THEN verification_failures + 1
@@ -701,6 +701,89 @@ def update_jobs_availability(
         """),
         normalized_updates,
     )
+
+
+def expire_jobs_due_to_lifecycle(conn: Connection) -> int:
+    """
+    Expire jobs that have too many verification failures or are too old.
+
+    This corresponds to EXPIRE_AFTER_DAYS and MAX_FAILURES settings.
+    Returns the number of affected rows.
+    """
+    result = conn.execute(
+        text("""
+            UPDATE jobs
+            SET status = 'expired',
+                updated_at = NOW()
+            WHERE status != 'expired'
+            AND (
+                verification_failures >= 3
+                OR availability_status = 'expired'
+                OR (last_verified_at IS NOT NULL AND last_verified_at < NOW() - INTERVAL '30 days')
+            )
+        """)
+    )
+    return result.rowcount
+
+
+def stale_active_jobs_due_to_lifecycle(conn: Connection) -> int:
+    """
+    Transition active jobs to stale if they haven't been verified recently.
+
+    This corresponds to STALE_AFTER_DAYS setting.
+    Returns the number of affected rows.
+    """
+    result = conn.execute(
+        text("""
+            UPDATE jobs
+            SET status = 'stale',
+                updated_at = NOW()
+            WHERE status = 'active'
+            AND last_verified_at IS NOT NULL
+            AND last_verified_at < NOW() - INTERVAL '7 days'
+        """)
+    )
+    return result.rowcount
+
+
+def activate_new_jobs_due_to_lifecycle(conn: Connection) -> int:
+    """
+    Transition new jobs to active after a certain period.
+
+    This corresponds to NEW_AFTER_HOURS setting.
+    Returns the number of affected rows.
+    """
+    result = conn.execute(
+        text("""
+            UPDATE jobs
+            SET status = 'active',
+                updated_at = NOW()
+            WHERE status = 'new'
+            AND first_seen_at < NOW() - INTERVAL '24 hours'
+        """)
+    )
+    return result.rowcount
+
+
+def reactivate_stale_jobs_due_to_lifecycle(conn: Connection) -> int:
+    """
+    Transition stale jobs back to active if they have been verified recently.
+    This acts as a healing mechanism for data consistency.
+    Returns the number of affected rows.
+    """
+    result = conn.execute(
+        text("""
+            UPDATE jobs
+            SET status = 'active',
+                updated_at = NOW()
+            WHERE status = 'stale'
+            AND availability_status = 'active'
+            AND last_verified_at IS NOT NULL
+            AND last_verified_at >= NOW() - INTERVAL '7 days'
+        """)
+    )
+    return result.rowcount
+
 
 def count_jobs_missing_compliance() -> int:
     with engine.connect() as conn:

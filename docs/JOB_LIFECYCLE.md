@@ -2,28 +2,35 @@
 
 OpenJobsEU prioritizes **job freshness and availability** over raw job volume.
 
-Each job progresses through a well-defined lifecycle driven by periodic verification and ingestion events.
+Each job progresses through a well-defined lifecycle driven by periodic verification and ingestion events. The system uses two distinct status fields to manage this: `availability_status` and `status`.
 
 ---
 
-## Status definitions
+## Status Fields Explained
 
-Jobs move through the following lifecycle states:
+### `availability_status` (The Observation)
+
+This field is written by the **Availability Worker** and represents the direct result of checking a job's URL. It is a raw observation.
+
+- **active**: The URL returned a success code (2xx).
+- **expired**: The URL returned a "not found" code (404, 410).
+- **unreachable**: The URL could not be reached (timeout, DNS error, 5xx server error).
+
+### `status` (The Lifecycle State)
+
+This field is written exclusively by the **Lifecycle Worker**. It represents the canonical state of the job and determines its visibility in the API. The lifecycle worker uses `availability_status`, timestamps, and failure counts to make its decision.
 
 - **NEW**
   Freshly discovered job, within the first 24 hours after `first_seen_at`.
 
-- **ACTIVE** 
+- **ACTIVE**
   Verified and visible job.
 
 - **STALE**
-  Job that has not been successfully verified within its expected verification window.
+  Job that has not been successfully verified recently.
 
-- **UNREACHABLE**
-  Job whose source could not be reached during availability verification (temporary state).
-
-- **EXPIRED** 
-  Job confirmed unavailable or outdated after repeated failed verifications.
+- **EXPIRED**
+  Job confirmed unavailable or outdated.
 
 From an API perspective:
 - `/jobs` with `status=visible` maps to **NEW + ACTIVE**
@@ -31,17 +38,14 @@ From an API perspective:
 
 ---
 
-## State transitions
+## State Transitions (`status` field)
 
-The lifecycle supports the following transitions:
+The lifecycle worker orchestrates the following transitions for the main `status` field:
 
 new → active
-active → stale 
-stale → active 
-stale → expired
-active → unreachable
-unreachable → active
-unreachable → expired
+active → stale
+stale → active
+(active, stale) → expired
 
 Expired jobs are not deleted immediately and may be retained for audit or analytical purposes.
 
@@ -49,14 +53,22 @@ Expired jobs are not deleted immediately and may be retained for audit or analyt
 
 ## Verification and transition rules
 
-- Newly ingested jobs are initially marked as **NEW**.
-- Jobs are periodically re-verified based on source-specific TTL rules.
-- If a job exceeds its verification window, it transitions to **STALE**.
-- A successful verification returns a **STALE** or **UNREACHABLE** job to **ACTIVE**.
-- Temporary connectivity issues result in **UNREACHABLE** status.
-- After multiple consecutive verification failures, a job transitions to **EXPIRED**.
+The process is a two-step pipeline:
 
-Lifecycle transitions are handled asynchronously by the availability worker and do not block ingestion or API access.
+1.  **Availability Check**: The `availability` worker periodically fetches jobs and checks their `source_url`. It records the outcome in the `availability_status` column without changing the main `status`.
+
+2.  **Lifecycle Transition**: The `lifecycle` worker runs as a separate process. It applies a set of rules in SQL to update the main `status` for all jobs in the database based on their current state, timestamps, and `availability_status`.
+
+Key rules implemented by the lifecycle worker:
+- A **NEW** job becomes **ACTIVE** after 24 hours.
+- An **ACTIVE** job becomes **STALE** if it hasn't been successfully verified for over 7 days.
+- A **STALE** job becomes **ACTIVE** again if it has been recently and successfully verified (i.e., `availability_status` is `active`).
+- Any job becomes **EXPIRED** if:
+    - Its `availability_status` is `expired`.
+    - It has not been verified for over 30 days.
+    - It has accumulated 3 or more consecutive `verification_failures`.
+
+This separation ensures that the lifecycle state is managed centrally and consistently, based on the latest available data from verification checks.
 
 ---
 

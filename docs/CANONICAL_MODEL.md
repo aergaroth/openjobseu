@@ -65,7 +65,9 @@ Feed usage:
 ## Lifecycle and Tracking (implemented)
 
 - **status**:
-  `new | active | stale | expired | unreachable`
+  `new | active | stale | expired`
+- **availability_status**:
+  `active | expired | unreachable`
 - **first_seen_at**
 - **last_seen_at**
 - **last_verified_at**
@@ -77,7 +79,6 @@ Status semantics:
 - `active` -> healthy/visible
 - `stale` -> verification outdated
 - `expired` -> unavailable or aged-out by rules
-- `unreachable` -> temporary access failure
 
 Visible jobs for API/feed: `new`, `active`.
 
@@ -99,7 +100,7 @@ Usage:
 - `last_seen_at` is refreshed on each successful upsert
 - `remote_class` and `geo_class` are normalized at write-time and backfilled when missing
 - compliance resolver updates `compliance_status` and `compliance_score`
-- availability/lifecycle workers update `status`, `last_verified_at`, `verification_failures`
+- availability/lifecycle workers update `status`, `availability_status`, `last_verified_at`, `verification_failures`
 
 ---
 
