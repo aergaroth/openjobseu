@@ -16,6 +16,8 @@ from storage.db_logic import (
     get_jobs_audit,
 )
 
+from app.utils.backfill_compliance import backfill_missing_compliance_classes
+
 logger = logging.getLogger("openjobseu.runtime")
 
 router = APIRouter(prefix="/internal", tags=["internal"])
@@ -105,6 +107,12 @@ def run_tick_from_audit():
     if isinstance(result, str):
         return Response(content=result, media_type="text/plain")
     return result
+
+
+@router.post("/backfill-compliance")
+def backfill_compliance(limit: int = Query(1000, ge=1, le=10000)):
+    updated_count = backfill_missing_compliance_classes(limit=limit)
+    return {"status": "ok", "updated_jobs_count": updated_count}
 
 
 @router.post("/tick")

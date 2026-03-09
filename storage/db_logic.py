@@ -10,159 +10,14 @@ from pathlib import Path
 from datetime import datetime, timezone
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
-from app.domain.classification.enums import GeoClass, RemoteClass
-from app.domain.compliance.engine import ENGINE_POLICY_VERSION
-from app.domain.jobs.identity import (
-    compute_job_fingerprint,
-    compute_job_uid,
-    compute_schema_hash,
-)
 from storage.db_engine import get_engine
-from app.domain.classification.mappers import normalize_geo_class, normalize_remote_class
+from app.domain.classification.taxonomy import classify_taxonomy
+from app.domain.jobs.identity import compute_job_fingerprint, compute_job_uid
 from app.utils.salary_extraction import extract_salary
-from app.utils.salary_structured import extract_structured_salary
-from app.utils.salary_transparency import detect_salary_transparency
 
 engine = get_engine()
 MIGRATIONS_PATH = Path("storage/migrations")
 logger = logging.getLogger(__name__)
-
-def _string_like(value: object | None) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, str):
-        return value
-
-    enum_value = getattr(value, "value", None)
-    if isinstance(enum_value, str):
-        return enum_value
-
-    return str(value)
-
-def _derive_remote_class(job: dict) -> str:
-    """Read remote_class from job dict (set by pipeline)."""
-    explicit_remote = job.get("remote_class")
-    if explicit_remote:
-        return normalize_remote_class(_string_like(explicit_remote)).value
-    
-    # Fallback for backward compatibility
-    return RemoteClass.UNKNOWN.value
-
-def _normalize_geo_class_value(value: object | None) -> str:
-    return normalize_geo_class(_string_like(value)).value
-
-def _derive_geo_class(job: dict) -> str:
-    """Read geo_class from job dict (set by pipeline)."""
-    explicit_geo = job.get("geo_class")
-    if explicit_geo:
-        return normalize_geo_class(_string_like(explicit_geo)).value
-    
-    # Fallback for backward compatibility
-    return GeoClass.UNKNOWN.value
-
-def _derive_taxonomy(job: dict) -> dict[str, str]:
-    """Derive taxonomy classification from job dict."""
-    from app.domain.classification.taxonomy import classify_taxonomy
-    
-    title = job.get("title")
-    if not title:
-        title = ""
-    
-    return classify_taxonomy(str(title))
-
-def _resolve_company_identity(company_id: str | None, job: dict) -> str:
-    if company_id:
-        return str(company_id)
-    embedded_company = job.get("company_id")
-    if embedded_company:
-        return str(embedded_company)
-    return ""
-
-def _derive_job_uid(job: dict, company_id: str | None) -> str:
-    explicit_job_uid = _string_like(job.get("job_uid"))
-    if explicit_job_uid:
-        return explicit_job_uid
-
-    return compute_job_uid(
-        company_id=_resolve_company_identity(company_id, job),
-        title=str(job.get("title") or ""),
-        location=str(job.get("remote_scope") or ""),
-    )
-
-def _derive_job_fingerprint(job: dict, company_id: str | None) -> str:
-    explicit_fingerprint = _string_like(job.get("job_fingerprint"))
-    if explicit_fingerprint:
-        return explicit_fingerprint
-
-    return compute_job_fingerprint(
-        str(job.get("description") or ""),
-        title=str(job.get("title") or ""),
-        location=str(job.get("remote_scope") or ""),
-        company_id=_resolve_company_identity(company_id, job),
-        company_name=str(job.get("company_name") or ""),
-    )
-
-def _derive_source_schema_hash(job: dict) -> str | None:
-    explicit_schema_hash = _string_like(job.get("source_schema_hash"))
-    if explicit_schema_hash:
-        return explicit_schema_hash
-
-    if "source_payload" not in job:
-        return None
-    source_payload = job.get("source_payload")
-    if source_payload is None:
-        return None
-    return compute_schema_hash(source_payload)
-
-def _derive_policy_version(job: dict) -> str:
-    explicit_policy_version = (_string_like(job.get("policy_version")) or "").strip()
-    if explicit_policy_version:
-        return explicit_policy_version
-
-    compliance = job.get("_compliance")
-    if isinstance(compliance, dict):
-        compliance_policy_version = (_string_like(compliance.get("policy_version")) or "").strip()
-        if compliance_policy_version:
-            if compliance_policy_version.lower().startswith("v"):
-                return compliance_policy_version
-            try:
-                numeric = float(compliance_policy_version)
-                if numeric.is_integer():
-                    return f"v{int(numeric)}"
-            except ValueError:
-                pass
-            return compliance_policy_version
-
-    return ENGINE_POLICY_VERSION.value
-
-def _derive_salary(job: dict) -> dict:
-    """Derive salary info from job dict or extract from description."""
-    # 1. If pipeline provided explicit salary (highest priority), use it
-    if job.get("salary_min") or job.get("salary_max"):
-        return {
-            "salary_min": job.get("salary_min"),
-            "salary_max": job.get("salary_max"),
-            "salary_currency": job.get("salary_currency"),
-            "salary_period": job.get("salary_period"),
-            "salary_source": job.get("salary_source"),
-            "salary_min_eur": job.get("salary_min_eur"),
-            "salary_max_eur": job.get("salary_max_eur"),
-        }
-
-    # 2. Attempt extraction from structured ATS fields
-    structured = extract_structured_salary(job)
-    if structured:
-        logger.info("salary_structured_detected", extra={"job_id": job.get("job_id")})
-        return structured
-
-    # 3. Fallback to regex extraction from description
-    regex_salary = extract_salary(job.get("description") or "")
-    if regex_salary:
-        logger.info("salary_regex_detected", extra={"job_id": job.get("job_id")})
-        return regex_salary
-
-    logger.info("salary_missing", extra={"job_id": job.get("job_id")})
-    return {}
 
 def _derive_source_fields(job: dict) -> tuple[str, str, str | None]:
     source = (_string_like(job.get("source")) or "").strip()
@@ -175,6 +30,18 @@ def _derive_source_fields(job: dict) -> tuple[str, str, str | None]:
         raise ValueError("job.source_job_id is required")
 
     return source, source_job_id, source_url
+
+def _string_like(value: object | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+
+    enum_value = getattr(value, "value", None)
+    if isinstance(enum_value, str):
+        return enum_value
+
+    return str(value)
 
 def _find_job_id_by_source_mapping(
     conn: Connection, *, source: str, source_job_id: str
@@ -381,46 +248,50 @@ def _require_open_conn(conn: Connection | None, *, op_name: str) -> Connection:
         raise ValueError(f"{op_name} requires an explicit open transaction connection (conn).")
     return conn
 
+def _derive_taxonomy(job: dict) -> dict[str, str]:
+    """Helper to derive taxonomy fields from a job dict for backward compatibility in tests."""
+    title = (job.get("title") or "").strip()
+    return classify_taxonomy(title)
+
+
 def _upsert_job_in_conn(
     conn: Connection,
     *,
     job: dict,
     first_seen_at,
     now,
-    remote_class: str,
-    geo_class: str,
     company_id: str | None = None,
 ) -> str:
-    resolved_company_id = _resolve_company_identity(company_id, job) or None
-    # Read taxonomy from job dict (set by pipeline)
-    job_family = job.get("job_family")
-    job_role = job.get("job_role")
-    seniority = job.get("seniority")
-    
     resolved_source, resolved_source_job_id, resolved_source_url = _derive_source_fields(job)
-    resolved_job_uid = _derive_job_uid(job, resolved_company_id)
-    resolved_job_fingerprint = _derive_job_fingerprint(job, resolved_company_id)
-    resolved_source_schema_hash = _derive_source_schema_hash(job)
-    resolved_policy_version = _derive_policy_version(job)
+
+    # Fallback to compute identity if missing (happens in many tests)
+    if "job_fingerprint" not in job:
+        job["job_fingerprint"] = compute_job_fingerprint(
+            job.get("description") or "",
+            title=job.get("title") or "",
+            location=job.get("remote_scope"),
+            company_id=job.get("company_id") or company_id,
+            company_name=job.get("company_name") or "",
+        )
+    if "job_uid" not in job:
+        job["job_uid"] = compute_job_uid(
+            company_id=job.get("company_id") or company_id,
+            title=job.get("title") or "",
+            location=job.get("remote_scope"),
+        )
+
+    # Fallback for salary extraction (happens in some tests)
+    if job.get("salary_min") is None and job.get("salary_max") is None:
+        salary_info = extract_salary(job.get("description") or "", title=job.get("title"))
+        if salary_info:
+            job.update(salary_info)
+
     canonical_job_id = _resolve_canonical_job_id(
         conn,
         incoming_job_id=str(job["job_id"]),
         source=resolved_source,
         source_job_id=resolved_source_job_id,
-        job_fingerprint=resolved_job_fingerprint,
-    )
-
-    salary = _derive_salary(job)
-    
-    salary_detected = bool(
-        salary.get("salary_min") is not None or 
-        salary.get("salary_max") is not None or
-        salary.get("salary_min_eur") is not None
-    )
-    
-    transparency_status = detect_salary_transparency(
-        job.get("description") or "",
-        salary_detected
+        job_fingerprint=str(job["job_fingerprint"]),
     )
 
     conn.execute(
@@ -549,28 +420,28 @@ def _upsert_job_in_conn(
             "status": job["status"],
             "first_seen_at": first_seen_at,
             "last_seen_at": now,
-            "remote_class": remote_class,
-            "geo_class": geo_class,
-            "company_id": resolved_company_id,
-            "job_uid": resolved_job_uid,
-            "job_fingerprint": resolved_job_fingerprint,
-            "source_schema_hash": resolved_source_schema_hash,
-            "policy_version": resolved_policy_version,
+            "remote_class": job.get("remote_class"),
+            "geo_class": job.get("geo_class"),
+            "company_id": job.get("company_id") or company_id,
+            "job_uid": job.get("job_uid"),
+            "job_fingerprint": job.get("job_fingerprint"),
+            "source_schema_hash": job.get("source_schema_hash"),
+            "policy_version": job.get("policy_version"),
             "compliance_status": job.get("compliance_status"),
             "compliance_score": job.get("compliance_score"),
-            "job_family": job_family,
-            "job_role": job_role,
-            "seniority": seniority,
+            "job_family": job.get("job_family"),
+            "job_role": job.get("job_role"),
+            "seniority": job.get("seniority"),
             "specialization": job.get("specialization"),
             "job_quality_score": job.get("job_quality_score"),
-            "salary_min": salary.get("salary_min"),
-            "salary_max": salary.get("salary_max"),
-            "salary_currency": salary.get("salary_currency"),
-            "salary_period": salary.get("salary_period"),
-            "salary_source": salary.get("salary_source"),
-            "salary_min_eur": salary.get("salary_min_eur"),
-            "salary_max_eur": salary.get("salary_max_eur"),
-            "salary_transparency_status": transparency_status,
+            "salary_min": int(job["salary_min"]) if job.get("salary_min") is not None else None,
+            "salary_max": int(job["salary_max"]) if job.get("salary_max") is not None else None,
+            "salary_currency": job.get("salary_currency"),
+            "salary_period": job.get("salary_period"),
+            "salary_source": job.get("salary_source"),
+            "salary_min_eur": int(job["salary_min_eur"]) if job.get("salary_min_eur") is not None else None,
+            "salary_max_eur": int(job["salary_max_eur"]) if job.get("salary_max_eur") is not None else None,
+            "salary_transparency_status": job.get("salary_transparency_status"),
         },
     )
 
@@ -584,21 +455,11 @@ def _upsert_job_in_conn(
         now=now,
     )
 
-    # Log metrics for dataset analysis
-    if transparency_status == "disclosed":
-        logger.info("salary_disclosed", extra={"job_id": canonical_job_id})
-    elif transparency_status == "transparent_statement":
-        logger.info("salary_transparent_statement", extra={"job_id": canonical_job_id})
-    elif transparency_status == "not_disclosed":
-        logger.info("salary_not_disclosed", extra={"job_id": canonical_job_id})
-
     return canonical_job_id
 
 def upsert_job(job: dict, conn: Connection | None = None, *, company_id: str | None = None) -> str:
     now = datetime.now(timezone.utc)
     first_seen_at = job.get("first_seen_at") or now
-    remote_class = _derive_remote_class(job)
-    geo_class = _derive_geo_class(job)
 
     target_conn = _require_open_conn(conn, op_name="upsert_job")
     return _upsert_job_in_conn(
@@ -606,8 +467,6 @@ def upsert_job(job: dict, conn: Connection | None = None, *, company_id: str | N
         job=job,
         first_seen_at=first_seen_at,
         now=now,
-        remote_class=remote_class,
-        geo_class=geo_class,
         company_id=company_id,
     )
 
@@ -885,67 +744,6 @@ def count_jobs_missing_compliance() -> int:
             """)
         ).fetchone()
     return int(row[0]) if row else 0
-
-def backfill_missing_compliance_classes(limit: int = 1000) -> int:
-    with engine.connect() as conn:
-        rows = conn.execute(
-            text("""
-                SELECT
-                    job_id,
-                    title,
-                    description,
-                    remote_source_flag,
-                    remote_scope,
-                    policy_v1_reason,
-                    remote_class,
-                    geo_class
-                FROM jobs
-                WHERE remote_class IS NULL OR geo_class IS NULL
-                ORDER BY COALESCE(last_seen_at, '1970-01-01T00:00:00+00:00') DESC
-                LIMIT :limit
-            """),
-            {"limit": limit},
-        ).mappings().all()
-
-    if not rows:
-        return 0
-
-    now = datetime.now(timezone.utc)
-
-    payloads: list[dict] = []
-    for row in rows:
-        payload = dict(row)
-        if payload.get("policy_v1_reason"):
-            payload["_compliance"] = {
-                "policy_reason": payload["policy_v1_reason"],
-                "remote_model": RemoteClass.UNKNOWN.value,
-            }
-
-        remote_class = payload.get("remote_class") or _derive_remote_class(payload)
-        geo_class = payload.get("geo_class") or _derive_geo_class(payload)
-        payloads.append(
-            {
-                "remote_class": remote_class,
-                "geo_class": geo_class,
-                "updated_at": now,
-                "job_id": payload["job_id"],
-            }
-        )
-
-    with engine.begin() as conn:
-        conn.execute(
-            text("""
-                UPDATE jobs
-                SET
-                    remote_class = :remote_class,
-                    geo_class = :geo_class,
-                    updated_at = :updated_at
-                WHERE job_id = :job_id
-            """),
-            payloads,
-        )
-
-    return len(rows)
 
 def get_jobs_for_compliance_resolution(
     limit: int = 500,

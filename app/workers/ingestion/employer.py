@@ -11,6 +11,8 @@ from app.domain.classification.enums import RemoteClass
 from app.domain.classification.taxonomy import classify_taxonomy
 from app.domain.compliance.engine import ENGINE_POLICY_VERSION, apply_policy
 from app.domain.compliance.resolver import resolve_compliance
+from app.domain.jobs.enrichment import enrich_and_apply_policy
+
 from app.domain.jobs.identity import (
     compute_job_fingerprint,
     compute_job_uid,
@@ -222,15 +224,12 @@ def ingest_company(company: dict):
                         skipped += 1
                         continue
 
-                    normalized = compute_job_identity(
-                        company_id=str(company.get("company_id") or ""),
-                        raw_job=raw,
-                        normalized_job=normalized,
-                    )
                     normalized_count += 1
 
-                    job, reason = apply_policy(
+                    job, reason = enrich_and_apply_policy(
                         normalized,
+                        raw_job=raw,
+                        company_id=str(company.get("company_id") or ""),
                         source=str(normalized.get("source") or provider),
                     )
 
@@ -259,41 +258,7 @@ def ingest_company(company: dict):
                         skipped += 1
                         continue
 
-                    compliance_payload = job.get("_compliance") or {}
-                    if not isinstance(compliance_payload, dict):
-                        compliance_payload = {}
-
-                    policy_version = None
-                    policy_version = compliance_payload.get("policy_version")
-
-                    if policy_version is None:
-                        policy_version = ENGINE_POLICY_VERSION.value
-
-                    policy_version_str = str(getattr(policy_version, "value", policy_version))
-                    job["policy_version"] = policy_version_str
-
-                    # Resolve compliance score and status (already resolved in apply_policy)
-                    remote_class = compliance_payload.get("remote_model")
-                    geo_class = compliance_payload.get("geo_class")
-                    compliance_status = compliance_payload.get("compliance_status")
-                    compliance_score = compliance_payload.get("compliance_score")
-                    decision_trace = compliance_payload.get("decision_trace")
-
-                    job["compliance_status"] = compliance_status
-                    job["compliance_score"] = compliance_score
-
-                    # Enrich job with taxonomy and quality score
-                    taxonomy = classify_taxonomy(job.get("title", ""))
-                    job["job_family"] = taxonomy.get("job_family")
-                    job["job_role"] = taxonomy.get("job_role")
-                    job["seniority"] = taxonomy.get("seniority")
-                    job["specialization"] = taxonomy.get("specialization")
-
-                    # Enrich with remote_class and geo_class from compliance
-                    job["remote_class"] = remote_class
-                    job["geo_class"] = geo_class
-
-                    # Compute quality score
+                    # Compute quality score (after all other enrichments)
                     job["job_quality_score"] = compute_job_quality_score(job)
 
                     canonical_job_id = upsert_job(
@@ -303,21 +268,29 @@ def ingest_company(company: dict):
                     )
 
                     # Insert compliance report
+                    compliance_payload = job.get("_compliance") or {}
+                    if not isinstance(compliance_payload, dict):
+                        compliance_payload = {}
+
+                    remote_class = compliance_payload.get("remote_model")
+                    geo_class = compliance_payload.get("geo_class")
+                    decision_trace = compliance_payload.get("decision_trace")
+
                     insert_compliance_report(
                         conn,
                         job_id=canonical_job_id,
-                        job_uid=str(job.get("job_uid") or ""),
-                        policy_version=policy_version_str,
+                        job_uid=str(job.get("job_uid")),
+                        policy_version=str(job.get("policy_version")),
                         remote_class=remote_class,
                         geo_class=geo_class,
                         hard_geo_flag=bool(
                             compliance_payload.get("policy_reason") == "geo_restriction_hard"
                         ),
-                        base_score=compliance_score,
+                        base_score=job.get("compliance_score"),
                         penalties=None,
                         bonuses=None,
-                        final_score=compliance_score,
-                        final_status=compliance_status,
+                        final_score=job.get("compliance_score"),
+                        final_status=job.get("compliance_status"),
                         decision_vector=decision_trace,
                     )
 

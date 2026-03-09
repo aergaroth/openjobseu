@@ -63,7 +63,7 @@ htmlcov/
 .env.*
 
 # Local data / scratch files
-data/
+
 *.log
 *.bak
 

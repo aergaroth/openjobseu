@@ -70,22 +70,23 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
     monkeypatch.setattr(employer, "get_adapter", lambda _provider: _FakeAdapter())
     monkeypatch.setattr(employer, "get_engine", lambda: _NoopEngine())
 
-    def _fake_apply_policy(job, source):
+    def _fake_enrich_and_apply_policy(job, raw_job, company_id, source):
         call_order.append("apply_policy")
         assert source == "greenhouse:acme"
-        assert job["job_uid"] == compute_job_uid(
+        assert company_id == "company-1"
+        job["job_uid"] = compute_job_uid(
             "company-1",
-            normalize_output["title"],
-            normalize_output["remote_scope"],
+            job["title"],
+            job["remote_scope"],
         )
-        assert job["job_fingerprint"] == compute_job_fingerprint(
-            normalize_output["description"],
-            title=normalize_output["title"],
-            location=normalize_output["remote_scope"],
+        job["job_fingerprint"] = compute_job_fingerprint(
+            job["description"],
+            title=job["title"],
+            location=job["remote_scope"],
             company_id="company-1",
-            company_name=normalize_output["company_name"],
+            company_name=job["company_name"],
         )
-        assert job["source_schema_hash"] == compute_schema_hash(raw_job)
+        job["source_schema_hash"] = compute_schema_hash(raw_job)
         job["_compliance"] = {
             "policy_version": "v9",
             "policy_reason": None,
@@ -95,9 +96,12 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
             "compliance_score": 100,
             "decision_trace": [],
         }
+        job["policy_version"] = "v9"
+        job["compliance_status"] = "approved"
+        job["compliance_score"] = 100
         return job, None
 
-    monkeypatch.setattr(employer, "apply_policy", _fake_apply_policy)
+    monkeypatch.setattr(employer, "enrich_and_apply_policy", _fake_enrich_and_apply_policy)
 
     def _fake_upsert(job, conn=None, *, company_id=None):
         call_order.append("upsert")
