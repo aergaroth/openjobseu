@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 from storage.db_engine import get_engine
-from app.domain.classification.taxonomy import classify_taxonomy
+from app.domain.taxonomy.taxonomy import classify_taxonomy
 from app.domain.jobs.identity import compute_job_fingerprint, compute_job_uid
 from app.domain.money.salary_parser import extract_salary
 
@@ -248,7 +248,7 @@ def _require_open_conn(conn: Connection | None, *, op_name: str) -> Connection:
         raise ValueError(f"{op_name} requires an explicit open transaction connection (conn).")
     return conn
 
-def _derive_taxonomy(job: dict) -> dict[str, str]:
+def compute_job_taxonomy(job: dict) -> dict[str, str]:
     """Helper to derive taxonomy fields from a job dict for backward compatibility in tests."""
     title = (job.get("title") or "").strip()
     return classify_taxonomy(title)

@@ -139,6 +139,7 @@ These can be added in later model revisions once source reliability and policy c
 ## Adapter vs Normalization Contract
 
 Adapters:
+- located in `app/adapters/ats/`
 - fetch source payloads
 - handle transport and source-specific wire formats
 - do not persist

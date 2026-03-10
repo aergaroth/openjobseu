@@ -68,3 +68,42 @@ def _schema_signature(value: Any) -> str:
 def compute_schema_hash(raw_payload: Any) -> str:
     signature = _schema_signature(raw_payload)
     return hashlib.sha256(signature.encode("utf-8")).hexdigest()
+
+
+def compute_job_identity(
+    company_id: str | None,
+    raw_job: dict,
+    normalized_job: dict,
+) -> dict:
+    """
+    Computes UID, fingerprint and schema hash for a normalized job.
+    This is pure domain logic related to job identity.
+    """
+    resolved_company_id = company_id or normalized_job.get("company_id")
+    if not resolved_company_id:
+        raise ValueError("Missing company_id for job identity")
+
+    title = (normalized_job.get("title") or "").strip()
+    location = (normalized_job.get("remote_scope") or "").strip()
+    description = (normalized_job.get("description") or "").strip()
+
+    # Stable identity (must not change when job text changes)
+    normalized_job["job_uid"] = compute_job_uid(
+        company_id=resolved_company_id,
+        title=title,
+        location=location,
+    )
+
+    # Content fingerprint (detects edits in job description)
+    normalized_job["job_fingerprint"] = compute_job_fingerprint(
+        description,
+        title=title,
+        location=location,
+        company_id=resolved_company_id,
+        company_name=(normalized_job.get("company_name") or "").strip(),
+    )
+
+    # Detect ATS schema changes
+    normalized_job["source_schema_hash"] = compute_schema_hash(raw_job)
+
+    return normalized_job

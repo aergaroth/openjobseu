@@ -29,6 +29,7 @@ OpenJobsEU runs as a tick-based pipeline:
 
 ### Active ingestion source
 - `employer_ing` (curated employers table + ATS APIs)
+- ATS Adapters are located in `app/adapters/ats/`
 
 ---
 
@@ -73,7 +74,7 @@ Database backend:
 - or `DB_MODE=cloudsql` with `INSTANCE_CONNECTION_NAME`, `DB_NAME`, `DB_USER`
 
 Ingestion orchestration:
-- `run_tick_pipeline()` is the single worker orchestrator
+- `run_pipeline()` is the single worker orchestrator
 - pipeline executes `run_employer_ingestion()` then `run_post_ingestion()`
 
 Log rendering:

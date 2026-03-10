@@ -3,7 +3,8 @@ from datetime import datetime, timezone
 from time import perf_counter
 
 from app.workers.ingestion.employer import run_employer_ingestion
-from app.workers.post_ingestion import run_post_ingestion
+from app.workers.availability import run_availability_pipeline
+from app.workers.lifecycle import run_lifecycle_pipeline
 
 logger = logging.getLogger("openjobseu.pipeline")
 
@@ -17,23 +18,36 @@ def _int_metric(value, default: int = 0) -> int:
         return default
 
 
-def run_tick_pipeline() -> dict:
+def run_pipeline() -> dict:
     """
     Execute full tick pipeline:
-    ingestion -> post_ingestion
+    1. ingestion
+    2. availability
+    3. lifecycle
     """
 
     tick_started_at = datetime.now(timezone.utc).isoformat()
     tick_started_perf = perf_counter()
 
+    # 1. Ingestion
     employer_result = {"actions": [], "metrics": {"status": "failed"}}
     try:
         employer_result = run_employer_ingestion()
     except Exception:
         logger.exception("employer ingestion failed")
-    finally:
-        # Always execute lifecycle checks after ingestion attempt.
-        run_post_ingestion()
+
+    # 2. Availability
+    availability_summary = {}
+    try:
+        availability_summary = run_availability_pipeline() or {}
+    except Exception:
+        logger.exception("availability step failed")
+
+    # 3. Lifecycle
+    try:
+        run_lifecycle_pipeline()
+    except Exception:
+        logger.exception("lifecycle step failed")
 
     tick_finished_at = datetime.now(timezone.utc).isoformat()
     tick_duration_ms = int((perf_counter() - tick_started_perf) * 1000)
@@ -45,6 +59,7 @@ def run_tick_pipeline() -> dict:
         "tick_finished_at": tick_finished_at,
         "tick_duration_ms": tick_duration_ms,
         "ingestion": ingestion_metrics,
+        "availability": availability_summary,
     }
 
     logger.info(

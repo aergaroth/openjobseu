@@ -1,9 +1,9 @@
 from typing import Any, Dict
 
-from app.ats.base import ATSAdapter
-from app.ats.registry import register
+from app.adapters.ats.base import ATSAdapter
+from app.adapters.ats.registry import register
 
-from app.ats.utils import (
+from app.adapters.ats.utils import (
     normalize_source_datetime,
     sanitize_location,
     sanitize_url,

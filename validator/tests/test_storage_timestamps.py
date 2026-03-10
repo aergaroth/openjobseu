@@ -1,6 +1,6 @@
 import datetime
-from app.domain.classification.enums import GeoClass, RemoteClass
-from app.domain.classification.mappers import normalize_geo_class, normalize_remote_class
+from app.domain.taxonomy.enums import GeoClass, RemoteClass
+from app.domain.taxonomy.mappers import normalize_geo_class, normalize_remote_class
 from app.domain.compliance.classifiers.geo import classify_geo_scope
 
 

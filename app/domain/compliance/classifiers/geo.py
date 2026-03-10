@@ -1,7 +1,7 @@
 import re
 from html import unescape
 
-from app.domain.classification.enums import GeoClass
+from app.domain.taxonomy.enums import GeoClass
 from app.domain.compliance.geo_data import (
     APAC_STRONG_SIGNALS,
     AUSTRALIA_STRONG_SIGNALS,

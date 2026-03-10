@@ -1,6 +1,6 @@
 from enum import Enum
 
-from app.domain.classification.enums import GeoClass, RemoteClass
+from app.domain.taxonomy.enums import GeoClass, RemoteClass
 from app.domain.compliance.classifiers.geo import classify_geo
 from app.domain.compliance.classifiers.hard_geo import detect_hard_geo_restriction
 from app.domain.compliance.classifiers.remote import classify_remote

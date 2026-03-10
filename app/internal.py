@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from app.audit_filter_registry import get_audit_filter_registry
 from app.logging import should_use_text_logs
 from app.utils.tick_formatting import format_tick_summary
-from app.workers.tick_pipeline import run_tick_pipeline
+from app.workers.pipeline import run_pipeline
 from storage.db_logic import (
     get_audit_company_compliance_stats,
     get_audit_source_compliance_stats_last_7d,
@@ -140,7 +140,7 @@ def tick(*, response_format: str = "auto", force_text: bool = False):
         },
     )
 
-    result = run_tick_pipeline()
+    result = run_pipeline()
 
     payload = {
         "status": "ok",

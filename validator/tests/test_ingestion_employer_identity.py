@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from app.domain.classification.enums import GeoClass, RemoteClass
+from app.domain.taxonomy.enums import GeoClass, RemoteClass
 from app.domain.jobs.identity import (
     compute_job_fingerprint,
     compute_job_uid,
@@ -70,12 +70,15 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
     monkeypatch.setattr(employer, "get_adapter", lambda _provider: _FakeAdapter())
     monkeypatch.setattr(employer, "get_engine", lambda: _NoopEngine())
 
-    def _fake_enrich_and_apply_policy(job, raw_job, company_id, source):
+    def _fake_process_ingested_job(job, source):
         call_order.append("apply_policy")
-        assert source == "greenhouse:acme"
-        assert company_id == "company-1"
+        assert source == "greenhouse"
+        assert job["company_id"] == "company-1"
+        
+        # Identity is now computed inside process_ingested_job
+        # but for this test we'll mock its behavior
         job["job_uid"] = compute_job_uid(
-            "company-1",
+            job["company_id"],
             job["title"],
             job["remote_scope"],
         )
@@ -83,10 +86,11 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
             job["description"],
             title=job["title"],
             location=job["remote_scope"],
-            company_id="company-1",
+            company_id=job["company_id"],
             company_name=job["company_name"],
         )
-        job["source_schema_hash"] = compute_schema_hash(raw_job)
+        # source_schema_hash is set by worker before call
+        
         job["_compliance"] = {
             "policy_version": "v9",
             "policy_reason": None,
@@ -99,9 +103,23 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
         job["policy_version"] = "v9"
         job["compliance_status"] = "approved"
         job["compliance_score"] = 100
-        return job, None
+        
+        report = {
+            "job_id": None,
+            "job_uid": job["job_uid"],
+            "policy_version": "v9",
+            "remote_class": job["_compliance"]["remote_model"],
+            "geo_class": job["_compliance"]["geo_class"],
+            "hard_geo_flag": False,
+            "base_score": 100,
+            "final_score": 100,
+            "final_status": "approved",
+            "decision_vector": [],
+            "policy_reason": None
+        }
+        return job, report
 
-    monkeypatch.setattr(employer, "enrich_and_apply_policy", _fake_enrich_and_apply_policy)
+    monkeypatch.setattr(employer, "process_ingested_job", _fake_process_ingested_job)
 
     def _fake_upsert(job, conn=None, *, company_id=None):
         call_order.append("upsert")

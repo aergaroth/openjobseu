@@ -2,14 +2,14 @@ import ast
 from pathlib import Path
 import pytest
 
-from app.ats.base import ATSAdapter
-from app.ats.greenhouse import GreenhouseAdapter
+from app.adapters.ats.base import ATSAdapter
+from app.adapters.ats.greenhouse import GreenhouseAdapter
 
 
 def test_ats_adapters_expose_fetch_and_normalize_methods():
     """Test that all ATS adapters implement required fetch() and normalize() methods."""
     repo_root = Path(__file__).resolve().parents[2]
-    adapters_dir = repo_root / "app" / "ats"
+    adapters_dir = repo_root / "app" / "adapters" / "ats"
 
     missing_methods: list[str] = []
 

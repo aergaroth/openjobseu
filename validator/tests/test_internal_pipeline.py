@@ -30,11 +30,11 @@ def _fake_pipeline_result():
 def pipeline_spy(monkeypatch):
     calls = []
 
-    def _fake_run_tick_pipeline():
+    def _fake_run_pipeline():
         calls.append({})
         return _fake_pipeline_result()
 
-    monkeypatch.setattr(internal, "run_tick_pipeline", _fake_run_tick_pipeline)
+    monkeypatch.setattr(internal, "run_pipeline", _fake_run_pipeline)
     return calls
 
 

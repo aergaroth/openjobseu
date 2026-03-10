@@ -20,7 +20,7 @@ ATS Adapters -> Employer Ingestion Worker -> Policy Signals -> DB Upsert -> Post
 
 ## Runtime Orchestration
 
-- Runtime entrypoint: `app.workers.tick_pipeline.run_tick_pipeline`
+- Runtime entrypoint: `app.workers.pipeline.run_pipeline`
 - Tick pipeline orchestration:
   - runs `run_employer_ingestion()`
   - runs `run_post_ingestion()`
@@ -34,10 +34,10 @@ ATS Adapters -> Employer Ingestion Worker -> Policy Signals -> DB Upsert -> Post
 
 Runtime path:
 - loads active ATS companies from `companies` table (`is_active=true`, `ats_provider`, `ats_slug`)
-- adapters resolved via `app/ats/registry.py`
+- adapters resolved via `app/adapters/ats/registry.py`
 - current adapter implementations:
-  - `app/ats/greenhouse.py`
-  - `app/ats/lever.py` (inactive)
+  - `app/adapters/ats/greenhouse.py`
+  - `app/adapters/ats/lever.py` (inactive)
 - normalization happens inside adapters (`normalize()`)
 - policy tagging uses `app/domain/compliance/engine.py` (`apply_policy`)
 

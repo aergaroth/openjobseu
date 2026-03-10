@@ -1,5 +1,5 @@
 from app.workers.ingestion import log_helpers
-from app.domain.classification.enums import RemoteClass
+from app.domain.taxonomy.enums import RemoteClass
 
 
 def test_fetch_phase_logs_on_debug(monkeypatch):

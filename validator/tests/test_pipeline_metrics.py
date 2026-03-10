@@ -1,9 +1,9 @@
-from app.workers import tick_pipeline
+from app.workers import pipeline
 
 
 def test_tick_pipeline_returns_runtime_metrics(monkeypatch):
     monkeypatch.setattr(
-        tick_pipeline,
+        pipeline,
         "run_employer_ingestion",
         lambda: {
             "actions": ["employer_ingestion_completed"],
@@ -16,9 +16,10 @@ def test_tick_pipeline_returns_runtime_metrics(monkeypatch):
             },
         },
     )
-    monkeypatch.setattr(tick_pipeline, "run_post_ingestion", lambda: None)
+    monkeypatch.setattr(pipeline, "run_availability_pipeline", lambda: None)
+    monkeypatch.setattr(pipeline, "run_lifecycle_pipeline", lambda: None)
 
-    result = tick_pipeline.run_tick_pipeline()
+    result = pipeline.run_pipeline()
 
     assert result["actions"] == ["employer_ingestion_completed"]
     assert "metrics" in result
@@ -30,19 +31,20 @@ def test_tick_pipeline_returns_runtime_metrics(monkeypatch):
 
 
 def test_tick_pipeline_runs_post_ingestion_on_ingestion_failure(monkeypatch):
-    post_calls = {"count": 0}
+    lifecycle_calls = {"count": 0}
 
     def _broken_ingestion():
         raise RuntimeError("boom")
 
-    def _fake_post_ingestion():
-        post_calls["count"] += 1
+    def _fake_lifecycle():
+        lifecycle_calls["count"] += 1
 
-    monkeypatch.setattr(tick_pipeline, "run_employer_ingestion", _broken_ingestion)
-    monkeypatch.setattr(tick_pipeline, "run_post_ingestion", _fake_post_ingestion)
+    monkeypatch.setattr(pipeline, "run_employer_ingestion", _broken_ingestion)
+    monkeypatch.setattr(pipeline, "run_availability_pipeline", lambda: None)
+    monkeypatch.setattr(pipeline, "run_lifecycle_pipeline", _fake_lifecycle)
 
-    result = tick_pipeline.run_tick_pipeline()
+    result = pipeline.run_pipeline()
 
     assert result["actions"] == []
     assert result["metrics"]["ingestion"]["status"] == "failed"
-    assert post_calls["count"] == 1
+    assert lifecycle_calls["count"] == 1

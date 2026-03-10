@@ -8,7 +8,7 @@ os.environ.setdefault("DB_MODE", "standard")
 from fastapi.testclient import TestClient
 
 import app.internal as internal_api
-from app.domain.classification.enums import ComplianceStatus, GeoClass, RemoteClass
+from app.domain.taxonomy.enums import ComplianceStatus, GeoClass, RemoteClass
 from app.main import app
 from storage.db_logic import init_db, upsert_job
 from storage.db_engine import get_engine

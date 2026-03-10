@@ -1,4 +1,4 @@
-from app.domain.classification.enums import RemoteClass
+from app.domain.taxonomy.enums import RemoteClass
 
 
 def format_tick_summary(payload: dict) -> str:

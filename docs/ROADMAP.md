@@ -46,6 +46,7 @@ Non-goals remain unchanged:
 - [x] Cloud Scheduler trigger for `/internal/tick` in production
 - [x] CI test workflow with PostgreSQL service
 - [x] Runtime-aware logging (text local, JSON in containers)
+- [x] Reorganized ATS adapters into `app/adapters/ats/` structure
 
 ---
 

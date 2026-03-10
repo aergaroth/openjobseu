@@ -5,20 +5,12 @@ from time import perf_counter
 import requests
 from sqlalchemy import text
 
-import app.ats  # noqa: F401
-from app.ats.registry import get_adapter
-from app.domain.classification.enums import RemoteClass
-from app.domain.classification.taxonomy import classify_taxonomy
-from app.domain.compliance.engine import ENGINE_POLICY_VERSION, apply_policy
-from app.domain.compliance.resolver import resolve_compliance
-from app.domain.jobs.enrichment import enrich_and_apply_policy
+import app.adapters.ats as ats  # noqa: F401
+from app.adapters.ats.registry import get_adapter
+from app.domain.taxonomy.enums import RemoteClass
+from app.domain.jobs.identity import compute_schema_hash
+from app.domain.jobs.job_processing import process_ingested_job
 
-from app.domain.jobs.identity import (
-    compute_job_fingerprint,
-    compute_job_uid,
-    compute_schema_hash,
-)
-from app.domain.jobs.quality_score import compute_job_quality_score
 from storage.db_engine import get_engine
 from storage.db_logic import (
     insert_compliance_report,
@@ -46,42 +38,6 @@ def _normalize_remote_model_for_metrics(remote_model: str | None) -> str:
 
 def normalize_job(adapter, raw_job: dict) -> dict | None:
     return adapter.normalize(raw_job)
-
-
-def compute_job_identity(
-    company_id: str | None,
-    raw_job: dict,
-    normalized_job: dict,
-) -> dict:
-
-    resolved_company_id = company_id or normalized_job.get("company_id")
-    if not resolved_company_id:
-        raise ValueError("Missing company_id for job identity")
-
-    title = (normalized_job.get("title") or "").strip()
-    location = (normalized_job.get("remote_scope") or "").strip()
-    description = (normalized_job.get("description") or "").strip()
-
-    # Stable identity (must not change when job text changes)
-    normalized_job["job_uid"] = compute_job_uid(
-        company_id=resolved_company_id,
-        title=title,
-        location=location,
-    )
-
-    # Content fingerprint (detects edits in job description)
-    normalized_job["job_fingerprint"] = compute_job_fingerprint(
-        description,
-        title=title,
-        location=location,
-        company_id=resolved_company_id,
-        company_name=(normalized_job.get("company_name") or "").strip(),
-    )
-
-    # Detect ATS schema changes
-    normalized_job["source_schema_hash"] = compute_schema_hash(raw_job)
-
-    return normalized_job
 
 
 def ingest_company(company: dict):
@@ -215,6 +171,7 @@ def ingest_company(company: dict):
         RemoteClass.UNKNOWN.value: 0,
     }
 
+    company_id = company.get("company_id")
     try:
         with engine.begin() as conn:
             for raw in raw_jobs:
@@ -225,16 +182,17 @@ def ingest_company(company: dict):
                         continue
 
                     normalized_count += 1
+                    normalized["source_schema_hash"] = compute_schema_hash(raw)
+                    normalized["company_id"] = company_id
 
-                    job, reason = enrich_and_apply_policy(
-                        normalized,
-                        raw_job=raw,
-                        company_id=str(company.get("company_id") or ""),
-                        source=str(normalized.get("source") or provider),
-                    )
+                    job, report = process_ingested_job(normalized, source=provider)
 
+                    # Metrics & Logging
+                    compliance_payload = (job or normalized).get("_compliance", {})
+                    reason = report.get("policy_reason")
+                    
                     metric_remote_model = _normalize_remote_model_for_metrics(
-                        (job or normalized).get("_compliance", {}).get("remote_model")
+                        compliance_payload.get("remote_model")
                     )
                     remote_model_counts[metric_remote_model] += 1
 
@@ -242,59 +200,40 @@ def ingest_company(company: dict):
                         rejected_policy_count += 1
                         rejected_by_reason["geo_restriction"] += 1
                         hard_geo_rejected_count += 1
-                        skipped += 1
-                        continue
-
-                    if reason in rejected_by_reason:
+                    elif reason in rejected_by_reason:
                         rejected_policy_count += 1
                         rejected_by_reason[reason] += 1
 
                     if not job:
                         skipped += 1
-                        continue
+                    else:
+                        # Log salary detection (from worker as requested)
+                        salary_source = job.get("salary_source")
+                        if salary_source:
+                            logger.info(f"salary_{salary_source}_detected", extra={"job_id": job.get("job_id")})
+                        else:
+                            logger.info("salary_missing", extra={"job_id": job.get("job_id")})
 
-                    compliance_status = job.get("compliance_status")
-                    if compliance_status and compliance_status != "approved":
-                        skipped += 1
-                        continue
+                        canonical_job_id = upsert_job(job, conn=conn, company_id=company_id)
+                        accepted += 1
+                        report["job_id"] = canonical_job_id
 
-                    # Compute quality score (after all other enrichments)
-                    job["job_quality_score"] = compute_job_quality_score(job)
-
-                    canonical_job_id = upsert_job(
-                        job,
-                        conn=conn,
-                        company_id=company["company_id"],
-                    )
-
-                    # Insert compliance report
-                    compliance_payload = job.get("_compliance") or {}
-                    if not isinstance(compliance_payload, dict):
-                        compliance_payload = {}
-
-                    remote_class = compliance_payload.get("remote_model")
-                    geo_class = compliance_payload.get("geo_class")
-                    decision_trace = compliance_payload.get("decision_trace")
-
+                    # Persistence of compliance report (for all processed jobs)
                     insert_compliance_report(
                         conn,
-                        job_id=canonical_job_id,
-                        job_uid=str(job.get("job_uid")),
-                        policy_version=str(job.get("policy_version")),
-                        remote_class=remote_class,
-                        geo_class=geo_class,
-                        hard_geo_flag=bool(
-                            compliance_payload.get("policy_reason") == "geo_restriction_hard"
-                        ),
-                        base_score=job.get("compliance_score"),
+                        job_id=report.get("job_id"),
+                        job_uid=report["job_uid"],
+                        policy_version=report["policy_version"],
+                        remote_class=report["remote_class"],
+                        geo_class=report["geo_class"],
+                        hard_geo_flag=report["hard_geo_flag"],
+                        base_score=report["base_score"],
                         penalties=None,
                         bonuses=None,
-                        final_score=job.get("compliance_score"),
-                        final_status=job.get("compliance_status"),
-                        decision_vector=decision_trace,
+                        final_score=report["final_score"],
+                        final_status=report["final_status"],
+                        decision_vector=report["decision_vector"],
                     )
-
-                    accepted += 1
 
                 except Exception as exc:
                     logger.warning(
