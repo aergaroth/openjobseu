@@ -46,5 +46,5 @@ def test_tick_pipeline_runs_post_ingestion_on_ingestion_failure(monkeypatch):
     result = pipeline.run_pipeline()
 
     assert result["actions"] == []
-    assert result["metrics"]["ingestion"]["status"] == "failed"
+    assert result["metrics"]["ingestion"]["status"] == "error"
     assert lifecycle_calls["count"] == 1

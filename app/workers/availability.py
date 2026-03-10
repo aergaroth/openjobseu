@@ -127,4 +127,5 @@ def run_availability_pipeline() -> dict:
         with db_engine.begin() as conn:
             update_jobs_availability(updates=updates, conn=conn)
 
-    return summary
+    summary["status"] = "ok"
+    return {"metrics": summary}

@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timezone
+import sys
 from time import perf_counter
 
 from app.workers.ingestion.employer import run_employer_ingestion
@@ -8,6 +9,15 @@ from app.workers.lifecycle import run_lifecycle_pipeline
 
 logger = logging.getLogger("openjobseu.pipeline")
 
+# NOTE: We store the callable names as strings so that tests can monkeypatch the
+# functions on the ``pipeline`` module. If we stored the callables directly, the
+# references would be bound at import time and monkeypatching would have no
+# effect, causing the orchestration order tests to fail.
+PIPELINE_STEPS = [
+    ("ingestion", "run_employer_ingestion"),
+    ("availability", "run_availability_pipeline"),
+    ("lifecycle", "run_lifecycle_pipeline"),
+]
 
 def _int_metric(value, default: int = 0) -> int:
     try:
@@ -20,61 +30,61 @@ def _int_metric(value, default: int = 0) -> int:
 
 def run_pipeline() -> dict:
     """
-    Execute full tick pipeline:
-    1. ingestion
-    2. availability
-    3. lifecycle
+    Execute full tick pipeline using declarative steps
     """
-
     tick_started_at = datetime.now(timezone.utc).isoformat()
     tick_started_perf = perf_counter()
 
-    # 1. Ingestion
-    employer_result = {"actions": [], "metrics": {"status": "failed"}}
-    try:
-        employer_result = run_employer_ingestion()
-    except Exception:
-        logger.exception("employer ingestion failed")
+    actions = []
+    metrics = {}
 
-    # 2. Availability
-    availability_summary = {}
-    try:
-        availability_summary = run_availability_pipeline() or {}
-    except Exception:
-        logger.exception("availability step failed")
+    for step_name, step_fn_name in PIPELINE_STEPS:
+        try:
+            step_callable = getattr(sys.modules[__name__], step_fn_name)
+            result = step_callable() or {}
 
-    # 3. Lifecycle
-    try:
-        run_lifecycle_pipeline()
-    except Exception:
-        logger.exception("lifecycle step failed")
+            actions.extend(result.get("actions", []))
+
+            if "metrics" in result:
+                metrics[step_name] = result["metrics"]
+
+        except Exception as e:
+            logger.exception(f"Step {step_name} failed: {e}")
+            metrics[step_name] = {"status": "error"}
 
     tick_finished_at = datetime.now(timezone.utc).isoformat()
     tick_duration_ms = int((perf_counter() - tick_started_perf) * 1000)
-    ingestion_metrics = employer_result.get("metrics") or {}
-    source_status = str(ingestion_metrics.get("status") or "ok").strip().lower()
 
-    metrics = {
-        "tick_started_at": tick_started_at,
-        "tick_finished_at": tick_finished_at,
-        "tick_duration_ms": tick_duration_ms,
-        "ingestion": ingestion_metrics,
-        "availability": availability_summary,
-    }
+    # Aggregate metrics for logging
+    metric_values = [m for m in metrics.values() if isinstance(m, dict)]
+    sources_ok = sum(1 for m in metric_values if m.get("status") == "ok")
+    sources_failed = len(metric_values) - sources_ok
+    persisted_count = sum(
+        _int_metric(m.get("persisted_count")) for m in metric_values
+    )
 
     logger.info(
         "tick_finished",
         extra={
             "component": "pipeline",
             "phase": "tick_finished",
+            "tick_started_at": tick_started_at,
+            "tick_finished_at": tick_finished_at,
             "total_duration_ms": tick_duration_ms,
-            "sources_ok": 1 if source_status == "ok" else 0,
-            "sources_failed": 0 if source_status == "ok" else 1,
-            "persisted_count": _int_metric(ingestion_metrics.get("persisted_count", 0)),
+            "sources_ok": sources_ok,
+            "sources_failed": sources_failed,
+            "persisted_count": persisted_count,
         },
     )
 
+    final_metrics = {
+        "tick_started_at": tick_started_at,
+        "tick_finished_at": tick_finished_at,
+        "tick_duration_ms": tick_duration_ms,
+        **metrics,
+    }
+
     return {
-        "actions": list(employer_result.get("actions") or []),
-        "metrics": metrics,
+        "actions": actions,
+        "metrics": final_metrics,
     }

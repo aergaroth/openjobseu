@@ -44,7 +44,7 @@ def test_pipeline_orchestration_full_flow(monkeypatch):
 
     def _fake_availability():
         order.append("availability")
-        return {"checked": 5, "expired": 2, "unreachable": 1}
+        return {"metrics": {"checked": 5, "expired": 2, "unreachable": 1}}
 
     def _fake_lifecycle():
         order.append("lifecycle")
