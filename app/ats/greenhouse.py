@@ -17,7 +17,7 @@ class GreenhouseAdapter(ATSAdapter):
     active = True
     # INCREMENTAL_FETCH determines whether the adapter should only process
     # records updated since the last sync. When False, all jobs are processed.
-    INCREMENTAL_FETCH = False
+    INCREMENTAL_FETCH = True
     API_URL_TEMPLATE = (
         "https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs?content=true"
     )

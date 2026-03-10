@@ -59,34 +59,39 @@ def enrich_and_apply_policy(
     if not job_after_policy:
         return None, reason
 
-    # 3. Further enrichment post-policy
+    # 3. Further enrichment post-policy (only if approved)
     enriched_job = job_after_policy
+    compliance_payload = enriched_job.get("_compliance") or {}
+    compliance_status = compliance_payload.get("compliance_status")
 
-    # Taxonomy
-    taxonomy = classify_taxonomy(str(enriched_job.get("title") or ""))
-    enriched_job.update(taxonomy)
+    if compliance_status == "approved":
+        # Taxonomy
+        taxonomy = classify_taxonomy(str(enriched_job.get("title") or ""))
+        enriched_job.update(taxonomy)
 
-    # Salary
-    salary_info = {}
-    structured = extract_structured_salary(enriched_job)
-    if structured:
-        salary_info = structured
+        # Salary
+        salary_info = {}
+        structured = extract_structured_salary(enriched_job)
+        if structured:
+            salary_info = structured
+        else:
+            regex_salary = extract_salary(enriched_job.get("description") or "")
+            if regex_salary:
+                salary_info = regex_salary
+        enriched_job.update(salary_info)
+
+        salary_detected = bool(salary_info.get("salary_min") is not None or salary_info.get("salary_max") is not None)
+        transparency_status = detect_salary_transparency(
+            enriched_job.get("description") or "", salary_detected
+        )
+        enriched_job["salary_transparency_status"] = transparency_status
+        if salary_info:
+            logger.info(f"salary_{salary_info.get('salary_source')}_detected", extra={"job_id": enriched_job.get("job_id")})
+        else:
+            logger.info("salary_missing", extra={"job_id": enriched_job.get("job_id")})
     else:
-        regex_salary = extract_salary(enriched_job.get("description") or "")
-        if regex_salary:
-            salary_info = regex_salary
-    enriched_job.update(salary_info)
-
-    salary_detected = bool(salary_info.get("salary_min") is not None or salary_info.get("salary_max") is not None)
-    transparency_status = detect_salary_transparency(
-        enriched_job.get("description") or "", salary_detected
-    )
-    enriched_job["salary_transparency_status"] = transparency_status
-    if salary_info:
-        logger.info(f"salary_{salary_info.get('salary_source')}_detected", extra={"job_id": enriched_job.get("job_id")})
-    else:
-        logger.info("salary_missing", extra={"job_id": enriched_job.get("job_id")})
-
+        # Defaults for rejected/other status
+        enriched_job["salary_transparency_status"] = None
 
     # Compliance fields
     compliance_payload = enriched_job.get("_compliance") or {}
