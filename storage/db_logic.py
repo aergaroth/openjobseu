@@ -13,7 +13,7 @@ from sqlalchemy.engine import Connection
 from storage.db_engine import get_engine
 from app.domain.classification.taxonomy import classify_taxonomy
 from app.domain.jobs.identity import compute_job_fingerprint, compute_job_uid
-from app.utils.salary_extraction import extract_salary
+from app.domain.money.salary_parser import extract_salary
 
 engine = get_engine()
 MIGRATIONS_PATH = Path("storage/migrations")

@@ -1,7 +1,7 @@
 import json
 import pytest
 from pathlib import Path
-from app.utils.salary_extraction import extract_salary
+from app.domain.money.salary_parser import extract_salary
 
 def load_salary_cases():
     path = Path(__file__).parent / "data" / "salary_cases.json"

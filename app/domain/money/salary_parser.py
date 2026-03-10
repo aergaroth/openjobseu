@@ -1,9 +1,9 @@
 import re
 import logging
 from typing import Optional, List, Dict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from app.domain.classification.currency_mapper import detect_currency
+from app.domain.money.currency import detect_currency, normalize_to_eur
 
 logger = logging.getLogger(__name__)
 
@@ -43,21 +43,6 @@ FUNDING_CONTEXT_PATTERNS = [
     re.compile(r"\d+\s?billion", re.IGNORECASE),
 ]
 
-EXCHANGE_RATES = {
-    "EUR": 1.0,
-    "USD": 0.92,
-    "GBP": 1.17,
-    "PLN": 0.23,
-    "CHF": 1.03,
-    "SEK": 0.09,
-    "NOK": 0.09,
-    "DKK": 0.13,
-    "CZK": 0.04,
-    "HUF": 0.0025,
-    "RON": 0.20,
-    "BGN": 0.51,
-}
-
 @dataclass
 class SalaryMatch:
     salary_min: Optional[float] = None
@@ -68,7 +53,7 @@ class SalaryMatch:
     salary_raw: Optional[str] = None
     salary_min_eur: Optional[float] = None
     salary_max_eur: Optional[float] = None
-    salary_confidence: int = 0 # Changed to int
+    salary_confidence: int = 0
     pattern_name: Optional[str] = None
 
 def normalize_amount(value_str: str) -> int:
@@ -77,7 +62,7 @@ def normalize_amount(value_str: str) -> int:
     Supports spaced thousands like '9 500' -> 9500.
     Handles commas as thousand separators like '90,000' -> 90000.
     """
-    return int(value_str.replace(" ", "").replace(",", "")) # Added .replace(",", "")
+    return int(value_str.replace(" ", "").replace(",", ""))
 
 def detect_period_local(text: str, currency: Optional[str] = None) -> str:
     """
@@ -99,19 +84,6 @@ def detect_period_local(text: str, currency: Optional[str] = None) -> str:
         return "month"
 
     return "year"
-
-def normalize_to_eur(amount: float, currency: str | None) -> float | None:
-    """
-    Converts an amount to EUR using predefined exchange rates. Returns a float.
-    """
-    if not amount or not currency:
-        return None
-    
-    rate = EXCHANGE_RATES.get(currency.upper())
-    if not rate:
-        return None
-    
-    return amount * rate
 
 def is_reasonable_salary(min_val: float, max_val: float, period: str, currency: Optional[str] = None) -> bool:
     """
@@ -143,7 +115,6 @@ def is_reasonable_salary(min_val: float, max_val: float, period: str, currency: 
     yearly_max = (max_val_eur or 0) * multiplier
 
     # Reasonable yearly range: 15k - 500k EUR
-    # Note: These are rough estimates and might need fine-tuning
     if (yearly_min > 0 and yearly_min < 15000) or (yearly_max > 0 and yearly_max > 500000):
         return False
 
@@ -173,7 +144,6 @@ def calculate_confidence(salary_match: SalaryMatch, text_window: str, full_text:
     if any(keyword in text_window for keyword in SALARY_KEYWORDS):
         confidence += 50
     # +10 if period detected (local and not default 'year')
-    # Modified: if a period keyword was actually found, add 10 points
     if "hour" in text_window or "day" in text_window or "month" in text_window or "year" in text_window:
         confidence += 10
 
@@ -188,7 +158,6 @@ def find_salary_windows(text: str, window_size: int = 120) -> List[str]:
     Identifies potential salary-related windows in the text based on keywords.
     """
     windows = []
-    # Combined text for keyword search
     text_lower = text.lower()
 
     found_keywords_indices = []
@@ -197,9 +166,8 @@ def find_salary_windows(text: str, window_size: int = 120) -> List[str]:
             found_keywords_indices.append(match.start())
     
     if not found_keywords_indices:
-        return [text] # If no keywords, consider the whole text as one window
+        return [text]
 
-    # Sort and merge overlapping windows
     found_keywords_indices.sort()
     
     for idx in found_keywords_indices:
@@ -207,8 +175,6 @@ def find_salary_windows(text: str, window_size: int = 120) -> List[str]:
         end = min(len(text), idx + window_size)
         windows.append(text[start:end])
     
-    # TODO: Implement merging overlapping windows for cleaner processing
-    # For now, return possibly overlapping windows
     return windows
 
 def _parse_salary_match(match_text: str, full_text: str) -> Optional[SalaryMatch]:
@@ -218,33 +184,20 @@ def _parse_salary_match(match_text: str, full_text: str) -> Optional[SalaryMatch
     salary_match = SalaryMatch(salary_raw=match_text)
     text_lower = match_text.lower()
     
-    # Standardize thousands separators for regex matching. Keep original for salary_raw
-    # Remove commas and spaces for easier numeric parsing later, but regex will handle them in matching
-    
     # Regex patterns, ordered by specificity/priority
-    # Handling different dash types: [-–—] (hyphen, en-dash, em-dash)
     patterns = [
-        # Range with K and optional currency
         (r"(?:[€$£]|pln|zł)?\s*(\d{1,3}[\s,]?)\s?[kK]\s*[-–—]\s*(?:[€$£]|pln|zł)?\s*(\d{1,3}[\s,]?)\s?[kK]", 1000, True, "k_range"), 
-        # Range with spaced/comma thousands and optional currency
         (r"(?:[€$£]|pln|zł)?\s*(\d[\d\s,]{1,})\s*(?:[€$£]|pln|zł)?\s*[-–—]\s*(?:[€$£]|pln|zł)?\s*(\d[\d\s,]{1,})\s*(?:[€$£]|pln|zł)?", 1, True, "spaced_thousands_range"),
-        # Fallback with two numbers and currency keyword in between (e.g., 9000 PLN 11000 PLN)
         (r"(\d[\d\s,]{1,})\s*(?:[€$£]|pln|zł)\s+(\d[\d\s,]{1,})", 1, True, "currency_separated_range"),
-        # Rate pattern (e.g., 15 USD per hour, 20 000 PLN / month)
         (r"(\d[\d\s,]{1,})\s?(?:usd|eur|gbp|pln|zł|€|\$|£)?\s?/?\s?(?:per\s+)?(hour|day|month|year)", 1, False, "hourly_rate"),
-        # Single value with K and optional currency
         (r"(?:[€$£]|pln|zł)?\s*(\d{1,3}[\s,]?)\s?[kK]\b", 1000, False, "k_single"),
-        # Single value with spaced/comma thousands and optional currency
         (r"(?:[€$£]|pln|zł)?\s*(\d[\d\s,]{1,})\b", 1, False, "spaced_thousands_single"),
     ]
 
     for pattern_str, multiplier, is_range, pattern_name in patterns:
-        # We apply regex on text_lower which has some cleanup already
-        # For patterns that include spaces/commas, regex handles them.
         match = re.search(pattern_str, text_lower) 
         if match:
             try:
-                # Remove spaces and commas before converting to int for all matched number groups
                 val1_str = match.group(1).replace(" ", "").replace(",", "")
                 val1 = int(val1_str) * multiplier
                 
@@ -259,16 +212,13 @@ def _parse_salary_match(match_text: str, full_text: str) -> Optional[SalaryMatch
                 
                 salary_match.pattern_name = pattern_name
                 
-                # Local currency detection must happen before period detection for heuristics
                 salary_match.salary_currency = detect_currency(match_text) or detect_currency(full_text)
 
-                # For hourly rate pattern, period is part of the match
-                if pattern_name == "hourly_rate" and len(match.groups()) > 1: # check if period was matched
+                if pattern_name == "hourly_rate" and len(match.groups()) > 1:
                     period_str = match.group(2)
-                    if period_str: # Ensure period_str is not empty
+                    if period_str:
                         salary_match.salary_period = period_str
                 else:
-                    # Local period detection, which may use currency as a hint
                     salary_match.salary_period = detect_period_local(
                         match_text, salary_match.salary_currency
                     )
@@ -280,33 +230,26 @@ def _parse_salary_match(match_text: str, full_text: str) -> Optional[SalaryMatch
     
     return None
 
-
 def is_valid_salary_context(text: str, start: int, end: int) -> bool:
     """
     Check surrounding text for positive/negative signals.
     """
-    # Context window: 40 chars before and after
     window_start = max(0, start - 40)
     window_end = min(len(text), end + 40)
     window = text[window_start:window_end]
 
-    # 1. Reject negative context immediately
     for word in NEGATIVE_CONTEXT:
         if word in window:
             return False
 
-    # 2. Reject if funding context is found nearby
     if is_funding_context(window):
         return False
 
-    # 3. Accept if positive keyword is present
     for word in SALARY_KEYWORDS:
         if word in window:
             return True
 
-    # 4. Default: Accept (neutral), but relying on strict regex patterns
     return True
-
 
 def extract_salary(description: str, title: Optional[str] = None) -> Dict[str, any] | None:
     """
@@ -315,44 +258,36 @@ def extract_salary(description: str, title: Optional[str] = None) -> Dict[str, a
     if not description and not title:
         return None
 
-    # Combine description and title for comprehensive scanning
     full_text = f"{title or ''} {description or ''}".lower()
     
-    # Find potential salary windows
     salary_windows = find_salary_windows(full_text)
 
     best_match: Optional[SalaryMatch] = None
 
     for window in salary_windows:
-        # Try to parse salary from the window
         parsed_match = _parse_salary_match(window, full_text) 
 
         if parsed_match:
-            # Calculate confidence
             parsed_match.salary_confidence = calculate_confidence(parsed_match, window, full_text)
 
-            # Reject if confidence is too low
-            if parsed_match.salary_confidence < 40: # Threshold changed to 40
+            if parsed_match.salary_confidence < 40:
                 logger.debug(f"Salary rejected due to low confidence: {parsed_match}")
                 continue
 
-            # Sanity checks
             if not is_reasonable_salary(parsed_match.salary_min or 0, parsed_match.salary_max or 0, parsed_match.salary_period or "year", parsed_match.salary_currency):
                 logger.debug(f"Salary rejected by sanity check: {parsed_match}")
                 continue
 
-            # If multiple matches, take the one with higher confidence
             if not best_match or parsed_match.salary_confidence > best_match.salary_confidence:
                 best_match = parsed_match
 
     if best_match:
-        # Final normalization to EUR
         best_match.salary_min_eur = normalize_to_eur(best_match.salary_min or 0, best_match.salary_currency)
         best_match.salary_max_eur = normalize_to_eur(best_match.salary_max or 0, best_match.salary_currency)
 
         return {
-            "salary_min": int(best_match.salary_min) if best_match.salary_min is not None else None, # Cast to int
-            "salary_max": int(best_match.salary_max) if best_match.salary_max is not None else None, # Cast to int
+            "salary_min": int(best_match.salary_min) if best_match.salary_min is not None else None,
+            "salary_max": int(best_match.salary_max) if best_match.salary_max is not None else None,
             "salary_currency": best_match.salary_currency,
             "salary_period": best_match.salary_period,
             "salary_source": best_match.salary_source,

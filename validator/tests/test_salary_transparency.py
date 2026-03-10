@@ -1,4 +1,4 @@
-from app.utils.salary_transparency import detect_salary_transparency
+from app.domain.money.transparency import detect_salary_transparency
 
 def test_salary_disclosed_priority():
     # If salary is detected, it is always 'disclosed' regardless of description

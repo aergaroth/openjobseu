@@ -1,5 +1,5 @@
 import logging
-from app.utils.salary_extraction import normalize_to_eur
+from app.domain.money.currency import normalize_to_eur
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ def extract_structured_salary(job: dict) -> dict | None:
             min_val = data.get("min") or data.get("min_amount") or data.get("minimum")
             max_val = data.get("max") or data.get("max_amount") or data.get("maximum")
             currency = data.get("currency") or data.get("currency_code") or data.get("currencyCode")
-            period = data.get("interval") or data.get("period") or data.get("unit") # New: Period detection
+            period = data.get("interval") or data.get("period") or data.get("unit")
 
             # Basic validation
             if not min_val and not max_val:
