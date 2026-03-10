@@ -64,10 +64,13 @@ def test_availability_pipeline_uses_single_transaction_conn(monkeypatch):
     summary = availability.run_availability_pipeline()
 
     assert summary == {
-        "checked": 3,
-        "active": 1,
-        "expired": 1,
-        "unreachable": 1,
+        "metrics": {
+            "checked": 3,
+            "active": 1,
+            "expired": 1,
+            "unreachable": 1,
+            "status": "ok",
+        }
     }
     assert [item[0] for item in seen] == ["a", "b", "c"]
     assert all(item[3] is not None for item in seen)
