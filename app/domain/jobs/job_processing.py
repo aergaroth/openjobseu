@@ -7,7 +7,6 @@ from app.domain.compliance.engine import ENGINE_POLICY_VERSION, apply_policy
 from app.domain.jobs.identity import (
     compute_job_fingerprint,
     compute_job_uid,
-    compute_schema_hash,
 )
 from app.domain.money.salary_parser import extract_salary
 from app.domain.money.structured_salary import extract_structured_salary

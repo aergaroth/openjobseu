@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse
 
-from app.audit_filter_registry import get_audit_filter_registry
+from app.domain.compliance.audit_filter_registry import get_audit_filter_registry
 from app.logging import should_use_text_logs
 from app.utils.tick_formatting import format_tick_summary
 from app.workers.pipeline import run_pipeline
@@ -17,6 +17,7 @@ from storage.db_logic import (
 )
 
 from app.utils.backfill_compliance import backfill_missing_compliance_classes
+from app.utils.backfill_salary import backfill_missing_salary_fields
 
 logger = logging.getLogger("openjobseu.runtime")
 
@@ -112,6 +113,12 @@ def run_tick_from_audit():
 @router.post("/backfill-compliance")
 def backfill_compliance(limit: int = Query(1000, ge=1, le=10000)):
     updated_count = backfill_missing_compliance_classes(limit=limit)
+    return {"status": "ok", "updated_jobs_count": updated_count}
+
+
+@router.post("/backfill-salary")
+def backfill_salary(limit: int = Query(1000, ge=1, le=10000)):
+    updated_count = backfill_missing_salary_fields(limit=limit)
     return {"status": "ok", "updated_jobs_count": updated_count}
 
 
