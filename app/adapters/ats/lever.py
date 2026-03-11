@@ -21,4 +21,7 @@ class LeverAdapter(ATSAdapter):
     def normalize(self, raw_job: Dict) -> Dict | None:
         raise NotImplementedError("Lever adapter is not implemented yet")
 
+    def probe_jobs(self, slug: str) -> Dict[str, Any]:
+        raise NotImplementedError("Lever adapter probe is not implemented yet")
+
 register(LeverAdapter.source_name, LeverAdapter)

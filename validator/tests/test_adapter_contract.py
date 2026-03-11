@@ -28,7 +28,8 @@ def test_ats_adapters_expose_fetch_and_normalize_methods():
                 for child in node.body
                 if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
             }
-            if "fetch" not in method_names or "normalize" not in method_names:
+            required = {"fetch", "normalize", "probe_jobs"}
+            if not required.issubset(method_names):
                 missing_methods.append(
                     f"{file_path.relative_to(repo_root)}:{node.lineno}"
                 )

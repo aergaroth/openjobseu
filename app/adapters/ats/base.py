@@ -75,6 +75,11 @@ class ATSAdapter(ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def probe_jobs(self, slug: str) -> Dict[str, Any]:
+        """Lightweight discovery probe that inspects availability of jobs."""
+        raise NotImplementedError
+
 
 # Backward compatibility alias
 BaseATSAdapter = ATSAdapter

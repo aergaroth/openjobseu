@@ -1,7 +1,5 @@
 from datetime import datetime, timezone
 from typing import Any
-import requests
-
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
 from app.adapters.ats.utils import (
@@ -21,6 +19,18 @@ class GreenhouseAdapter(ATSAdapter):
     API_URL_TEMPLATE = (
         "https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs?content=true"
     )
+    REMOTE_KEYWORDS_NORMALIZE = [
+        "remote job",
+        "home based",
+        "work from home",
+        "fully remote",
+    ]
+    REMOTE_KEYWORDS_PROBE = [
+        "remote",
+        "anywhere",
+        "distributed",
+        "work from home",
+    ]
 
     @staticmethod
     def _resolve_board_token(company: dict) -> str:
@@ -35,21 +45,14 @@ class GreenhouseAdapter(ATSAdapter):
 
     def fetch(self, company: dict, updated_since: Any = None) -> list[dict]:
         board_token = self._resolve_board_token(company)
-        api_url = self.API_URL_TEMPLATE.format(board_token=board_token)
-        
+        api_url = self._build_jobs_url(board_token, include_content=True)
+
         resp = self.session.get(api_url, timeout=15)
         resp.raise_for_status()
 
         payload = resp.json()
 
-        if isinstance(payload, list):
-            jobs = payload
-        elif isinstance(payload, dict):
-            jobs = payload.get("jobs", [])
-            if not isinstance(jobs, list):
-                raise ValueError("Greenhouse API payload does not contain a jobs list")
-        else:
-            raise ValueError("Greenhouse API did not return a list or dict payload")
+        jobs = self._extract_jobs_from_payload(payload, "fetch")
 
         if self.INCREMENTAL_FETCH:
             jobs = self._filter_incremental_jobs(jobs, updated_since)
@@ -121,13 +124,7 @@ class GreenhouseAdapter(ATSAdapter):
 
         cleaned_description = clean_description(description, source=self.source_name)
         full_text = f"{title} {location or ''}".lower()
-        remote_keywords = [
-            "remote job",
-            "home based",
-            "work from home",
-            "fully remote",
-        ]
-        is_remote = any(kw in full_text for kw in remote_keywords)
+        is_remote = any(kw in full_text for kw in self.REMOTE_KEYWORDS_NORMALIZE)
 
         # Normalize remote_scope using base class method
         normalized_remote_scope = self.normalize_remote_scope(location)
@@ -145,5 +142,70 @@ class GreenhouseAdapter(ATSAdapter):
             "status": "new",
             "first_seen_at": first_seen_at,
         }
+
+    def probe_jobs(self, slug: str) -> dict[str, Any]:
+        board_token = str(slug or "").strip()
+        if not board_token:
+            raise ValueError("slug cannot be empty for greenhouse probe")
+
+        api_url = self._build_jobs_url(board_token, include_content=False)
+        resp = self.session.get(api_url, timeout=15)
+        resp.raise_for_status()
+
+        payload = resp.json()
+        jobs = self._extract_jobs_from_payload(payload, "probe")
+
+        jobs_total = 0
+        remote_hits = 0
+        recent_job_at: datetime | None = None
+
+        for job in jobs:
+            if not isinstance(job, dict):
+                continue
+
+            jobs_total += 1
+            job_updated_at = to_utc_datetime(job.get("updated_at"))
+            if job_updated_at is None:
+                job_updated_at = to_utc_datetime(job.get("pubDate"))
+
+            if job_updated_at and (recent_job_at is None or job_updated_at > recent_job_at):
+                recent_job_at = job_updated_at
+
+            title = (job.get("title") or "").lower()
+            location_value = ""
+            raw_location = job.get("location")
+            if isinstance(raw_location, dict):
+                location_value = raw_location.get("name") or ""
+            elif isinstance(raw_location, str):
+                location_value = raw_location
+
+            location = sanitize_location(location_value) or ""
+            full_text = f"{title} {location}".lower()
+            if any(keyword in full_text for keyword in self.REMOTE_KEYWORDS_PROBE):
+                remote_hits += 1
+
+        return {
+            "jobs_total": jobs_total,
+            "recent_job_at": recent_job_at,
+            "remote_hits": remote_hits,
+        }
+
+    @classmethod
+    def _build_jobs_url(cls, board_token: str, include_content: bool) -> str:
+        url = cls.API_URL_TEMPLATE.format(board_token=board_token)
+        if include_content:
+            return url
+        return url.replace("?content=true", "")
+
+    @staticmethod
+    def _extract_jobs_from_payload(payload: Any, context: str) -> list[dict]:
+        if isinstance(payload, list):
+            return payload
+        if isinstance(payload, dict):
+            jobs = payload.get("jobs", [])
+            if not isinstance(jobs, list):
+                raise ValueError(f"Greenhouse {context} payload does not contain a jobs list")
+            return jobs
+        raise ValueError(f"Greenhouse {context} API did not return a list or dict payload")
 
 register(GreenhouseAdapter.source_name, GreenhouseAdapter)
