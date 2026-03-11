@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
@@ -5,6 +6,8 @@ from storage.db_engine import get_engine
 from storage.common import _derive_source_fields, _require_open_conn
 from app.domain.jobs.identity import compute_job_fingerprint, compute_job_uid
 from app.domain.money.salary_parser import extract_salary
+
+logger = logging.getLogger(__name__)
 
 def get_jobs(
     status: str | None = None,
@@ -231,6 +234,31 @@ def _upsert_job_source_mapping_in_conn(
         },
     )
 
+def _insert_job_snapshot_in_conn(conn: Connection, job: dict) -> None:
+    conn.execute(
+        text("""
+            INSERT INTO job_snapshots (
+                job_id,
+                job_fingerprint,
+                title,
+                company_name,
+                salary_min,
+                salary_max,
+                salary_currency
+            )
+            VALUES (
+                :job_id,
+                :job_fingerprint,
+                :title,
+                :company_name,
+                :salary_min,
+                :salary_max,
+                :salary_currency
+            )
+        """),
+        job,
+    )
+
 def _upsert_job_in_conn(
     conn: Connection,
     *,
@@ -270,6 +298,41 @@ def _upsert_job_in_conn(
         source_job_id=resolved_source_job_id,
         job_fingerprint=str(job["job_fingerprint"]),
     )
+
+    # Detect fingerprint change and snapshot previous state
+    existing_job = conn.execute(
+        text("""
+            SELECT
+                job_fingerprint,
+                title,
+                company_name,
+                salary_min,
+                salary_max,
+                salary_currency
+            FROM jobs
+            WHERE job_id = :job_id
+        """),
+        {"job_id": canonical_job_id},
+    ).mappings().fetchone()
+
+    if existing_job:
+        existing_fingerprint = existing_job["job_fingerprint"]
+        new_fingerprint = str(job["job_fingerprint"])
+
+        if existing_fingerprint and existing_fingerprint != new_fingerprint:
+            # Snapshot the PREVIOUS state
+            snapshot_data = dict(existing_job)
+            snapshot_data["job_id"] = canonical_job_id
+            
+            _insert_job_snapshot_in_conn(conn, snapshot_data)
+
+            logger.debug(
+                "job_snapshot_created",
+                extra={
+                    "job_id": canonical_job_id,
+                    "fingerprint": new_fingerprint
+                }
+            )
 
     conn.execute(
         text("""
