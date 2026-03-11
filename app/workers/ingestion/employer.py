@@ -2,46 +2,26 @@ from datetime import datetime, timezone
 import logging
 from time import perf_counter
 
-import requests
-from sqlalchemy import text
-
 import app.adapters.ats as ats  # noqa: F401
 from app.adapters.ats.registry import get_adapter
 from app.domain.taxonomy.enums import RemoteClass
-from app.domain.jobs.identity import compute_schema_hash
-from app.domain.jobs.job_processing import process_ingested_job
 
 from storage.db_engine import get_engine
 from storage.db_logic import (
-    insert_compliance_report,
     load_active_ats_companies,
     mark_ats_synced,
-    upsert_job,
 )
 
 from app.workers.ingestion.log_helpers import log_ingestion
+from app.workers.ingestion.fetch import fetch_company_jobs
+from app.workers.ingestion.metrics import IngestionMetrics
+from app.workers.ingestion.process_loop import process_company_jobs
 
 logger = logging.getLogger("openjobseu.ingestion.employer")
 SOURCE = "employer_ing"
 
 
-def _normalize_remote_model_for_metrics(remote_model: str | None) -> str:
-    model = (remote_model or "").strip().lower()
-    if model == RemoteClass.REMOTE_ONLY.value:
-        return RemoteClass.REMOTE_ONLY.value
-    if model in {RemoteClass.REMOTE_REGION_LOCKED.value, "remote_but_geo_restricted"}:
-        return "remote_but_geo_restricted"
-    if model in {"office_first", "hybrid"}:
-        return RemoteClass.NON_REMOTE.value
-    return RemoteClass.UNKNOWN.value
-
-
-def normalize_job(adapter, raw_job: dict) -> dict | None:
-    return adapter.normalize(raw_job)
-
-
 def ingest_company(company: dict):
-
     provider = str(company.get("ats_provider") or "").strip().lower()
     updated_since = company.get("last_sync_at")
 
@@ -81,195 +61,41 @@ def ingest_company(company: dict):
             "error": "inactive_ats_adapter",
         }
 
-    try:
-        raw_jobs = list(adapter.fetch(company, updated_since=updated_since))
-    except requests.HTTPError as exc:
-        status_code = getattr(getattr(exc, "response", None), "status_code", None)
-        logger.warning(
-            "employer ingestion fetch failed with http status",
-            extra={
-                "company_id": company.get("company_id"),
-                "ats_provider": provider,
-                "ats_slug": company.get("ats_slug"),
-                "status_code": status_code,
-            },
-        )
+    raw_jobs, error = fetch_company_jobs(company, adapter, updated_since=updated_since)
+    if error:
         return {
             "fetched": 0,
             "normalized_count": 0,
             "accepted": 0,
             "skipped": 0,
-            "error": "invalid_ats_slug" if status_code == 404 else "fetch_failed",
-        }
-    except (requests.ConnectionError, requests.Timeout) as exc:
-        logger.warning(
-            "employer ingestion fetch failed due to network error",
-            extra={
-                "company_id": company.get("company_id"),
-                "ats_provider": provider,
-                "ats_slug": company.get("ats_slug"),
-                "error_type": type(exc).__name__,
-            },
-        )
-        return {
-            "fetched": 0,
-            "normalized_count": 0,
-            "accepted": 0,
-            "skipped": 0,
-            "error": "fetch_network_failed",
-        }
-    except requests.RequestException as exc:
-        logger.warning(
-            "employer ingestion fetch failed due to request exception",
-            extra={
-                "company_id": company.get("company_id"),
-                "ats_provider": provider,
-                "ats_slug": company.get("ats_slug"),
-                "error_type": type(exc).__name__,
-            },
-        )
-        return {
-            "fetched": 0,
-            "normalized_count": 0,
-            "accepted": 0,
-            "skipped": 0,
-            "error": "fetch_failed",
-        }
-    except Exception as exc:
-        logger.error(
-            "employer ingestion fetch failed with unhandled exception",
-            extra={
-                "company_id": company.get("company_id"),
-                "ats_provider": provider,
-                "ats_slug": company.get("ats_slug"),
-                "error": str(exc),
-                "error_type": type(exc).__name__,
-            },
-        )
-        return {
-            "fetched": 0,
-            "normalized_count": 0,
-            "accepted": 0,
-            "skipped": 0,
-            "error": "fetch_failed",
+            "error": error,
         }
 
     engine = get_engine()
-    normalized_count = 0
-    accepted = 0
-    skipped = 0
-    rejected_policy_count = 0
-    hard_geo_rejected_count = 0
-    rejected_by_reason = {
-        RemoteClass.NON_REMOTE.value: 0,
-        "geo_restriction": 0,
-    }
-    remote_model_counts = {
-        RemoteClass.REMOTE_ONLY.value: 0,
-        "remote_but_geo_restricted": 0,
-        RemoteClass.NON_REMOTE.value: 0,
-        RemoteClass.UNKNOWN.value: 0,
-    }
-
+    metrics = IngestionMetrics(fetched_count=len(raw_jobs))
     company_id = company.get("company_id")
     try:
         with engine.begin() as conn:
-            for raw in raw_jobs:
-                try:
-                    normalized = normalize_job(adapter, raw)
-                    if not normalized:
-                        skipped += 1
-                        continue
-
-                    normalized_count += 1
-                    normalized["source_schema_hash"] = compute_schema_hash(raw)
-                    normalized["company_id"] = company_id
-
-                    job, report = process_ingested_job(normalized, source=provider)
-
-                    # Metrics & Logging
-                    compliance_payload = (job or normalized).get("_compliance", {})
-                    reason = report.get("policy_reason")
-                    
-                    metric_remote_model = _normalize_remote_model_for_metrics(
-                        compliance_payload.get("remote_model")
-                    )
-                    remote_model_counts[metric_remote_model] += 1
-
-                    if reason == "geo_restriction_hard":
-                        rejected_policy_count += 1
-                        rejected_by_reason["geo_restriction"] += 1
-                        hard_geo_rejected_count += 1
-                    elif reason in rejected_by_reason:
-                        rejected_policy_count += 1
-                        rejected_by_reason[reason] += 1
-
-                    if not job:
-                        skipped += 1
-                    else:
-                        # Log salary detection (from worker as requested)
-                        salary_source = job.get("salary_source")
-                        if salary_source:
-                            logger.info(f"salary_{salary_source}_detected", extra={"job_id": job.get("job_id")})
-                        else:
-                            logger.info("salary_missing", extra={"job_id": job.get("job_id")})
-
-                        canonical_job_id = upsert_job(job, conn=conn, company_id=company_id)
-                        accepted += 1
-                        report["job_id"] = canonical_job_id
-
-                    # Persistence of compliance report (for all processed jobs)
-                    insert_compliance_report(
-                        conn,
-                        job_id=report.get("job_id"),
-                        job_uid=report["job_uid"],
-                        policy_version=report["policy_version"],
-                        remote_class=report["remote_class"],
-                        geo_class=report["geo_class"],
-                        hard_geo_flag=report["hard_geo_flag"],
-                        base_score=report["base_score"],
-                        penalties=None,
-                        bonuses=None,
-                        final_score=report["final_score"],
-                        final_status=report["final_status"],
-                        decision_vector=report["decision_vector"],
-                    )
-
-                except Exception as exc:
-                    logger.warning(
-                        "employer ingestion job processing failed",
-                        extra={
-                            "company_id": company.get("company_id"),
-                            "ats_provider": provider,
-                            "source_job_id": raw.get("id") if isinstance(raw, dict) else None,
-                            "error": str(exc),
-                            "type": type(exc).__name__,
-                        },
-                    )
-                    skipped += 1
-                    continue
-
+            process_company_jobs(
+                conn,
+                raw_jobs,
+                adapter,
+                company_id,
+                provider,
+                metrics,
+            )
             mark_ats_synced(conn, company.get("company_ats_id"))
 
     except Exception:
         return {
             "fetched": len(raw_jobs),
-            "normalized_count": normalized_count,
+            "normalized_count": metrics.normalized,
             "accepted": 0,
             "skipped": 0,
             "error": "transaction_failed",
         }
 
-    return {
-        "fetched": len(raw_jobs),
-        "normalized_count": normalized_count,
-        "accepted": accepted,
-        "skipped": skipped,
-        "rejected_policy_count": rejected_policy_count,
-        "rejected_by_reason": rejected_by_reason,
-        "remote_model_counts": remote_model_counts,
-        "hard_geo_rejected_count": hard_geo_rejected_count,
-    }
+    return metrics.to_result_dict()
 
 
 def run_employer_ingestion() -> dict:

@@ -6,7 +6,7 @@ from app.domain.jobs.identity import (
     compute_job_uid,
     compute_schema_hash,
 )
-from app.workers.ingestion import employer
+from app.workers.ingestion import employer, process_loop
 
 
 class _NoopTx:
@@ -119,7 +119,7 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
         }
         return job, report
 
-    monkeypatch.setattr(employer, "process_ingested_job", _fake_process_ingested_job)
+    monkeypatch.setattr(process_loop, "process_ingested_job", _fake_process_ingested_job)
 
     def _fake_upsert(job, conn=None, *, company_id=None):
         call_order.append("upsert")
@@ -128,9 +128,9 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
         persisted_jobs.append(dict(job))
         return job["job_id"]
 
-    monkeypatch.setattr(employer, "upsert_job", _fake_upsert)
+    monkeypatch.setattr(process_loop, "upsert_job", _fake_upsert)
     monkeypatch.setattr(
-        employer,
+        process_loop,
         "insert_compliance_report",
         lambda *args, **kwargs: call_order.append("insert_report"),
     )
