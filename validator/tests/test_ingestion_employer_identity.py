@@ -270,3 +270,87 @@ def test_ingest_company_accepts_uuid_company_identifiers(monkeypatch):
     assert persisted_jobs[0]["job_uid"]
     assert persisted_jobs[0]["job_fingerprint"]
     assert sync_markers == [company_ats_uuid]
+
+
+def test_ingest_company_rejected_job_does_not_insert_compliance_report_without_job_id(monkeypatch):
+    last_sync_at = datetime(2026, 1, 10, 12, 0, tzinfo=timezone.utc)
+    company = {
+        "company_ats_id": "company-ats-1",
+        "company_id": "company-1",
+        "ats_provider": "greenhouse",
+        "ats_slug": "acme",
+        "last_sync_at": last_sync_at,
+    }
+    raw_job = {
+        "id": 789,
+        "title": "US-only role",
+        "description": "Remote only in US timezones",
+        "location": {"name": "United States"},
+        "absolute_url": "https://example.com/jobs/789",
+    }
+    normalize_output = {
+        "job_id": "greenhouse:acme:789",
+        "source": "greenhouse:acme",
+        "source_job_id": "789",
+        "source_url": "https://example.com/jobs/789",
+        "title": "US-only role",
+        "company_name": "Acme",
+        "description": "Remote only in US timezones",
+        "remote_source_flag": True,
+        "remote_scope": "US",
+        "status": "new",
+        "first_seen_at": "2026-01-01T00:00:00+00:00",
+    }
+
+    upsert_calls: list[dict] = []
+    report_calls: list[dict] = []
+
+    class _FakeAdapter:
+        active = True
+
+        def fetch(self, _company, updated_since=None):
+            assert updated_since == last_sync_at
+            return [raw_job]
+
+        def normalize(self, _raw_job):
+            return dict(normalize_output)
+
+    monkeypatch.setattr(employer, "get_adapter", lambda _provider: _FakeAdapter())
+    monkeypatch.setattr(employer, "get_engine", lambda: _NoopEngine())
+
+    def _fake_process_ingested_job(job, source):
+        assert source == "greenhouse"
+        report = {
+            "job_id": None,
+            "job_uid": "uid-rejected-1",
+            "policy_version": "v3",
+            "remote_class": RemoteClass.REMOTE_REGION_LOCKED.value,
+            "geo_class": GeoClass.NON_EU.value,
+            "hard_geo_flag": False,
+            "base_score": 0,
+            "final_score": 0,
+            "final_status": "rejected",
+            "decision_vector": [],
+            "policy_reason": "geo_restriction",
+        }
+        return None, report
+
+    monkeypatch.setattr(process_loop, "process_ingested_job", _fake_process_ingested_job)
+    monkeypatch.setattr(
+        process_loop,
+        "upsert_job",
+        lambda job, conn=None, *, company_id=None: upsert_calls.append(dict(job)) or "job-x",
+    )
+    monkeypatch.setattr(
+        process_loop,
+        "insert_compliance_report",
+        lambda *args, **kwargs: report_calls.append(kwargs),
+    )
+    monkeypatch.setattr(employer, "mark_ats_synced", lambda _conn, _company_ats_id: None)
+
+    result = employer.ingest_company(company)
+
+    assert result["accepted"] == 0
+    assert result["skipped"] == 1
+    assert upsert_calls == []
+    assert report_calls == []
