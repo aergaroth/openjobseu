@@ -3,7 +3,8 @@ import re
 from typing import Any
 
 
-def normalize(text: str) -> str:
+def normalize(text: Any) -> str:
+    text = str(text or "")
     text = text.lower()
     text = re.sub(r"\s+", " ", text)
     text = text.strip()

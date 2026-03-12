@@ -73,7 +73,7 @@ def ingest_company(company: dict):
 
     engine = get_engine()
     metrics = IngestionMetrics(fetched_count=len(raw_jobs))
-    company_id = company.get("company_id")
+    company_id = str(company.get("company_id") or "")
     try:
         with engine.begin() as conn:
             process_company_jobs(
