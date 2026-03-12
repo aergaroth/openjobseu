@@ -65,22 +65,25 @@ def process_company_jobs(
                 metrics.observe_accept()
                 report["job_id"] = canonical_job_id
 
-            # Persistence of compliance report (for all processed jobs)
-            insert_compliance_report(
-                conn,
-                job_id=report.get("job_id"),
-                job_uid=report["job_uid"],
-                policy_version=report["policy_version"],
-                remote_class=report["remote_class"],
-                geo_class=report["geo_class"],
-                hard_geo_flag=report["hard_geo_flag"],
-                base_score=report["base_score"],
-                penalties=None,
-                bonuses=None,
-                final_score=report["final_score"],
-                final_status=report["final_status"],
-                decision_vector=report["decision_vector"],
-            )
+            # Persist compliance report only when a canonical job exists.
+            # Rejected jobs are not upserted into jobs table, therefore they
+            # don't have a valid FK target for compliance_reports.job_id.
+            if report.get("job_id"):
+                insert_compliance_report(
+                    conn,
+                    job_id=report["job_id"],
+                    job_uid=report["job_uid"],
+                    policy_version=report["policy_version"],
+                    remote_class=report["remote_class"],
+                    geo_class=report["geo_class"],
+                    hard_geo_flag=report["hard_geo_flag"],
+                    base_score=report["base_score"],
+                    penalties=None,
+                    bonuses=None,
+                    final_score=report["final_score"],
+                    final_status=report["final_status"],
+                    decision_vector=report["decision_vector"],
+                )
 
         except Exception as exc:
             logger.warning(
