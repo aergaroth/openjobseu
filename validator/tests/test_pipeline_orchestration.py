@@ -11,18 +11,23 @@ def test_pipeline_runs_steps_in_order(monkeypatch):
     )
     monkeypatch.setattr(
         pipeline,
+        "run_lifecycle_pipeline",
+        lambda: order.append("lifecycle"),
+    )
+    monkeypatch.setattr(
+        pipeline,
         "run_availability_pipeline",
         lambda: order.append("availability"),
     )
     monkeypatch.setattr(
         pipeline,
-        "run_lifecycle_pipeline",
-        lambda: order.append("lifecycle"),
+        "run_market_metrics_worker",
+        lambda: order.append("market_metrics"),
     )
 
     pipeline.run_pipeline()
 
-    assert order == ["availability", "lifecycle"]
+    assert order == ["lifecycle", "availability", "market_metrics"]
 
 
 def test_pipeline_orchestration_full_flow(monkeypatch):
@@ -42,17 +47,22 @@ def test_pipeline_orchestration_full_flow(monkeypatch):
             },
         }
 
+    def _fake_lifecycle():
+        order.append("lifecycle")
+
     def _fake_availability():
         order.append("availability")
         return {"metrics": {"checked": 5, "expired": 2, "unreachable": 1}}
 
-    def _fake_lifecycle():
-        order.append("lifecycle")
+    def _fake_market_metrics():
+        order.append("market_metrics")
+        return {"metrics": {"component": "market_metrics", "jobs_created": 10}}
 
     info_calls = []
     monkeypatch.setattr(pipeline, "run_employer_ingestion", _fake_employer_ingestion)
-    monkeypatch.setattr(pipeline, "run_availability_pipeline", _fake_availability)
     monkeypatch.setattr(pipeline, "run_lifecycle_pipeline", _fake_lifecycle)
+    monkeypatch.setattr(pipeline, "run_availability_pipeline", _fake_availability)
+    monkeypatch.setattr(pipeline, "run_market_metrics_worker", _fake_market_metrics)
     monkeypatch.setattr(
         pipeline.logger,
         "info",
@@ -63,10 +73,11 @@ def test_pipeline_orchestration_full_flow(monkeypatch):
 
     result = pipeline.run_pipeline()
 
-    assert order == ["ingestion", "availability", "lifecycle"]
+    assert order == ["ingestion", "lifecycle", "availability", "market_metrics"]
     assert result["actions"] == ["employer_ingestion_completed"]
     assert result["metrics"]["ingestion"]["source"] == "employer_ing"
     assert result["metrics"]["availability"]["checked"] == 5
+    assert result["metrics"]["market_metrics"]["component"] == "market_metrics"
 
     finish_calls = [
         call

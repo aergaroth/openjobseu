@@ -6,6 +6,7 @@ from time import perf_counter
 from app.workers.ingestion.employer import run_employer_ingestion
 from app.workers.availability import run_availability_pipeline
 from app.workers.lifecycle import run_lifecycle_pipeline
+from app.workers.market_metrics import run_market_metrics_worker
 
 logger = logging.getLogger("openjobseu.pipeline")
 
@@ -15,8 +16,9 @@ logger = logging.getLogger("openjobseu.pipeline")
 # effect, causing the orchestration order tests to fail.
 PIPELINE_STEPS = [
     ("ingestion", "run_employer_ingestion"),
-    ("availability", "run_availability_pipeline"),
     ("lifecycle", "run_lifecycle_pipeline"),
+    ("availability", "run_availability_pipeline"),
+    ("market_metrics", "run_market_metrics_worker"),
 ]
 
 def _int_metric(value, default: int = 0) -> int:
