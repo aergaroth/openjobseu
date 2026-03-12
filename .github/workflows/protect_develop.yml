@@ -1,0 +1,22 @@
+name: Protect Develop Branch
+
+on:
+  delete:
+
+jobs:
+  recreate-develop:
+    if: github.event.ref == 'develop' && github.event.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Recreate develop branch from main
+        run: |
+          git checkout -b develop
+          git push origin develop
