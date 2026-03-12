@@ -236,7 +236,7 @@ def is_valid_salary_context(text: str, start: int, end: int) -> bool:
     """
     window_start = max(0, start - 40)
     window_end = min(len(text), end + 40)
-    window = text[window_start:window_end]
+    window = text[window_start:window_end].lower()
 
     for word in NEGATIVE_CONTEXT:
         if word in window:
@@ -249,7 +249,11 @@ def is_valid_salary_context(text: str, start: int, end: int) -> bool:
         if word in window:
             return True
 
-    return True
+    # Accept explicit monetary markers even without salary keywords
+    if re.search(r"[€$£]|\b(?:eur|usd|gbp|pln|zł)\b", window):
+        return True
+
+    return False
 
 def extract_salary(description: str, title: Optional[str] = None) -> Dict[str, any] | None:
     """
@@ -268,6 +272,13 @@ def extract_salary(description: str, title: Optional[str] = None) -> Dict[str, a
         parsed_match = _parse_salary_match(window, full_text) 
 
         if parsed_match:
+            match_idx = full_text.find(parsed_match.salary_raw.lower()) if parsed_match.salary_raw else -1
+            if match_idx != -1:
+                match_end = match_idx + len(parsed_match.salary_raw)
+                if not is_valid_salary_context(full_text, match_idx, match_end):
+                    logger.debug(f"Salary rejected by context check: {parsed_match}")
+                    continue
+
             parsed_match.salary_confidence = calculate_confidence(parsed_match, window, full_text)
 
             if parsed_match.salary_confidence < 40:

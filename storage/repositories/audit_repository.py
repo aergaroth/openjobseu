@@ -347,3 +347,69 @@ def get_audit_source_compliance_stats_last_7d() -> list[dict]:
             }
         )
     return result
+
+
+def get_ghost_jobs(days_threshold: int = 3) -> list[dict]:
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT
+                    job_id,
+                    source,
+                    source_job_id,
+                    first_seen_at,
+                    last_seen_at,
+                    (last_seen_at - first_seen_at) AS lifetime
+                FROM job_sources
+                WHERE last_seen_at - first_seen_at < (:days_threshold * INTERVAL '1 day')
+            """),
+            {"days_threshold": int(days_threshold)},
+        ).mappings().all()
+
+    return [dict(row) for row in rows]
+
+
+def get_job_lifetime_stats() -> dict:
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("""
+                SELECT
+                    AVG(last_seen_at - first_seen_at) AS avg_lifetime,
+                    PERCENTILE_CONT(0.5)
+                    WITHIN GROUP (ORDER BY last_seen_at - first_seen_at)
+                    AS median_lifetime
+                FROM job_sources
+            """)
+        ).mappings().one()
+
+    return {
+        "avg_lifetime": row["avg_lifetime"],
+        "median_lifetime": row["median_lifetime"],
+    }
+
+
+def get_repost_candidates(days_threshold: int = 30) -> list[dict]:
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT
+                    j.job_id,
+                    j.company_name,
+                    j.title,
+                    j.first_seen_at,
+                    prev.last_seen_at AS previous_last_seen_at,
+                    (j.first_seen_at - prev.last_seen_at) AS gap
+                FROM jobs j
+                JOIN jobs prev
+                  ON j.job_fingerprint = prev.job_fingerprint
+                 AND j.company_name = prev.company_name
+                 AND j.title = prev.title
+                 AND j.job_id <> prev.job_id
+                WHERE j.first_seen_at > prev.last_seen_at
+                  AND j.first_seen_at - prev.last_seen_at < (:days_threshold * INTERVAL '1 day')
+                ORDER BY j.first_seen_at DESC
+            """),
+            {"days_threshold": int(days_threshold)},
+        ).mappings().all()
+
+    return [dict(row) for row in rows]

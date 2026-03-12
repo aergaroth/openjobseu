@@ -99,7 +99,8 @@ def test_upsert_reuses_same_source_mapping():
                     j.title,
                     js.source,
                     js.source_job_id,
-                    js.job_id AS mapped_job_id
+                    js.job_id AS mapped_job_id,
+                    js.seen_count
                 FROM jobs j
                 JOIN job_sources js ON js.job_id = j.job_id
                 WHERE js.source = 'remotive' AND js.source_job_id = '42'
@@ -113,3 +114,4 @@ def test_upsert_reuses_same_source_mapping():
     assert int(source_rows_count) == 1
     assert row["job_id"] == row["mapped_job_id"]
     assert row["title"] == "Principal Backend Engineer"
+    assert int(row["seen_count"]) == 2

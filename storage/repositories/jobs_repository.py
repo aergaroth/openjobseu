@@ -5,6 +5,7 @@ from sqlalchemy.engine import Connection
 from storage.db_engine import get_engine
 from storage.common import _derive_source_fields, _require_open_conn
 from app.domain.jobs.identity import compute_job_fingerprint, compute_job_uid
+from app.domain.jobs.canonical_identity import compute_canonical_job_id
 from app.domain.money.salary_parser import extract_salary
 
 logger = logging.getLogger(__name__)
@@ -213,13 +214,14 @@ def _upsert_job_source_mapping_in_conn(
             )
             ON CONFLICT (source, source_job_id) DO UPDATE SET
                 job_id = excluded.job_id,
-                source_url = COALESCE(excluded.source_url, job_sources.source_url),
+                source_url = excluded.source_url,
                 first_seen_at = CASE
                     WHEN excluded.first_seen_at < job_sources.first_seen_at
                     THEN excluded.first_seen_at
                     ELSE job_sources.first_seen_at
                 END,
                 last_seen_at = excluded.last_seen_at,
+                seen_count = job_sources.seen_count + 1,
                 updated_at = excluded.updated_at
         """),
         {

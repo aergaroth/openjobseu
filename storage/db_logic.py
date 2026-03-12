@@ -113,6 +113,7 @@ from .repositories.lifecycle_repository import (
     stale_active_jobs_due_to_lifecycle,
     activate_new_jobs_due_to_lifecycle,
     reactivate_stale_jobs_due_to_lifecycle,
+    mark_reposts_due_to_lifecycle,
 )
 from .repositories.availability_repository import (
     get_jobs_for_verification,
@@ -131,4 +132,7 @@ from .repositories.audit_repository import (
     get_audit_source_filter_values,
     get_audit_company_compliance_stats,
     get_audit_source_compliance_stats_last_7d,
+    get_ghost_jobs,
+    get_job_lifetime_stats,
+    get_repost_candidates,
 )

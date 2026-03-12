@@ -92,16 +92,20 @@ def test_lifecycle_pipeline_uses_single_transaction_conn(monkeypatch):
     def _fake_reactivate(conn):
         calls.append(("reactivate", conn))
 
+    def _fake_repost(conn):
+        calls.append(("repost", conn))
+
     monkeypatch.setattr(lifecycle, "expire_jobs_due_to_lifecycle", _fake_expire)
     monkeypatch.setattr(lifecycle, "stale_active_jobs_due_to_lifecycle", _fake_stale)
     monkeypatch.setattr(lifecycle, "activate_new_jobs_due_to_lifecycle", _fake_activate)
     monkeypatch.setattr(lifecycle, "reactivate_stale_jobs_due_to_lifecycle", _fake_reactivate)
+    monkeypatch.setattr(lifecycle, "mark_reposts_due_to_lifecycle", _fake_repost)
     monkeypatch.setattr(lifecycle, "get_engine", lambda: _NoopEngine())
 
     lifecycle.run_lifecycle_pipeline()
 
-    assert len(calls) == 4
-    assert [c[0] for c in calls] == ["expire", "stale", "activate", "reactivate"]
+    assert len(calls) == 5
+    assert [c[0] for c in calls] == ["expire", "stale", "activate", "reactivate", "repost"]
     
     # Verify that all calls shared the same connection object
     assert all(c[1] is not None for c in calls)

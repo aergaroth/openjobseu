@@ -81,3 +81,41 @@ def reactivate_stale_jobs_due_to_lifecycle(conn: Connection) -> int:
         """)
     )
     return result.rowcount
+
+
+def mark_reposts_due_to_lifecycle(conn: Connection, *, days_threshold: int = 30) -> int:
+    """
+    Mark jobs as reposts when there is a previous job with the same
+    fingerprint + company + title whose last_seen_at is within threshold days.
+    Also stores how many qualifying previous jobs were found.
+    """
+    result = conn.execute(
+        text("""
+            UPDATE jobs j
+            SET
+                is_repost = CASE WHEN COALESCE(matches.repost_count, 0) > 0 THEN TRUE ELSE FALSE END,
+                repost_count = COALESCE(matches.repost_count, 0),
+                updated_at = NOW()
+            FROM (
+                SELECT
+                    cur.job_id,
+                    COUNT(prev.job_id) AS repost_count
+                FROM jobs cur
+                LEFT JOIN jobs prev
+                  ON cur.job_fingerprint = prev.job_fingerprint
+                 AND cur.company_name = prev.company_name
+                 AND cur.title = prev.title
+                 AND cur.job_id <> prev.job_id
+                 AND cur.first_seen_at > prev.last_seen_at
+                 AND cur.first_seen_at - prev.last_seen_at < (:days_threshold * INTERVAL '1 day')
+                GROUP BY cur.job_id
+            ) matches
+            WHERE j.job_id = matches.job_id
+              AND (
+                  COALESCE(j.repost_count, 0) <> COALESCE(matches.repost_count, 0)
+                  OR j.is_repost <> (COALESCE(matches.repost_count, 0) > 0)
+              )
+        """),
+        {"days_threshold": int(days_threshold)},
+    )
+    return result.rowcount

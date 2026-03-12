@@ -4,6 +4,7 @@ from app.domain.jobs.identity import (
     compute_schema_hash,
     normalize,
 )
+from app.domain.jobs.canonical_identity import compute_canonical_job_id
 
 
 def test_normalize_lowercases_and_collapses_whitespace():
@@ -75,3 +76,34 @@ def test_compute_schema_hash_uses_schema_not_values():
 
     assert compute_schema_hash(payload_a) == compute_schema_hash(payload_b)
     assert compute_schema_hash(payload_a) != compute_schema_hash(payload_c)
+
+
+def test_compute_canonical_job_id_is_stable_for_equivalent_text():
+    job_a = {
+        "company_name": "  Acme   Corp ",
+        "title": " Senior   Backend Engineer ",
+        "description": " Build APIs\nfor EU clients. ",
+    }
+    job_b = {
+        "company_name": "acme corp",
+        "title": "senior backend engineer",
+        "description": "build apis for eu clients.",
+    }
+
+    assert compute_canonical_job_id(job_a) == compute_canonical_job_id(job_b)
+
+
+def test_compute_canonical_job_id_uses_first_1000_description_chars():
+    prefix = "A" * 1000
+    job_a = {
+        "company_name": "Acme",
+        "title": "Backend Engineer",
+        "description": prefix + "X",
+    }
+    job_b = {
+        "company_name": "Acme",
+        "title": "Backend Engineer",
+        "description": prefix + "Y",
+    }
+
+    assert compute_canonical_job_id(job_a) == compute_canonical_job_id(job_b)

@@ -3,6 +3,7 @@ from storage.db_engine import get_engine
 from storage.db_logic import (
     activate_new_jobs_due_to_lifecycle,
     expire_jobs_due_to_lifecycle,
+    mark_reposts_due_to_lifecycle,
     reactivate_stale_jobs_due_to_lifecycle,
     stale_active_jobs_due_to_lifecycle,
 )
@@ -32,3 +33,4 @@ def run_lifecycle_pipeline(conn: Connection | None = None) -> None:
     stale_active_jobs_due_to_lifecycle(conn)
     activate_new_jobs_due_to_lifecycle(conn)
     reactivate_stale_jobs_due_to_lifecycle(conn)
+    mark_reposts_due_to_lifecycle(conn)
