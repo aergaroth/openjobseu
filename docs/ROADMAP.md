@@ -75,3 +75,9 @@ Non-goals remain unchanged:
 - Controlled company self-publishing workflows (manual/compliance-first)
 - Richer structured metadata once source quality is stable
 - Policy reason taxonomy expansion and review tooling for borderline offers
+
+### Planned features
+
+- public dataset API
+- labour market analytics
+- commercial API plans
