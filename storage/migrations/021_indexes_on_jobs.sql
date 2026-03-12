@@ -10,6 +10,6 @@ CREATE INDEX IF NOT EXISTS idx_jobs_active_taxonomy
 ON jobs (job_family, seniority)
 WHERE availability_status = 'active';
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_jobs_active_dataset
+CREATE INDEX IF NOT EXISTS idx_jobs_active_dataset
 ON jobs (first_seen_at, salary_min_eur)
 WHERE availability_status = 'active';
