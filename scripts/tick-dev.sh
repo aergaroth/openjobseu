@@ -36,24 +36,32 @@ fi
 append_candidate "$FIXED_CLOUD_RUN_URL"
 append_candidate "$LOCAL_URL"
 
+
 for base_url in $CANDIDATES; do
+  # 1. Pobierz token (jeśli gcloud jest dostępny)
+  AUTH_HEADER=""
+  if command -v gcloud >/dev/null 2>&1; then
+    TOKEN=$(gcloud auth print-identity-token 2>/dev/null || true)
+    if [ -n "$TOKEN" ]; then
+      AUTH_HEADER="Authorization: Bearer $TOKEN"
+    fi
+  fi
+
+  # 2. Sprawdź /ready (dodajemy nagłówek)
   ready_body="$(mktemp)"
-  ready_status="$(curl -sS -o "$ready_body" -w "%{http_code}" "${base_url}/ready" || true)"
+  ready_status="$(curl -sS -H "$AUTH_HEADER" -o "$ready_body" -w "%{http_code}" "${base_url}/ready" || true)"
+  
   if [ "${ready_status:-000}" != "200" ]; then
     echo "tick-dev.sh: ${base_url}/ready -> ${ready_status:-000}" >&2
-    cat "$ready_body" >&2 || true
-    rm -f "$ready_body"
+    # ... reszta obsługi błędu ...
     continue
   fi
   rm -f "$ready_body"
 
+  # 3. Wykonaj POST /internal/tick (dodajemy nagłówek)
   tick_body="$(mktemp)"
-  tick_status="$(curl -sS -X POST -o "$tick_body" -w "%{http_code}" "${base_url}/internal/tick?format=text" || true)"
-  if [ "${tick_status:-000}" -ge 200 ] && [ "${tick_status:-000}" -lt 300 ]; then
-    cat "$tick_body"
-    rm -f "$tick_body"
-    exit 0
-  fi
+  tick_status="$(curl -sS -X POST -H "$AUTH_HEADER" -o "$tick_body" -w "%{http_code}" "${base_url}/internal/tick?format=text" || true)"
+  
 
   echo "tick-dev.sh: ${base_url}/internal/tick?format=text -> ${tick_status:-000}" >&2
   cat "$tick_body" >&2 || true
