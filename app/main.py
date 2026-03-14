@@ -2,15 +2,18 @@ import asyncio
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timezone
 import logging
+import os
 
 from fastapi import FastAPI, Request, Response, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from storage.db_engine import get_engine, db_healthcheck
 from storage.db_logic import init_db
 from app.internal import router as internal_router
 from app.api.jobs import router as jobs_router
+from app.security.auth import auth_router, configure_oauth
 from app.logging import configure_logging
 
 
@@ -71,6 +74,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+configure_oauth(app)
+
+
+app.add_middleware(
+    SessionMiddleware,
+    # UWAGA: Ten domyślny klucz jest tylko do celów deweloperskich/testowych.
+    # W środowisku produkcyjnym należy ustawić zmienną środowiskową SESSION_SECRET_KEY.
+    secret_key=os.environ.get("SESSION_SECRET_KEY", "a-very-secret-key-for-dev"),
+)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -79,6 +92,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(internal_router)
 app.include_router(jobs_router)
 

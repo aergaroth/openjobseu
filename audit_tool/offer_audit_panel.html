@@ -78,11 +78,32 @@
     }
     button:disabled { opacity: .65; cursor: wait; }
     button:hover { transform: translateY(-1px); }
+    button.btn-danger { background: linear-gradient(130deg, #7a261c, var(--danger)); }
+    button.btn-secondary { background: linear-gradient(130deg, #4a5a63, var(--muted)); }
     .stats {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
       gap: 10px;
       font-size: 0.88rem;
+    }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      font-size: 0.88rem;
+    }
+    .diff {
+      font-size: 0.75rem;
+      color: #216e39;
+      font-weight: 600;
+      background: #c3f9d1;
+      padding: 2px 6px;
+      border-radius: 10px;
+      display: inline-block;
+    }
+    .diff.zero {
+      color: var(--muted);
+      background: #e6eaed;
     }
     .chip-box {
       border: 1px solid var(--line);
@@ -154,7 +175,7 @@
       padding: 8px 6px;
     }
     th {
-      background: #f5f0e5;
+      background: #cafeba;
       color: #35454f;
       position: sticky;
       top: 0;
@@ -163,6 +184,21 @@
     td a { color: var(--accent-2); text-decoration: none; }
     td a:hover { text-decoration: underline; }
     .mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+    .job-row { cursor: pointer; transition: background .15s; }
+    .job-row:hover { background: #e8e4d9; }
+    .details-row { display: none; background: #faf8f2; }
+    .details-row.open { display: table-row; }
+    .details-row td { padding: 12px 16px; border-bottom: 2px solid var(--line); }
+    .json-dump {
+      margin: 0;
+      padding: 12px;
+      background: #2a3238;
+      color: #e8edf1;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
     .tick-output {
       margin-top: 8px;
       border: 1px solid #cbbca5;
@@ -176,10 +212,18 @@
       overflow: auto;
       font-size: 0.8rem;
     }
+    .pagination {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 14px;
+      align-items: center;
+    }
     .error { color: var(--danger); font-weight: 600; }
     @media (max-width: 1080px) {
       .filters { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
       .stats { grid-template-columns: 1fr; }
+      .metrics-grid { grid-template-columns: repeat(2, 1fr); }
       .audit-stats-grid { grid-template-columns: 1fr; }
       .head { flex-direction: column; align-items: flex-start; }
     }
@@ -190,8 +234,40 @@
     <div class="head">
       <h1>Offer Audit Panel</h1>
       <div class="head-actions">
+        <button id="clear-btn" type="button" class="btn-secondary">Clear Filters</button>
         <button id="refresh-btn" type="button">Refresh</button>
         <button id="tick-btn" type="button">Run /internal/tick</button>
+        <button id="logout-btn" type="button" class="btn-danger" onclick="window.location.href='/logout'">Logout</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="metrics-grid">
+        <div class="chip-box">
+          <h3>Total Jobs</h3>
+          <div class="summary">
+            <strong id="metric-jobs-total">-</strong>
+            <span id="metric-jobs-24h" class="diff zero">+0 (24h)</span>
+          </div>
+        </div>
+        <div class="chip-box">
+          <h3>Total Companies</h3>
+          <div class="summary">
+            <strong id="metric-companies-total">-</strong>
+            <span id="metric-companies-24h" class="diff zero">+0 (24h)</span>
+          </div>
+        </div>
+        <div class="chip-box">
+          <h3>Company ATS</h3>
+          <div class="summary">
+            <strong id="metric-company-ats-total">-</strong>
+            <span id="metric-company-ats-24h" class="diff zero">+0 (24h)</span>
+          </div>
+        </div>
+        <div class="chip-box">
+          <h3>Last Tick At</h3>
+          <div class="summary"><strong id="metric-last-tick-at" style="font-size: 1rem;">-</strong></div>
+        </div>
       </div>
     </div>
 
@@ -295,6 +371,25 @@
       </div>
     </div>
 
+    <div class="panel">
+      <h3>Pipeline controls</h3>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+
+        <button onclick="runTick(this)">Run tick</button>
+
+        <button onclick="runDiscovery(this)">Run discovery</button>
+
+        <button onclick="runCareers(this)">Run careers crawler</button>
+
+        <button onclick="runGuess(this)">Run ATS guessing</button>
+
+      </div>
+
+    </div>
+
+
+
     <div class="panel table-wrap">
       <table>
         <thead>
@@ -315,6 +410,11 @@
         </thead>
         <tbody id="rows"></tbody>
       </table>
+      <div class="pagination">
+        <span id="page-info" style="font-size: 0.85rem; color: var(--muted);"></span>
+        <button id="prev-btn" type="button" style="min-width: 100px;">&laquo; Previous</button>
+        <button id="next-btn" type="button" style="min-width: 100px;">Next &raquo;</button>
+      </div>
     </div>
 
     <div class="panel">
@@ -393,8 +493,9 @@
       body.innerHTML = items.map((job) => {
         const url = esc(job.source_url || "");
         const label = url ? "open" : "";
+        const jobJson = esc(JSON.stringify(job, null, 2));
         return `
-          <tr>
+          <tr class="job-row" onclick="this.nextElementSibling.classList.toggle('open')" title="Click to view raw JSON">
             <td class="mono">${esc(job.job_id)}</td>
             <td>${esc(job.source)}</td>
             <td>${esc(job.title)}</td>
@@ -406,7 +507,12 @@
             <td>${esc(job.compliance_score)}</td>
             <td class="mono">${esc(job.first_seen_at)}</td>
             <td class="mono">${esc(job.last_seen_at)}</td>
-            <td>${url ? `<a href="${url}" target="_blank" rel="noreferrer">${label}</a>` : ""}</td>
+            <td>${url ? `<a href="${url}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">${label}</a>` : ""}</td>
+          </tr>
+          <tr class="details-row">
+            <td colspan="12">
+              <pre class="json-dump">${jobJson}</pre>
+            </td>
           </tr>
         `;
       }).join("");
@@ -497,6 +603,22 @@
       renderCountMap("count-source", data.counts?.source || {});
       renderCountMap("count-compliance", data.counts?.compliance_status || {});
       renderRows(data.items || []);
+
+      // Update pagination state
+      const offsetEl = document.getElementById("offset");
+      const limitEl = document.getElementById("limit");
+      const offset = parseInt(offsetEl.value || "0", 10);
+      const limit = parseInt(limitEl.value || "50", 10);
+      const total = data.total || 0;
+
+      const pageInfo = document.getElementById("page-info");
+      if (pageInfo) {
+        const end = total === 0 ? 0 : Math.min(offset + limit, total);
+        pageInfo.textContent = total === 0 ? "0 - 0 of 0" : `${offset + 1} - ${end} of ${total}`;
+      }
+
+      document.getElementById("prev-btn").disabled = offset <= 0;
+      document.getElementById("next-btn").disabled = (offset + limit) >= total;
     }
 
     async function safeLoadJobs() {
@@ -555,8 +677,39 @@
       }
     }
 
+    function updateDiff(id, value) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const num = parseInt(value, 10) || 0;
+      el.textContent = `+${num} (24h)`;
+      if (num > 0) el.classList.remove("zero");
+      else el.classList.add("zero");
+    }
+
+    async function loadMetrics() {
+      const response = await fetch("/internal/metrics");
+      if (!response.ok) {
+        throw new Error(`metrics request failed with status ${response.status}`);
+      }
+      const data = await response.json();
+      
+      document.getElementById("metric-jobs-total").textContent = data.jobs_total ?? "0";
+      updateDiff("metric-jobs-24h", data.jobs_24h);
+      document.getElementById("metric-companies-total").textContent = data.companies_total ?? "0";
+      updateDiff("metric-companies-24h", data.companies_24h);
+      document.getElementById("metric-company-ats-total").textContent = data.company_ats_total ?? "0";
+      updateDiff("metric-company-ats-24h", data.company_ats_24h);
+      
+      const lastTick = data.last_tick_at ? new Date(data.last_tick_at).toLocaleString() : "N/A";
+      document.getElementById("metric-last-tick-at").textContent = lastTick;
+    }
+
+    async function safeLoadMetrics() {
+      try { await loadMetrics(); } catch (error) { document.getElementById("metric-last-tick-at").textContent = "Error"; }
+    }
+
     async function safeLoadAll() {
-      await Promise.all([safeLoadJobs(), safeLoadAuditStats()]);
+      await Promise.all([safeLoadJobs(), safeLoadAuditStats(), safeLoadMetrics()]);
     }
 
     async function runTickDev() {
@@ -583,6 +736,52 @@
       }
     }
 
+    async function runTick(btn) {
+      await runInternal("/internal/tick?format=text", btn);
+    }
+
+    async function runDiscovery(btn) {
+      await runInternal("/internal/discovery/run", btn);
+    }
+
+    async function runCareers(btn) {
+      await runInternal("/internal/discovery/careers", btn);
+    }
+
+    async function runGuess(btn) {
+      await runInternal("/internal/discovery/guess", btn);
+    }
+
+    async function runInternal(url, btn) {
+      const out = document.getElementById("tick-output");
+      const meta = document.getElementById("tick-meta");
+
+      if (btn) btn.disabled = true;
+      meta.textContent = "running...";
+      out.textContent = "";
+
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          credentials: "same-origin"
+        });
+
+        const text = await response.text();
+
+        if (!response.ok) {
+          throw new Error(text);
+        }
+
+        meta.textContent = url;
+        out.textContent = text || "(ok)";
+      } catch (err) {
+        meta.textContent = "error";
+        out.textContent = String(err);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
     function scheduleLoad() {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(safeLoadJobs, 250);
@@ -594,6 +793,33 @@
       node.addEventListener("input", scheduleLoad);
       node.addEventListener("change", scheduleLoad);
     }
+
+    // Pagination bindings
+    document.getElementById("prev-btn").addEventListener("click", () => {
+      const offsetEl = document.getElementById("offset");
+      const limit = parseInt(document.getElementById("limit").value || "50", 10);
+      let offset = parseInt(offsetEl.value || "0", 10);
+      offsetEl.value = Math.max(0, offset - limit);
+      safeLoadJobs();
+    });
+
+    document.getElementById("next-btn").addEventListener("click", () => {
+      const offsetEl = document.getElementById("offset");
+      const limit = parseInt(document.getElementById("limit").value || "50", 10);
+      let offset = parseInt(offsetEl.value || "0", 10);
+      offsetEl.value = offset + limit;
+      safeLoadJobs();
+    });
+
+    // Clear filters binding
+    document.getElementById("clear-btn").addEventListener("click", () => {
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        el.value = (id === 'limit') ? "50" : (id === 'offset') ? "0" : "";
+      }
+      safeLoadJobs();
+    });
 
     document.getElementById("refresh-btn").addEventListener("click", safeLoadAll);
     document.getElementById("tick-btn").addEventListener("click", runTickDev);

@@ -2,9 +2,15 @@ import logging
 from functools import lru_cache
 from pathlib import Path
 
+from sqlalchemy import text
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse
 
+from app.security.auth import (
+    require_internal_or_user_api_access,
+    require_user_api_access,
+    require_user_login,
+)
 from app.domain.compliance.audit_filter_registry import get_audit_filter_registry
 from app.logging import should_use_text_logs
 from app.utils.tick_formatting import format_tick_summary
@@ -26,6 +32,7 @@ from storage.repositories.discovery_repository import (
     get_discovered_company_ats,
     get_discovery_candidates,
 )
+from storage.db_engine import get_engine
 
 from app.security.internal_access import require_internal_access
 
@@ -34,7 +41,6 @@ logger = logging.getLogger("openjobseu.runtime")
 router = APIRouter(
     prefix="/internal",
     tags=["internal"],
-    dependencies=[Depends(require_internal_access)],
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -47,7 +53,7 @@ def _load_audit_panel_html() -> str:
     return AUDIT_PANEL_PATH.read_text(encoding="utf-8")
 
 
-@router.get("/audit", response_class=HTMLResponse)
+@router.get("/audit", response_class=HTMLResponse, dependencies=[Depends(require_user_login)])
 def audit_panel():
     try:
         content = _load_audit_panel_html()
@@ -58,7 +64,7 @@ def audit_panel():
     return HTMLResponse(content=content)
 
 
-@router.get("/audit/jobs")
+@router.get("/audit/jobs", dependencies=[Depends(require_user_api_access)])
 def audit_jobs(
     status: str | None = Query(None),
     source: str | None = Query(None),
@@ -89,14 +95,14 @@ def audit_jobs(
     )
 
 
-@router.get("/audit/filters")
+@router.get("/audit/filters", dependencies=[Depends(require_user_api_access)])
 def audit_filter_registry():
     payload = get_audit_filter_registry()
     payload["source"] = get_audit_source_filter_values()
     return payload
 
 
-@router.get("/audit/stats/company")
+@router.get("/audit/stats/company", dependencies=[Depends(require_user_api_access)])
 def audit_company_stats(
     min_total_jobs: int = Query(10, ge=0, le=10000),
 ):
@@ -106,7 +112,7 @@ def audit_company_stats(
     }
 
 
-@router.get("/audit/stats/source-7d")
+@router.get("/audit/stats/source-7d", dependencies=[Depends(require_user_api_access)])
 def audit_source_stats_7d():
     return {
         "window": "last_7_days",
@@ -114,7 +120,34 @@ def audit_source_stats_7d():
     }
 
 
-@router.get("/discovery/audit")
+@router.get("/metrics", dependencies=[Depends(require_user_api_access)])
+def internal_metrics():
+    engine = get_engine()
+    query = """
+        SELECT 
+            (SELECT COUNT(*) FROM jobs) as jobs_total,
+            (SELECT COUNT(*) FROM jobs WHERE first_seen_at >= NOW() - INTERVAL '24 hours') as jobs_24h,
+            (SELECT COUNT(*) FROM companies) as companies_total,
+            (SELECT COUNT(*) FROM companies WHERE created_at >= NOW() - INTERVAL '24 hours') as companies_24h,
+            (SELECT COUNT(*) FROM company_ats) as company_ats_total,
+            (SELECT COUNT(*) FROM company_ats WHERE created_at >= NOW() - INTERVAL '24 hours') as company_ats_24h,
+            (SELECT MAX(last_seen_at) FROM jobs) as last_tick_at
+    """
+    with engine.connect() as conn:
+        row = conn.execute(text(query)).mappings().first()
+
+    return {
+        "jobs_total": row["jobs_total"] if row else 0,
+        "jobs_24h": row["jobs_24h"] if row else 0,
+        "companies_total": row["companies_total"] if row else 0,
+        "companies_24h": row["companies_24h"] if row else 0,
+        "company_ats_total": row["company_ats_total"] if row else 0,
+        "company_ats_24h": row["company_ats_24h"] if row else 0,
+        "last_tick_at": row["last_tick_at"].isoformat() if row and row["last_tick_at"] else None,
+    }
+
+
+@router.get("/discovery/audit", dependencies=[Depends(require_user_api_access)])
 def discovery_audit():
     results = get_discovered_company_ats(limit=100)
     return {
@@ -123,7 +156,7 @@ def discovery_audit():
     }
 
 
-@router.get("/discovery/candidates")
+@router.get("/discovery/candidates", dependencies=[Depends(require_user_api_access)])
 def discovery_candidates():
     results = get_discovery_candidates(limit=50)
     return {
@@ -132,7 +165,7 @@ def discovery_candidates():
     }
 
 
-@router.post("/discovery/careers")
+@router.post("/discovery/careers", dependencies=[Depends(require_internal_or_user_api_access)])
 def run_careers():
     metrics = run_careers_discovery()
     return {
@@ -142,7 +175,7 @@ def run_careers():
     }
 
 
-@router.post("/discovery/guess")
+@router.post("/discovery/guess", dependencies=[Depends(require_internal_or_user_api_access)])
 def run_guessing():
     metrics = run_ats_guessing()
     return {
@@ -152,17 +185,17 @@ def run_guessing():
     }
 
 
-@router.post("/discovery/run")
+@router.post("/discovery/run", dependencies=[Depends(require_internal_or_user_api_access)])
 def run_discovery():
     return run_discovery_pipeline()
 
 
-@router.post("/discovery/company-sources")
+@router.post("/discovery/company-sources", dependencies=[Depends(require_internal_access)])
 def run_company_sources():
     return run_company_source_discovery()
 
 
-@router.post("/audit/tick-dev")
+@router.post("/audit/tick-dev", dependencies=[Depends(require_user_api_access)])
 def run_tick_from_audit():
     result = tick(force_text=True)
     if isinstance(result, Response):
@@ -172,19 +205,19 @@ def run_tick_from_audit():
     return result
 
 
-@router.post("/backfill-compliance")
+@router.post("/backfill-compliance", dependencies=[Depends(require_internal_access)])
 def backfill_compliance(limit: int = Query(1000, ge=1, le=10000)):
     updated_count = backfill_missing_compliance_classes(limit=limit)
     return {"status": "ok", "updated_jobs_count": updated_count}
 
 
-@router.post("/backfill-salary")
+@router.post("/backfill-salary", dependencies=[Depends(require_internal_access)])
 def backfill_salary(limit: int = Query(1000, ge=1, le=10000)):
     updated_count = backfill_missing_salary_fields(limit=limit)
     return {"status": "ok", "updated_jobs_count": updated_count}
 
 
-@router.post("/tick")
+@router.post("/tick", dependencies=[Depends(require_internal_or_user_api_access)])
 def manual_tick(
     response_format: str = Query(
         "auto",
