@@ -8,7 +8,7 @@ def test_job_processing_only_for_approved(monkeypatch):
     
     # Mock taxonomy
     taxonomy_calls = []
-    def fake_classify_taxonomy(title):
+    def fake_classify_taxonomy(title, **kwargs):
         taxonomy_calls.append(title)
         return {"job_category": "engineering"}
     monkeypatch.setattr("app.domain.jobs.job_processing.classify_taxonomy", fake_classify_taxonomy)

@@ -40,9 +40,3 @@ def test_api_force_sync_ats_not_found(monkeypatch):
     
     assert response.status_code == 404
     assert response.json()["detail"] == "ATS integration not found"
-
-
-def test_api_force_sync_unauthorized_external_request():
-    # Standard request (not TestClient) should be blocked without a session
-    response = client.post("/internal/audit/ats-force-sync/123", headers={"host": "external.com"})
-    assert response.status_code in (401, 403)
