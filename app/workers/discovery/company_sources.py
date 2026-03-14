@@ -22,14 +22,12 @@ CAREERS_PATHS = [
 ]
 
 
-def _guess_careers(homepage: str) -> str | None:
+def _guess_careers(homepage: str) -> list[str]:
+    """
+    Generates a list of potential careers page URLs based on the homepage.
+    """
     homepage = homepage.rstrip("/")
-    # The original implementation had a bug where it would return on the first
-    # iteration of the loop. This version just returns the first guess, which
-    # is equivalent but clearer.
-    if CAREERS_PATHS:
-        return homepage + CAREERS_PATHS[0]
-    return None
+    return [homepage + path for path in CAREERS_PATHS]
 
 def _fetch_github_remote_companies():
     """
@@ -85,7 +83,17 @@ def run_company_source_discovery():
         if not homepage:
             continue
 
-        careers_url = _guess_careers(homepage)
+        candidate_urls = _guess_careers(homepage)
+        careers_url = None
+        for url in candidate_urls:
+            try:
+                # Use a HEAD request for efficiency to find the first working URL
+                response = requests.head(url, timeout=5, allow_redirects=True)
+                if response.ok:
+                    careers_url = response.url  # Use the final URL after redirects
+                    break
+            except requests.RequestException:
+                continue
 
         with engine.begin() as conn:
             inserted = insert_source_company(
