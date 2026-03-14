@@ -1,26 +1,30 @@
 from fastapi import Request, HTTPException, status
 
-INTERNAL_ACCESS_HEADER = "X-Serverless-Authorization"
-
 
 def require_internal_access(request: Request):
     """
-    Dependency to protect internal endpoints.
+    Protect internal endpoints.
 
-    Allows requests from:
-    - localhost
-    - Cloud Run / Scheduler (via X-Serverless-Authorization header)
+    Allowed:
+    - localhost (development)
+    - TestClient (for unit/integration tests)
+    - any authenticated Cloud Run identity (IAM verified)
     """
 
     client_host = request.client.host if request.client else None
-    headers = request.headers
 
-    is_localhost = client_host in ("127.0.0.1", "localhost", "testclient")
-    has_internal_header = bool(headers.get(INTERNAL_ACCESS_HEADER))
+    # Allow local development and test runs
+    if client_host in ("127.0.0.1", "localhost", "testclient"):
+        return
 
-    if not (is_localhost or has_internal_header):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access to internal endpoints is restricted.",
-        )
-    
+    # Check for identity header from GCP services (e.g. Cloud Run, Scheduler).
+    # This header is added by the proxy when the request is authenticated with an OIDC token.
+    identity = request.headers.get("X-Goog-Authenticated-User-Email")
+
+    if identity:
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Authentication required for internal endpoints",
+    )
