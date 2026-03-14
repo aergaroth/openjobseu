@@ -772,7 +772,8 @@
     }
 
     async function safeLoadAll() {
-      await Promise.all([safeLoadJobs(), safeLoadAuditStats(), safeLoadMetrics()
+      await Promise.all([safeLoadJobs(), safeLoadAuditStats(), safeLoadMetrics(), safeLoadAtsHealth()]);
+    }
 
     async function runTickDev() {
       const button = document.getElementById("tick-btn");
