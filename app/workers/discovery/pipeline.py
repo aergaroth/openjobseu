@@ -7,16 +7,24 @@ KISS
 import json
 from app.workers.discovery.ats_guessing import run_ats_guessing
 from app.workers.discovery.careers_crawler import run_careers_discovery
+from app.workers.discovery.company_sources import run_company_source_discovery
 
 
 def run_discovery_pipeline():
+    sources = run_company_source_discovery()
     careers = run_careers_discovery()
     guessing = run_ats_guessing()
 
     return {
-        "pipeline": "discovery",
-        "careers": careers,
-        "ats_guessing": guessing,
+        "status": "ok",
+        "actions": ["discovery_completed"],
+        "metrics": {
+            "status": "ok",
+            "pipeline": "discovery",
+            "sources": sources,
+            "careers": careers,
+            "ats_guessing": guessing,
+        }
     }
 
 

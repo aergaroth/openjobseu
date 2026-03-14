@@ -104,6 +104,13 @@ Internal endpoints:
 - `GET /internal/audit/stats/company`
 - `GET /internal/audit/stats/source-7d`
 - `POST /internal/audit/tick-dev`
+- `POST /internal/backfill-compliance`
+- `POST /internal/backfill-salary`
+- `GET /internal/discovery/audit`
+- `GET /internal/discovery/candidates`
+- `POST /internal/discovery/careers`
+- `POST /internal/discovery/guess`
+- `POST /internal/discovery/run`
 
 Audit panel data shape:
 - `/internal/audit/filters` returns canonical filter lists and dynamic `source` values from DB

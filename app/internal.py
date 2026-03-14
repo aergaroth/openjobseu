@@ -2,12 +2,16 @@ import logging
 from functools import lru_cache
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse
 
 from app.domain.compliance.audit_filter_registry import get_audit_filter_registry
 from app.logging import should_use_text_logs
 from app.utils.tick_formatting import format_tick_summary
+from app.workers.discovery.ats_guessing import run_ats_guessing
+from app.workers.discovery.careers_crawler import run_careers_discovery
+from app.workers.discovery.pipeline import run_discovery_pipeline
+from app.workers.discovery.company_sources import run_company_source_discovery
 from app.workers.pipeline import run_pipeline
 from storage.db_logic import (
     get_audit_company_compliance_stats,
@@ -18,10 +22,20 @@ from storage.db_logic import (
 
 from app.utils.backfill_compliance import backfill_missing_compliance_classes
 from app.utils.backfill_salary import backfill_missing_salary_fields
+from storage.repositories.discovery_repository import (
+    get_discovered_company_ats,
+    get_discovery_candidates,
+)
+
+from app.security.internal_access import require_internal_access
 
 logger = logging.getLogger("openjobseu.runtime")
 
-router = APIRouter(prefix="/internal", tags=["internal"])
+router = APIRouter(
+    prefix="/internal",
+    tags=["internal"],
+    dependencies=[Depends(require_internal_access)],
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 AUDIT_PANEL_PATH = REPO_ROOT / "audit_tool" / "offer_audit_panel.html"
@@ -98,6 +112,54 @@ def audit_source_stats_7d():
         "window": "last_7_days",
         "items": get_audit_source_compliance_stats_last_7d(),
     }
+
+
+@router.get("/discovery/audit")
+def discovery_audit():
+    results = get_discovered_company_ats(limit=100)
+    return {
+        "count": len(results),
+        "results": results,
+    }
+
+
+@router.get("/discovery/candidates")
+def discovery_candidates():
+    results = get_discovery_candidates(limit=50)
+    return {
+        "count": len(results),
+        "results": results,
+    }
+
+
+@router.post("/discovery/careers")
+def run_careers():
+    metrics = run_careers_discovery()
+    return {
+        "pipeline": "discovery",
+        "phase": "careers_discovery",
+        "metrics": metrics,
+    }
+
+
+@router.post("/discovery/guess")
+def run_guessing():
+    metrics = run_ats_guessing()
+    return {
+        "pipeline": "discovery",
+        "phase": "ats_guessing",
+        "metrics": metrics,
+    }
+
+
+@router.post("/discovery/run")
+def run_discovery():
+    return run_discovery_pipeline()
+
+
+@router.post("/discovery/company-sources")
+def run_company_sources():
+    return run_company_source_discovery()
 
 
 @router.post("/audit/tick-dev")
