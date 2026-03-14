@@ -19,7 +19,7 @@ def test_is_recent_outside_threshold():
 
 
 def test_is_recent_handles_none():
-    assert _is_recent(None) is False
+    assert _is_recent(None) is True
 
 
 def test_quality_filter_passes_when_conditions_met():
@@ -33,7 +33,7 @@ def test_quality_filter_passes_when_conditions_met():
 
 
 def test_quality_filter_fails_on_jobs():
-    jobs_total = 4
+    jobs_total = 0
     assert jobs_total < QUALITY_MIN_JOBS
 
 

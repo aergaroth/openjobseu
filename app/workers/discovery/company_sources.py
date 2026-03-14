@@ -1,12 +1,17 @@
 import logging
 import json
 import re
-import uuid
+import io
+import zipfile
 import requests
-from bs4 import BeautifulSoup
-from sqlalchemy import text
 
 from storage.db_engine import get_engine
+from storage.repositories.discovery_repository import insert_source_company
+
+# Re-eksporty dla zachowania kompatybilności z endpointami w internal.py
+from app.workers.discovery.ats_guessing import run_ats_guessing
+from app.workers.discovery.careers_crawler import run_careers_discovery
+from app.workers.discovery.ats_probe import probe_ats
 
 logger = logging.getLogger("openjobseu.discovery")
 
@@ -26,105 +31,30 @@ def _guess_careers(homepage: str) -> str | None:
         return homepage + CAREERS_PATHS[0]
     return None
 
-def _fetch_yc_companies():
-    """
-    Fetches company data from YC's public directory API.
-    It handles pagination to retrieve all companies for the specified region.
-    """
-    companies = []
-    page = 1
-    known_non_company_paths = {"/companies/jobs", "/companies/launches", "/companies/new", "/companies/exits", "/companies/top"}
-
-    while True:
-        try:
-            # YC uses a browse API to dynamically load companies.
-            response = requests.get(
-                "https://www.ycombinator.com/companies/browse",
-                params={"page": page, "regions[]": "Europe"},
-                headers={"User-Agent": "Mozilla/5.0"},
-                timeout=20,
-            )
-            response.raise_for_status()
-            data = response.json()
-
-            soup = BeautifulSoup(data["html"], "html.parser")
-
-            page_companies = []
-            # The links to company profiles are of the form /companies/<slug>
-            for tag in soup.find_all("a", href=lambda href: href and href.startswith("/companies/")):
-                href = tag["href"]
-
-                # Filter out general links like /companies/jobs or /companies/top/private
-                if href.count('/') > 2 or href in known_non_company_paths:
-                    continue
-
-                name = tag.get_text(strip=True)
-                if not name:
-                    continue
-
-                page_companies.append({
-                    "name": name,
-                    "profile": "https://www.ycombinator.com" + href,
-                })
-
-            if not page_companies:
-                break
-
-            companies.extend(page_companies)
-
-            if not data.get("hasMore"):
-                break
-            page += 1
-        except (requests.RequestException, KeyError, json.JSONDecodeError) as e:
-            logger.warning("Failed to fetch or parse YC companies page.", extra={"page": page, "error": str(e)})
-            break
-
-    # dedupe
-    unique = {c["profile"]: c for c in companies}
-
-    return list(unique.values())
-
-
-def _fetch_company_homepage(profile_url):
-
-    try:
-        response = requests.get(profile_url, timeout=20)
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        website = soup.find("a", {"rel": "noopener"})
-        if website:
-            return website["href"]
-
-    except Exception:
-        return None
-
-    return None
-
-
 def _fetch_github_remote_companies():
     """
     Fetches companies from the popular 'remoteintech/remote-jobs' GitHub repository.
-    Parses the raw Markdown content.
+    Parses the frontmatter from individual Markdown files via repo ZIP archive.
     """
-    url = "https://raw.githubusercontent.com/remoteintech/remote-jobs/main/README.md"
+    url = "https://github.com/remoteintech/remote-jobs/archive/refs/heads/main.zip"
     companies = []
     
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=15)
         response.raise_for_status()
         
-        # Regex to find markdown links mostly in table rows or lists: [Name](http...)
-        # This is a heuristic approach.
-        # Matches: [CompanyName](http://example.com)
-        pattern = re.compile(r"\[(?P<name>[^\]]+)\]\((?P<url>https?://[^)]+)\)")
-        
-        for line in response.text.splitlines():
-            # Skip header lines or table definitions often found in READMEs
-            if "---" in line or "Name" in line and "|" in line:
-                continue
-                
-            for match in pattern.finditer(line):
-                companies.append(match.groupdict())
+        with zipfile.ZipFile(io.BytesIO(response.content)) as z:
+            for filename in z.namelist():
+                if "src/companies/" in filename and filename.endswith(".md"):
+                    content = z.read(filename).decode("utf-8")
+                    name_match = re.search(r'title:\s*["\']?([^"\'\n]+)', content)
+                    url_match = re.search(r'website:\s*["\']?([^"\'\n]+)', content)
+                    
+                    if name_match and url_match:
+                        companies.append({
+                            "name": name_match.group(1).strip(),
+                            "url": url_match.group(1).strip()
+                        })
 
     except Exception as e:
         logger.warning("Failed to fetch GitHub remote companies", extra={"error": str(e)})
@@ -143,7 +73,6 @@ def run_company_source_discovery():
 
     # Aggregate sources
     sources = [
-        _fetch_yc_companies(),
         _fetch_github_remote_companies(),
     ]
     companies = [item for sublist in sources for item in sublist]
@@ -152,42 +81,18 @@ def run_company_source_discovery():
 
         metrics["companies_found"] += 1
 
-        homepage = None
-        if "profile" in c:
-            homepage = _fetch_company_homepage(c["profile"])
-        
+        homepage = c.get("url")
         if not homepage:
-            homepage = c.get("url")
-            if not homepage:
-                continue
+            continue
 
         careers_url = _guess_careers(homepage)
 
         with engine.begin() as conn:
-
-            stmt = text("""
-                INSERT INTO companies (
-                    company_id,
-                    brand_name,
-                    legal_name,
-                    careers_url,
-                    is_active,
-                    bootstrap,
-                    created_at,
-                    updated_at
-                )
-                VALUES (
-                    :uid, :name, :name, :careers_url, true, false, NOW(), NOW()
-                )
-                ON CONFLICT DO NOTHING
-                RETURNING company_id
-            """)
-            result = conn.execute(stmt, {
-                "uid": uuid.uuid4(),
-                "name": c.get("name") or "Unknown",
-                "careers_url": careers_url,
-            })
-            inserted = result.fetchone() is not None
+            inserted = insert_source_company(
+                conn,
+                name=c.get("name") or "Unknown",
+                careers_url=careers_url,
+            )
 
         if inserted:
             metrics["companies_inserted"] += 1

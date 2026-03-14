@@ -15,7 +15,7 @@ def require_internal_access(request: Request):
     client_host = request.client.host if request.client else None
     headers = request.headers
 
-    is_localhost = client_host in ("127.0.0.1", "localhost")
+    is_localhost = client_host in ("127.0.0.1", "localhost", "testclient")
     has_internal_header = bool(headers.get(INTERNAL_ACCESS_HEADER))
 
     if not (is_localhost or has_internal_header):

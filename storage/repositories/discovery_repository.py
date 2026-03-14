@@ -1,3 +1,4 @@
+import uuid
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 from storage.db_engine import get_engine
@@ -5,70 +6,60 @@ from storage.db_engine import get_engine
 engine = get_engine()
 
 
-def insert_company(conn, brand_name: str, homepage: str | None, careers_url: str | None) -> bool:
-    """
-    Insert company discovered from external sources.
-
-    Returns True if a new row was inserted, False if it already existed.
-    """
-
-    stmt = text(
-        """
+def insert_source_company(conn: Connection, name: str, careers_url: str | None) -> bool:
+    stmt = text("""
         INSERT INTO companies (
+            company_id,
             brand_name,
+            legal_name,
+            hq_country,
+            eu_entity_verified,
+            remote_posture,
             careers_url,
-            created_at
+            is_active,
+            bootstrap,
+            created_at,
+            updated_at
         )
         VALUES (
-            :brand_name,
-            :careers_url,
-            NOW()
+            :uid, :name, :name, 'ZZ', false, 'UNKNOWN', :careers_url, true, true, NOW(), NOW()
         )
-        ON CONFLICT (careers_url)
-        DO NOTHING
+        ON CONFLICT DO NOTHING
         RETURNING company_id
-        """
-    )
-
-    result = conn.execute(
-        stmt,
-        {
-            "brand_name": brand_name,
-            "careers_url": careers_url,
-        },
-    )
-
+    """)
+    result = conn.execute(stmt, {
+        "uid": uuid.uuid4(),
+        "name": name,
+        "careers_url": careers_url,
+    })
     return result.fetchone() is not None
 
 
-
-
-def load_discovery_companies(conn: Connection, limit: int = 50) -> list[dict]:
-    rows = conn.execute(
-        text("""
-            SELECT
-                c.company_id,
-                c.legal_name,
-                c.careers_url
-            FROM companies c
-            WHERE c.bootstrap = FALSE
-              AND c.is_active = TRUE
-              AND c.ats_provider IS NULL
-              AND c.careers_url IS NOT NULL
-            ORDER BY c.discovery_last_checked_at NULLS FIRST
-            LIMIT :limit
-        """),
-        {"limit": limit},
-    ).mappings().all()
-
+def load_discovery_companies(conn: Connection, phase: str, limit: int = 50) -> list[dict]:
+    column = "careers_last_checked_at" if phase == "careers" else "ats_guess_last_checked_at"
+    query = f"""
+        SELECT
+            c.company_id,
+            c.legal_name,
+            c.brand_name,
+            c.careers_url
+        FROM companies c
+        WHERE c.is_active = TRUE
+          AND c.ats_provider IS NULL
+          AND c.careers_url IS NOT NULL
+        ORDER BY c.{column} NULLS FIRST
+        LIMIT :limit
+    """
+    rows = conn.execute(text(query), {"limit": limit}).mappings().all()
     return [dict(row) for row in rows]
 
 
-def update_discovery_last_checked_at(conn: Connection, company_id: str) -> None:
+def update_discovery_last_checked_at(conn: Connection, company_id: str, phase: str) -> None:
+    column = "careers_last_checked_at" if phase == "careers" else "ats_guess_last_checked_at"
     conn.execute(
-        text("""
+        text(f"""
             UPDATE companies
-            SET discovery_last_checked_at = NOW()
+            SET {column} = NOW()
             WHERE company_id = :company_id
         """),
         {"company_id": company_id},
@@ -130,11 +121,12 @@ def get_discovery_candidates(limit: int = 50) -> list[dict]:
                     company_id,
                     legal_name,
                     careers_url,
-                    discovery_last_checked_at
+                    careers_last_checked_at,
+                    ats_guess_last_checked_at
                 FROM companies
                 WHERE ats_provider IS NULL
                   AND careers_url IS NOT NULL
-                ORDER BY discovery_last_checked_at NULLS FIRST
+                ORDER BY careers_last_checked_at NULLS FIRST, ats_guess_last_checked_at NULLS FIRST
                 LIMIT :limit
             """),
             {"limit": int(limit)},

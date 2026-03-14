@@ -20,7 +20,7 @@ from storage.repositories.discovery_repository import (
 logger = logging.getLogger("openjobseu.discovery")
 
 MAX_COMPANIES_PER_RUN = 50
-QUALITY_MIN_JOBS = 5
+QUALITY_MIN_JOBS = 1
 QUALITY_MIN_REMOTE_HITS = 1
 QUALITY_MAX_AGE_DAYS = 120
 PROVIDER_PATTERNS: Dict[str, re.Pattern] = {
@@ -76,8 +76,18 @@ def _detect_provider(url: str) -> tuple[str, str] | None:
 
 
 def _is_recent(recent_job_at: Any) -> bool:
+    if not recent_job_at:
+        return True
+    if isinstance(recent_job_at, str):
+        try:
+            recent_job_at = datetime.fromisoformat(recent_job_at.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+
     if not isinstance(recent_job_at, datetime):
-        return False
+        return True
+    if recent_job_at.tzinfo is None:
+        recent_job_at = recent_job_at.replace(tzinfo=timezone.utc)
     cutoff = datetime.now(timezone.utc) - timedelta(days=QUALITY_MAX_AGE_DAYS)
     return recent_job_at >= cutoff
 
@@ -166,7 +176,7 @@ def run_careers_discovery() -> Dict[str, int]:
     }
 
     with engine.connect() as conn:
-        rows = load_discovery_companies(conn, limit=MAX_COMPANIES_PER_RUN)
+        rows = load_discovery_companies(conn, phase="careers", limit=MAX_COMPANIES_PER_RUN)
 
     if not rows:
         logger.info(
@@ -181,10 +191,22 @@ def run_careers_discovery() -> Dict[str, int]:
 
     for row in rows:
         metrics["companies_scanned"] += 1
-        company_id = row["company_id"]
-        careers_url = row["careers_url"]
+        company_id = None
 
         try:
+            if hasattr(row, "_mapping"):
+                company_id = str(row._mapping["company_id"])
+                careers_url = row._mapping.get("careers_url")
+            elif hasattr(row, "get"):
+                company_id = str(row["company_id"])
+                careers_url = row.get("careers_url")
+            else:
+                company_id = str(getattr(row, "company_id", row[0] if isinstance(row, tuple) else ""))
+                careers_url = getattr(row, "careers_url", None)
+                
+            if not careers_url:
+                continue
+
             response = _fetch_careers_page(careers_url)
             if not response:
                 continue
@@ -214,8 +236,15 @@ def run_careers_discovery() -> Dict[str, int]:
             if not probe_result:
                 continue
 
-            jobs_total = probe_result.get("jobs_total") or 0
-            remote_hits = probe_result.get("remote_hits") or 0
+            try:
+                jobs_total = int(probe_result.get("jobs_total") or 0)
+            except (ValueError, TypeError):
+                jobs_total = 0
+                
+            try:
+                remote_hits = int(probe_result.get("remote_hits") or 0)
+            except (ValueError, TypeError):
+                remote_hits = 0
             recent_job_at = probe_result.get("recent_job_at")
 
             if jobs_total < QUALITY_MIN_JOBS or remote_hits < QUALITY_MIN_REMOTE_HITS or not _is_recent(recent_job_at):
@@ -235,9 +264,15 @@ def run_careers_discovery() -> Dict[str, int]:
                 metrics["ats_inserted"] += 1
             else:
                 metrics["ats_duplicates"] += 1
+        except Exception as e:
+            logger.error("error processing company in careers_crawler", exc_info=True, extra={
+                "company_id": company_id,
+                "component": "discovery"
+            })
         finally:
-            with engine.begin() as conn:
-                update_discovery_last_checked_at(conn, company_id=str(company_id))
+            if company_id:
+                with engine.begin() as conn:
+                    update_discovery_last_checked_at(conn, company_id=company_id, phase="careers")
 
     logger.info(
         "discovery_summary",

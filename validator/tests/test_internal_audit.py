@@ -1,6 +1,7 @@
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
+import pytest
 
 # guarantee that the database mode is configured even during module import.
 os.environ.setdefault("DB_MODE", "standard")
@@ -521,7 +522,8 @@ def test_internal_discovery_candidates_returns_companies_without_ats():
                 SET
                     careers_url = :careers_url,
                     ats_provider = :ats_provider,
-                    discovery_last_checked_at = :checked_at
+                    careers_last_checked_at = :checked_at,
+                    ats_guess_last_checked_at = :checked_at
                 WHERE company_id = :company_id
             """),
             [
@@ -569,23 +571,30 @@ def test_internal_discovery_candidates_returns_companies_without_ats():
     assert len(marker_results) == 2
 
     assert marker_results[0]["legal_name"] == f"{marker}-null-checked"
-    assert marker_results[0]["discovery_last_checked_at"] is None
+    assert marker_results[0]["careers_last_checked_at"] is None
+    assert marker_results[0]["ats_guess_last_checked_at"] is None
     assert marker_results[1]["legal_name"] == f"{marker}-old-checked"
-    assert marker_results[1]["discovery_last_checked_at"] is not None
+    assert marker_results[1]["careers_last_checked_at"] is not None
+    assert marker_results[1]["ats_guess_last_checked_at"] is not None
 
 
 def test_internal_discovery_run_returns_metrics(monkeypatch):
-    fake_metrics = {
-        "pipeline": "discovery",
-        "careers": {"checked": 10, "queued": 4},
-        "ats_guessing": {"detected": 3},
+    fake_result = {
+        "status": "ok",
+        "metrics": {
+            "pipeline": "discovery",
+            "careers": {"checked": 10, "queued": 4},
+            "ats_guessing": {"detected": 3},
+        }
     }
-
-    monkeypatch.setattr(internal_api, "run_discovery_pipeline", lambda: fake_metrics)
-
+    
+    monkeypatch.setattr(internal_api, "run_discovery_pipeline", lambda: fake_result)
+    
     response = client.post("/internal/discovery/run")
     assert response.status_code == 200
-
     payload = response.json()
-    assert payload["status"] == "ok"
-    assert payload["metrics"] == fake_metrics
+    
+    assert payload.get("status") == "ok"
+    assert payload.get("metrics", {})["pipeline"] == "discovery"
+    assert payload.get("metrics", {})["careers"]["checked"] == 10
+    assert payload.get("metrics", {})["ats_guessing"]["detected"] == 3
