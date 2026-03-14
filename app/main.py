@@ -79,8 +79,8 @@ configure_oauth(app)
 
 app.add_middleware(
     SessionMiddleware,
-    # UWAGA: Ten domyślny klucz jest tylko do celów deweloperskich/testowych.
-    # W środowisku produkcyjnym należy ustawić zmienną środowiskową SESSION_SECRET_KEY.
+    # WARNING: This default key is for development/testing purposes only.
+    # In a production environment, you must set the SESSION_SECRET_KEY environment variable.
     secret_key=os.environ.get("SESSION_SECRET_KEY", "a-very-secret-key-for-dev"),
 )
 

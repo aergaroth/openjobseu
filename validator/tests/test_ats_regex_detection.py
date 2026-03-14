@@ -20,6 +20,10 @@ def test_detect_workable_slug():
     assert _detect_provider('https://apply.workable.com/acme-io') == ('workable', 'acme-io')
 
 
+def test_detect_ashby_slug():
+    assert _detect_provider('https://jobs.ashbyhq.com/acme-io') == ('ashby', 'acme-io')
+
+
 def test_detect_none_when_missing():
     assert _detect_provider('https://example.com') is None
 

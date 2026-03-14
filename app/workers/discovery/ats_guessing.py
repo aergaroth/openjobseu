@@ -23,6 +23,7 @@ PROVIDERS_TO_PROBE = [
     "greenhouse",
     "lever",
     "workable",
+    "ashby",
 ]
 MAX_SLUG_CANDIDATES = 10
 

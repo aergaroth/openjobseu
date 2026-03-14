@@ -217,17 +217,62 @@ def _classify_seniority(title_lower: str) -> Seniority:
 # PUBLIC API
 # ------------------------------
 
-def classify_taxonomy(title: str) -> Dict[str, str]:
+def classify_taxonomy(
+    title: str,
+    department: str | None = None,
+    job_family: str | None = None,
+    job_role: str | None = None,
+    seniority: str | None = None,
+    specialization: str | None = None,
+) -> Dict[str, str]:
     title_lower = title.lower()
 
-    family = _classify_family(title_lower)
-    role = _classify_role(title_lower, family)
-    seniority = _classify_seniority(title_lower)
-    specialization = _classify_specialization(title_lower)
+    family = JobFamily.UNKNOWN
+    if job_family:
+        try:
+            family = JobFamily(job_family)
+        except ValueError:
+            pass
+
+    if family == JobFamily.UNKNOWN and department:
+        family = _classify_family(department.lower())
+
+    if family == JobFamily.UNKNOWN:
+        family = _classify_family(title_lower)
+
+    role = JobRole.UNKNOWN
+    if job_role:
+        try:
+            role = JobRole(job_role)
+        except ValueError:
+            pass
+
+    if role == JobRole.UNKNOWN:
+        role = _classify_role(title_lower, family)
+
+    resolved_seniority = Seniority.UNKNOWN
+    if seniority:
+        try:
+            resolved_seniority = Seniority(seniority)
+        except ValueError:
+            pass
+
+    if resolved_seniority == Seniority.UNKNOWN:
+        resolved_seniority = _classify_seniority(title_lower)
+
+    spec = Specialization.UNKNOWN
+    if specialization:
+        try:
+            spec = Specialization(specialization)
+        except ValueError:
+            pass
+
+    if spec == Specialization.UNKNOWN:
+        spec = _classify_specialization(title_lower)
     
     return {
         "job_family": family.value,
         "job_role": role.value,
-        "seniority": seniority.value,
-        "specialization": specialization.value,
+        "seniority": resolved_seniority.value,
+        "specialization": spec.value,
     }

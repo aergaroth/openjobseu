@@ -27,6 +27,7 @@ PROVIDER_PATTERNS: Dict[str, re.Pattern] = {
     "greenhouse": re.compile(r"boards\.greenhouse\.io/(?:embed/job_board\?for=)?([a-zA-Z0-9_-]+)", re.IGNORECASE),
     "lever": re.compile(r"jobs\.lever\.co/([a-zA-Z0-9_-]+)", re.IGNORECASE),
     "workable": re.compile(r"apply\.workable\.com/([a-zA-Z0-9_-]+)", re.IGNORECASE),
+    "ashby": re.compile(r"jobs\.ashbyhq\.com/([a-zA-Z0-9_-]+)", re.IGNORECASE),
 }
 
 INVALID_SLUG_KEYWORDS = {

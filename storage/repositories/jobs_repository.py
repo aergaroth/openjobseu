@@ -372,7 +372,8 @@ def _upsert_job_in_conn(
                 salary_source,
                 salary_min_eur,
                 salary_max_eur,
-                salary_transparency_status
+                salary_transparency_status,
+                source_department
             )
             VALUES (
                 :job_id,
@@ -408,7 +409,8 @@ def _upsert_job_in_conn(
                 :salary_source,
                 :salary_min_eur,
                 :salary_max_eur,
-                :salary_transparency_status
+                :salary_transparency_status,
+                :source_department
             )
             ON CONFLICT (job_id) DO UPDATE SET
                 source = COALESCE(jobs.source, excluded.source),
@@ -442,6 +444,7 @@ def _upsert_job_in_conn(
                 salary_min_eur = excluded.salary_min_eur,
                 salary_max_eur = excluded.salary_max_eur,
                 salary_transparency_status = excluded.salary_transparency_status,
+                source_department = excluded.source_department,
                 first_seen_at = CASE
                     WHEN excluded.first_seen_at < jobs.first_seen_at
                     THEN excluded.first_seen_at
@@ -484,6 +487,7 @@ def _upsert_job_in_conn(
             "salary_min_eur": int(job["salary_min_eur"]) if job.get("salary_min_eur") is not None else None,
             "salary_max_eur": int(job["salary_max_eur"]) if job.get("salary_max_eur") is not None else None,
             "salary_transparency_status": job.get("salary_transparency_status"),
+            "source_department": str(job.get("department"))[:255] if job.get("department") else None,
         },
     )
 

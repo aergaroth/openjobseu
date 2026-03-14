@@ -129,6 +129,51 @@ class GreenhouseAdapter(ATSAdapter):
         # Normalize remote_scope using base class method
         normalized_remote_scope = self.normalize_remote_scope(location)
 
+        department = None
+        departments = raw_job.get("departments")
+        if isinstance(departments, list) and departments:
+            dept = departments[0]
+            if isinstance(dept, dict):
+                department = dept.get("name")
+        if department and not isinstance(department, str):
+            department = str(department)
+
+        salary_min = None
+        salary_max = None
+        salary_currency = None
+        salary_period = None
+        salary_source = None
+
+        pay_bounds = raw_job.get("pay_bounds")
+        if isinstance(pay_bounds, list) and len(pay_bounds) > 0:
+            bound = pay_bounds[0]
+            if isinstance(bound, dict):
+                try:
+                    s_min = bound.get("min_value")
+                    s_max = bound.get("max_value")
+                    
+                    if s_min is not None:
+                        salary_min = int(float(s_min))
+                    if s_max is not None:
+                        salary_max = int(float(s_max))
+                        
+                    salary_currency = bound.get("currency")
+                    if isinstance(salary_currency, str):
+                        salary_currency = salary_currency.upper()
+                        
+                    unit = str(bound.get("unit") or "").lower()
+                    if "year" in unit:
+                        salary_period = "yearly"
+                    elif "month" in unit:
+                        salary_period = "monthly"
+                    elif "hour" in unit:
+                        salary_period = "hourly"
+
+                    if salary_min or salary_max:
+                        salary_source = "ats_api"
+                except (ValueError, TypeError):
+                    pass
+
         return {
             "job_id": f"greenhouse:{board_token}:{raw_id}",
             "source": f"greenhouse:{board_token}",
@@ -139,8 +184,14 @@ class GreenhouseAdapter(ATSAdapter):
             "description": cleaned_description.strip(),
             "remote_source_flag": is_remote,
             "remote_scope": normalized_remote_scope,
+            "department": department or None,
             "status": "new",
             "first_seen_at": first_seen_at,
+            "salary_min": salary_min,
+            "salary_max": salary_max,
+            "salary_currency": salary_currency,
+            "salary_period": salary_period,
+            "salary_source": salary_source,
         }
 
     def probe_jobs(self, slug: str) -> dict[str, Any]:

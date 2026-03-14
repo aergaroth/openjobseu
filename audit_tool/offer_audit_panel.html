@@ -372,6 +372,29 @@
     </div>
 
     <div class="panel">
+      <div class="chip-box audit-stats-card">
+        <h3 style="color: var(--danger);">Dead / Stale ATS Integrations (> 3 days without sync)</h3>
+        <div class="table-wrap" style="max-height: 260px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>Provider</th>
+                <th>Slug</th>
+                <th>Last Sync</th>
+                <th>Created</th>
+                <th>Careers URL</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="ats-health-rows"></tbody>
+          </table>
+        </div>
+        <div class="audit-stats-meta" id="ats-health-meta">loading...</div>
+      </div>
+    </div>
+
+    <div class="panel">
       <h3>Pipeline controls</h3>
 
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -383,6 +406,10 @@
         <button onclick="runCareers(this)">Run careers crawler</button>
 
         <button onclick="runGuess(this)">Run ATS guessing</button>
+
+        <button onclick="runAtsReverse(this)">Run ATS reverse discovery</button>
+
+        <button onclick="runBackfillDepartment(this)">Backfill Departments</button>
 
       </div>
 
@@ -398,6 +425,7 @@
             <th>Source</th>
             <th>Title</th>
             <th>Company</th>
+            <th>Source Dept</th>
             <th>Status</th>
             <th>Remote class</th>
             <th>Geo class</th>
@@ -487,7 +515,7 @@
       const body = document.getElementById("rows");
       if (!body) return;
       if (!items || items.length === 0) {
-        body.innerHTML = '<tr><td colspan="12">No jobs found for current filter.</td></tr>';
+        body.innerHTML = '<tr><td colspan="13">No jobs found for current filter.</td></tr>';
         return;
       }
       body.innerHTML = items.map((job) => {
@@ -500,6 +528,7 @@
             <td>${esc(job.source)}</td>
             <td>${esc(job.title)}</td>
             <td>${esc(job.company_name)}</td>
+            <td>${esc(job.source_department)}</td>
             <td>${esc(job.status)}</td>
             <td>${esc(job.remote_class)}</td>
             <td>${esc(job.geo_class)}</td>
@@ -510,7 +539,7 @@
             <td>${url ? `<a href="${url}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">${label}</a>` : ""}</td>
           </tr>
           <tr class="details-row">
-            <td colspan="12">
+            <td colspan="13">
               <pre class="json-dump">${jobJson}</pre>
             </td>
           </tr>
@@ -626,7 +655,7 @@
         await loadJobs();
       } catch (error) {
         const body = document.getElementById("rows");
-        body.innerHTML = `<tr><td class="error" colspan="12">${esc(error.message)}</td></tr>`;
+        body.innerHTML = `<tr><td class="error" colspan="13">${esc(error.message)}</td></tr>`;
       }
     }
 
@@ -677,6 +706,40 @@
       }
     }
 
+    async function loadAtsHealth() {
+      const response = await fetch("/internal/audit/ats-health?days_threshold=3");
+      if (!response.ok) throw new Error(`ats-health request failed`);
+      const payload = await response.json();
+      const body = document.getElementById("ats-health-rows");
+      const items = payload.items || [];
+      if (items.length === 0) {
+        body.innerHTML = '<tr><td colspan="7">All integrations look healthy!</td></tr>';
+      } else {
+        body.innerHTML = items.map(row => `
+          <tr>
+            <td>${esc(row.legal_name)}</td>
+            <td>${esc(row.provider)}</td>
+            <td class="mono">${esc(row.ats_slug)}</td>
+            <td class="mono">${row.last_sync_at ? esc(row.last_sync_at) : 'Never'}</td>
+            <td class="mono">${esc(row.created_at)}</td>
+            <td>${row.careers_url ? `<a href="${esc(row.careers_url)}" target="_blank" rel="noreferrer">open</a>` : "N/A"}</td>
+            <td>
+              <button type="button" style="min-width:auto; padding: 4px 8px; font-size:0.75rem; margin-right: 4px;" onclick="runForceSync(this, '${esc(row.company_ats_id)}')">Force Sync</button>
+              <button type="button" class="btn-danger" style="min-width:auto; padding: 4px 8px; font-size:0.75rem;" onclick="deactivateAts('${esc(row.company_ats_id)}')">Deactivate</button>
+            </td>
+          </tr>
+        `).join("");
+      }
+      document.getElementById("ats-health-meta").textContent = `${items.length} stale integrations found.`;
+    }
+
+    async function safeLoadAtsHealth() {
+      try { await loadAtsHealth(); } catch (e) {
+        const body = document.getElementById("ats-health-rows");
+        if (body) body.innerHTML = `<tr><td class="error" colspan="7">${esc(e.message)}</td></tr>`;
+      }
+    }
+
     function updateDiff(id, value) {
       const el = document.getElementById(id);
       if (!el) return;
@@ -709,8 +772,7 @@
     }
 
     async function safeLoadAll() {
-      await Promise.all([safeLoadJobs(), safeLoadAuditStats(), safeLoadMetrics()]);
-    }
+      await Promise.all([safeLoadJobs(), safeLoadAuditStats(), safeLoadMetrics()
 
     async function runTickDev() {
       const button = document.getElementById("tick-btn");
@@ -750,6 +812,29 @@
 
     async function runGuess(btn) {
       await runInternal("/internal/discovery/guess", btn);
+    }
+
+    async function runAtsReverse(btn) {
+      await runInternal("/internal/discovery/ats-reverse", btn);
+    }
+
+    async function runBackfillDepartment(btn) {
+      await runInternal("/internal/backfill-department", btn);
+    }
+
+    async function runForceSync(btn, companyAtsId) {
+      await runInternal(`/internal/audit/ats-force-sync/${companyAtsId}`, btn);
+    }
+
+    async function deactivateAts(companyAtsId) {
+      if (!confirm("Are you sure you want to deactivate this ATS integration?")) return;
+      try {
+        const response = await fetch(`/internal/audit/ats-deactivate/${companyAtsId}`, { method: 'POST' });
+        if (!response.ok) throw new Error("Deactivation failed");
+        await safeLoadAtsHealth();
+      } catch (e) {
+        alert(e.message);
+      }
     }
 
     async function runInternal(url, btn) {
@@ -829,7 +914,7 @@
         await loadFilterRegistry();
       } catch (error) {
         const body = document.getElementById("rows");
-        body.innerHTML = `<tr><td class="error" colspan="12">${esc(error.message)}</td></tr>`;
+        body.innerHTML = `<tr><td class="error" colspan="13">${esc(error.message)}</td></tr>`;
         return;
       }
       safeLoadAll();

@@ -413,3 +413,36 @@ def get_repost_candidates(days_threshold: int = 30) -> list[dict]:
         ).mappings().all()
 
     return [dict(row) for row in rows]
+
+
+def get_failing_ats_integrations(days_threshold: int = 3) -> list[dict]:
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT
+                    ca.company_ats_id,
+                    c.legal_name,
+                    ca.provider,
+                    ca.ats_slug,
+                    ca.careers_url,
+                    ca.last_sync_at,
+                    ca.created_at
+                FROM company_ats ca
+                JOIN companies c ON c.company_id = ca.company_id
+                WHERE ca.is_active = TRUE
+                  AND c.is_active = TRUE
+                  AND (
+                      ca.last_sync_at < NOW() - (:days_threshold * INTERVAL '1 day')
+                      OR (ca.last_sync_at IS NULL AND ca.created_at < NOW() - (:days_threshold * INTERVAL '1 day'))
+                  )
+                ORDER BY COALESCE(ca.last_sync_at, ca.created_at) ASC
+            """),
+            {"days_threshold": int(days_threshold)},
+        ).mappings().all()
+
+    result = []
+    for row in rows:
+        d = dict(row)
+        d["company_ats_id"] = str(d["company_ats_id"])
+        result.append(d)
+    return result

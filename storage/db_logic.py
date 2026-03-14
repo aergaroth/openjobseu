@@ -123,6 +123,8 @@ from .repositories.availability_repository import (
 from .repositories.ats_repository import (
     load_active_ats_companies,
     mark_ats_synced,
+    get_ats_integration_by_id,
+    deactivate_ats_integration,
 )
 from .repositories.audit_repository import (
     _build_jobs_audit_filter_clauses,
@@ -135,4 +137,5 @@ from .repositories.audit_repository import (
     get_ghost_jobs,
     get_job_lifetime_stats,
     get_repost_candidates,
+    get_failing_ats_integrations,
 )

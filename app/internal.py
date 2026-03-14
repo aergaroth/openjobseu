@@ -18,16 +18,25 @@ from app.workers.discovery.ats_guessing import run_ats_guessing
 from app.workers.discovery.careers_crawler import run_careers_discovery
 from app.workers.discovery.pipeline import run_discovery_pipeline
 from app.workers.discovery.company_sources import run_company_source_discovery
+from app.workers.discovery.ats_reverse import run_ats_reverse_discovery
+from app.adapters.ats.greenhouse import GreenhouseAdapter
+from app.adapters.ats.lever import LeverAdapter
+from app.adapters.ats.workable import WorkableAdapter
+from app.adapters.ats.ashby import AshbyAdapter
 from app.workers.pipeline import run_pipeline
 from storage.db_logic import (
     get_audit_company_compliance_stats,
     get_audit_source_compliance_stats_last_7d,
     get_audit_source_filter_values,
     get_jobs_audit,
+    get_failing_ats_integrations,
+    get_ats_integration_by_id,
+    deactivate_ats_integration,
 )
 
 from app.utils.backfill_compliance import backfill_missing_compliance_classes
 from app.utils.backfill_salary import backfill_missing_salary_fields
+from app.utils.backfill_department import backfill_missing_departments
 from storage.repositories.discovery_repository import (
     get_discovered_company_ats,
     get_discovery_candidates,
@@ -37,6 +46,13 @@ from storage.db_engine import get_engine
 from app.security.internal_access import require_internal_access
 
 logger = logging.getLogger("openjobseu.runtime")
+
+ADAPTER_MAP = {
+    "greenhouse": GreenhouseAdapter,
+    "lever": LeverAdapter,
+    "workable": WorkableAdapter,
+    "ashby": AshbyAdapter,
+}
 
 router = APIRouter(
     prefix="/internal",
@@ -185,6 +201,16 @@ def run_guessing():
     }
 
 
+@router.post("/discovery/ats-reverse", dependencies=[Depends(require_internal_or_user_api_access)])
+def run_ats_reverse():
+    metrics = run_ats_reverse_discovery()
+    return {
+        "pipeline": "discovery",
+        "phase": "ats_reverse",
+        "metrics": metrics,
+    }
+
+
 @router.post("/discovery/run", dependencies=[Depends(require_internal_or_user_api_access)])
 def run_discovery():
     return run_discovery_pipeline()
@@ -215,6 +241,57 @@ def backfill_compliance(limit: int = Query(1000, ge=1, le=10000)):
 def backfill_salary(limit: int = Query(1000, ge=1, le=10000)):
     updated_count = backfill_missing_salary_fields(limit=limit)
     return {"status": "ok", "updated_jobs_count": updated_count}
+
+
+@router.post("/backfill-department", dependencies=[Depends(require_internal_access)])
+def backfill_department():
+    updated_count = backfill_missing_departments()
+    return {"status": "ok", "updated_jobs_count": updated_count}
+
+
+@router.get("/audit/ats-health", dependencies=[Depends(require_user_api_access)])
+def audit_ats_health(days_threshold: int = Query(3, ge=1, le=30)):
+    results = get_failing_ats_integrations(days_threshold=days_threshold)
+    return {
+        "days_threshold": days_threshold,
+        "count": len(results),
+        "items": results,
+    }
+
+
+@router.post("/audit/ats-deactivate/{company_ats_id}", dependencies=[Depends(require_user_api_access)])
+def api_deactivate_ats(company_ats_id: str):
+    with get_engine().begin() as conn:
+        deactivate_ats_integration(conn, company_ats_id)
+    return {"status": "ok", "company_ats_id": company_ats_id}
+
+
+@router.post("/audit/ats-force-sync/{company_ats_id}", dependencies=[Depends(require_user_api_access)])
+def api_force_sync_ats(company_ats_id: str):
+    with get_engine().connect() as conn:
+        ats_integration = get_ats_integration_by_id(conn, company_ats_id)
+        if not ats_integration:
+            raise HTTPException(status_code=404, detail="ATS integration not found")
+
+    provider = ats_integration["ats_provider"]
+    adapter_cls = ADAPTER_MAP.get(provider)
+    if not adapter_cls:
+        raise HTTPException(status_code=400, detail=f"No adapter found for provider: {provider}")
+
+    adapter = adapter_cls()
+    company_dict = {
+        "ats_slug": ats_integration["ats_slug"],
+        "company_id": ats_integration["company_id"],
+        "legal_name": ats_integration["legal_name"],
+    }
+
+    try:
+        raw_jobs = adapter.fetch(company_dict, updated_since=None)
+        job_count = len(raw_jobs)
+        return Response(content=f"Force sync successful. Fetched {job_count} jobs.", media_type="text/plain")
+    except Exception as e:
+        logger.error(f"Force sync failed for {company_ats_id}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Force sync failed: {str(e)}")
 
 
 @router.post("/tick", dependencies=[Depends(require_internal_or_user_api_access)])

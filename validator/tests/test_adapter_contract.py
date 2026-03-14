@@ -4,6 +4,16 @@ import pytest
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.greenhouse import GreenhouseAdapter
+from app.adapters.ats.lever import LeverAdapter
+from app.adapters.ats.workable import WorkableAdapter
+from app.adapters.ats.ashby import AshbyAdapter
+
+ADAPTERS = [
+    GreenhouseAdapter(),
+    LeverAdapter(),
+    WorkableAdapter(),
+    AshbyAdapter(),
+]
 
 
 def test_ats_adapters_expose_fetch_and_normalize_methods():
@@ -40,10 +50,9 @@ def test_ats_adapters_expose_fetch_and_normalize_methods():
     )
 
 
-def test_ats_adapter_contract_fields():
+@pytest.mark.parametrize("adapter", ADAPTERS)
+def test_ats_adapter_contract_fields(adapter):
     """Test that adapters implement required contract fields and methods."""
-    # Test with concrete GreenhouseAdapter
-    adapter = GreenhouseAdapter()
     
     # Check source_name is defined
     assert hasattr(adapter, "source_name"), "Adapter must have source_name attribute"
@@ -60,9 +69,9 @@ def test_ats_adapter_contract_fields():
     assert callable(adapter.normalize_remote_scope), "normalize_remote_scope must be callable"
 
 
-def test_normalize_remote_scope_mapping():
+@pytest.mark.parametrize("adapter", ADAPTERS)
+def test_normalize_remote_scope_mapping(adapter):
     """Test that normalize_remote_scope correctly maps location strings."""
-    adapter = GreenhouseAdapter()
     
     # Test Europe variants
     assert adapter.normalize_remote_scope("Remote - Europe") == "europe"
@@ -84,20 +93,88 @@ def test_normalize_remote_scope_mapping():
     assert adapter.normalize_remote_scope("Berlin, Germany") == "berlin, germany"
 
 
-def test_normalized_job_has_required_fields():
+VALID_JOBS = [
+    (
+        GreenhouseAdapter(),
+        {
+            "id": 12345,
+            "title": "Senior Python Developer",
+            "content": "<p>We are looking for a senior Python developer...</p>",
+            "absolute_url": "https://boards.greenhouse.io/company/jobs/12345",
+            "location": {"name": "Remote - Europe"},
+            "departments": [{"name": "Engineering"}],
+            "updated_at": "2024-01-15T10:00:00Z",
+            "_ats_board_token": "test-company",
+            "pay_bounds": [
+                {
+                    "min_value": 80000,
+                    "max_value": 100000,
+                    "unit": "YEAR"
+                }
+            ]
+        }
+    ),
+    (
+        LeverAdapter(),
+        {
+            "id": "12345-abc",
+            "text": "Senior Python Developer",
+            "descriptionPlain": "We are looking for a senior Python developer...",
+            "hostedUrl": "https://jobs.lever.co/test-company/12345-abc",
+            "categories": {"location": "Remote - Europe", "department": "Engineering"},
+            "createdAt": "2024-01-15T10:00:00Z",
+            "_ats_slug": "test-company",
+            "salaryRange": {
+                "min": 90000,
+                "max": 110000,
+                "currency": "EUR",
+                "interval": "per year"
+            }
+        }
+    ),
+    (
+        WorkableAdapter(),
+        {
+            "shortcode": "ABC123XYZ",
+            "title": "Senior Python Developer",
+            "description": "<p>We are looking for a senior Python developer...</p>",
+            "url": "https://apply.workable.com/test-company/j/ABC123XYZ/",
+            "location": {"country": "Remote - Europe"},
+            "department": ["Engineering"],
+            "published": "2024-01-15T10:00:00Z",
+            "_ats_slug": "test-company",
+            "salary": {
+                "min": 70000,
+                "max": 85000,
+                "currency": "GBP",
+                "unit": "yearly"
+            }
+        }
+    ),
+    (
+        AshbyAdapter(),
+        {
+            "id": "123-ashby-456",
+            "title": "Senior Python Developer",
+            "descriptionHtml": "<p>We are looking for a senior Python developer...</p>",
+            "jobUrl": "https://jobs.ashbyhq.com/test-company/123-ashby-456",
+            "location": "Remote - Europe",
+            "departmentName": "Engineering",
+            "publishedAt": "2024-01-15T10:00:00Z",
+            "_ats_slug": "test-company",
+            "compensationTier": {
+                "minAmount": 100000,
+                "maxAmount": 120000,
+                "currencyCode": "USD",
+                "interval": "year"
+            }
+        }
+    ),
+]
+
+@pytest.mark.parametrize("adapter, raw_job", VALID_JOBS)
+def test_normalized_job_has_required_fields(adapter, raw_job):
     """Test that normalize() returns a dict with required canonical fields."""
-    adapter = GreenhouseAdapter()
-    
-    # Mock raw job data (with _ats_board_token injected by fetch)
-    raw_job = {
-        "id": 12345,
-        "title": "Senior Python Developer",
-        "content": "<p>We are looking for a senior Python developer...</p>",
-        "absolute_url": "https://boards.greenhouse.io/company/jobs/12345",
-        "location": {"name": "Remote - Europe"},
-        "updated_at": "2024-01-15T10:00:00Z",
-        "_ats_board_token": "test-company",
-    }
     
     normalized = adapter.normalize(raw_job)
     
@@ -116,45 +193,54 @@ def test_normalized_job_has_required_fields():
     assert normalized["remote_scope"] == "europe", "remote_scope should be normalized"
     
     # Verify values
-    assert normalized["source_job_id"] == "12345"
+    assert str(normalized["source_job_id"]) in str(raw_job.get("id") or raw_job.get("shortcode"))
     assert normalized["title"] == "Senior Python Developer"
     assert len(normalized["description"]) > 0
+    assert normalized.get("department") == "Engineering", "Department should be extracted"
+    
+    # Extra validation for transparent ATS structured data (e.g. Ashby)
+    if raw_job.get("compensationTier"):
+        assert normalized["salary_min"] == 100000
+        assert normalized["salary_max"] == 120000
+        assert normalized["salary_source"] == "ats_api"
+    elif raw_job.get("pay_bounds"):
+        assert normalized["salary_min"] == 80000
+        assert normalized["salary_max"] == 100000
+        assert normalized["salary_source"] == "ats_api"
+    elif raw_job.get("salaryRange"):
+        assert normalized["salary_min"] == 90000
+        assert normalized["salary_max"] == 110000
+        assert normalized["salary_source"] == "ats_api"
+    elif raw_job.get("salary"):
+        assert normalized["salary_min"] == 70000
+        assert normalized["salary_max"] == 85000
+        assert normalized["salary_source"] == "ats_api"
 
 
-def test_normalized_job_skips_invalid_data():
+INVALID_JOBS = [
+    # Greenhouse missing attributes
+    (GreenhouseAdapter(), {"id": 12345, "content": "Description", "absolute_url": "http://example.com", "_ats_board_token": "test"}),
+    (GreenhouseAdapter(), {"title": "Developer", "content": "Description", "absolute_url": "http://example.com", "_ats_board_token": "test"}),
+    (GreenhouseAdapter(), {"id": 12345, "title": "Developer", "content": "Description", "_ats_board_token": "test"}),
+    # Lever missing attributes
+    (LeverAdapter(), {"id": "123", "descriptionPlain": "Desc", "hostedUrl": "http://example.com", "_ats_slug": "test"}),
+    (LeverAdapter(), {"text": "Developer", "descriptionPlain": "Desc", "hostedUrl": "http://example.com", "_ats_slug": "test"}),
+    (LeverAdapter(), {"id": "123", "text": "Developer", "descriptionPlain": "Desc", "_ats_slug": "test"}),
+    # Workable missing attributes (URL is optional as workable adapter has a fallback for it)
+    (WorkableAdapter(), {"shortcode": "123", "description": "Desc", "url": "http://example.com", "_ats_slug": "test"}),
+    (WorkableAdapter(), {"title": "Developer", "description": "Desc", "url": "http://example.com", "_ats_slug": "test"}),
+    # Ashby missing attributes
+    (AshbyAdapter(), {"id": "123", "descriptionHtml": "Desc", "jobUrl": "http://example.com", "_ats_slug": "test"}),
+    (AshbyAdapter(), {"title": "Developer", "descriptionHtml": "Desc", "jobUrl": "http://example.com", "_ats_slug": "test"}),
+]
+
+@pytest.mark.parametrize("adapter, raw_job", INVALID_JOBS)
+def test_normalized_job_skips_invalid_data(adapter, raw_job):
     """Test that normalize() returns None for invalid/incomplete job data."""
-    adapter = GreenhouseAdapter()
-    
-    # Missing title
-    raw_job_no_title = {
-        "id": 12345,
-        "content": "Description",
-        "absolute_url": "https://example.com/job",
-        "_ats_board_token": "test-company",
-    }
-    assert adapter.normalize(raw_job_no_title) is None
-    
-    # Missing ID
-    raw_job_no_id = {
-        "title": "Developer",
-        "content": "Description",
-        "absolute_url": "https://example.com/job",
-        "_ats_board_token": "test-company",
-    }
-    assert adapter.normalize(raw_job_no_id) is None
-    
-    # Missing URL
-    raw_job_no_url = {
-        "id": 12345,
-        "title": "Developer",
-        "content": "Description",
-        "_ats_board_token": "test-company",
-    }
-    assert adapter.normalize(raw_job_no_url) is None
+    assert adapter.normalize(raw_job) is None
 
 
-def test_adapter_inheritance():
+@pytest.mark.parametrize("adapter", ADAPTERS)
+def test_adapter_inheritance(adapter):
     """Test that adapters properly inherit from ATSAdapter base class."""
-    adapter = GreenhouseAdapter()
-    
     assert isinstance(adapter, ATSAdapter), "Adapter must inherit from ATSAdapter"

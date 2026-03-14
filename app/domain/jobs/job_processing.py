@@ -91,7 +91,10 @@ def process_ingested_job(job: dict, source: str) -> Tuple[Optional[dict], dict]:
     processed_job = job_after_policy
 
     # 3. Taxonomy
-    taxonomy = classify_taxonomy(str(processed_job.get("title") or ""))
+    taxonomy = classify_taxonomy(
+        title=str(processed_job.get("title") or ""),
+        department=processed_job.get("department"),
+    )
     processed_job.update(taxonomy)
 
     # 4. Salary
