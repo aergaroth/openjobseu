@@ -1,6 +1,8 @@
 import logging
 from typing import Any, Dict
 
+import requests
+
 from app.adapters.ats.registry import get_adapter
 
 logger = logging.getLogger("openjobseu.discovery")
@@ -32,6 +34,30 @@ def probe_ats(provider: str, slug: str) -> Dict[str, Any] | None:
     except NotImplementedError as exc:
         logger.warning(
             "discovery probe skipped because adapter probe is not implemented",
+            extra={
+                "component": "discovery",
+                "phase": "probe",
+                "provider": normalized_provider,
+                "slug": normalized_slug,
+                "error": str(exc),
+            },
+        )
+        return None
+    except requests.RequestException as exc:
+        # 404s and network errors are expected during blind probing/guessing
+        logger.debug(
+            "discovery probe request failed",
+            extra={
+                "component": "discovery",
+                "phase": "probe",
+                "provider": normalized_provider,
+                "slug": normalized_slug,
+            },
+        )
+        return None
+    except Exception as exc:
+        logger.warning(
+            "discovery probe unexpected error",
             extra={
                 "component": "discovery",
                 "phase": "probe",
