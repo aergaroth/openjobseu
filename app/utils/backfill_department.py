@@ -31,7 +31,8 @@ def backfill_missing_departments() -> int:
     with engine.connect() as conn:
         companies = load_active_ats_companies(conn)
 
-    for row in companies:
+    total = len(companies)
+    for idx, row in enumerate(companies, 1):
         company = dict(row)
         provider = company.get("provider")
         adapter_cls = ADAPTER_MAP.get(provider)
@@ -81,6 +82,12 @@ def backfill_missing_departments() -> int:
 
         except Exception as e:
             logger.warning("backfill_department_failed", extra={"company_id": company.get("company_id"), "error": str(e)})
+
+        if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
+            pct = int((idx / total) * 100)
+            filled = int(20 * idx / total)
+            bar = "█" * filled + "-" * (20 - filled)
+            logger.info(f"employer_ingestion progress: [{bar}] {pct}% ({idx}/{total})")
 
     logger.info("backfill_department_completed", extra={"updated_count": updated_count})
     return updated_count

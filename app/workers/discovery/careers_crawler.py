@@ -19,7 +19,7 @@ from storage.repositories.discovery_repository import (
 
 logger = logging.getLogger("openjobseu.discovery")
 
-MAX_COMPANIES_PER_RUN = 50
+MAX_COMPANIES_PER_RUN = 10
 QUALITY_MIN_JOBS = 1
 QUALITY_MIN_REMOTE_HITS = 1
 QUALITY_MAX_AGE_DAYS = 120
@@ -190,7 +190,8 @@ def run_careers_discovery() -> Dict[str, int]:
         )
         return metrics
 
-    for row in rows:
+    total = len(rows)
+    for idx, row in enumerate(rows, 1):
         metrics["companies_scanned"] += 1
         company_id = None
 

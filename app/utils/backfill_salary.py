@@ -91,7 +91,10 @@ def backfill_missing_salary_fields(limit: int = 1000) -> int:
                 logger.error(f"Failed to update salary batch: {e}")
 
         processed += len(batch)
-        logger.info(f"Salary backfill progress: {processed}/{total_found} (updated: {updated})")
+        pct = int((processed / total_found) * 100)
+        filled = int(20 * processed / total_found)
+        bar = "█" * filled + "-" * (20 - filled)
+        logger.info(f"salary_backfill progress: [{bar}] {pct}% ({processed}/{total_found}) | updated: {updated}")
 
     logger.info(f"Salary backfill finished. Total jobs updated: {updated}")
     return updated

@@ -92,9 +92,12 @@ def run_ats_reverse_discovery() -> dict[str, int]:
     }
 
     slugs_to_test = _load_slugs()
+    total = len(PROVIDERS_TO_PROBE) * len(slugs_to_test)
+    idx = 0
 
     for provider in PROVIDERS_TO_PROBE:
         for slug in slugs_to_test:
+            idx += 1
             # Deduplication check before querying API to save requests
             with engine.connect() as conn:
                 exists = conn.execute(
@@ -169,6 +172,12 @@ def run_ats_reverse_discovery() -> dict[str, int]:
                 metrics["ats_inserted"] += 1
             else:
                 metrics["ats_duplicates"] += 1
+                
+            if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
+                pct = int((idx / total) * 100)
+                filled = int(20 * idx / total)
+                bar = "█" * filled + "-" * (20 - filled)
+                logger.info(f"ats_reverse progress: [{bar}] {pct}% ({idx}/{total})")
 
     logger.info(
         "ats_reverse_discovery_summary",

@@ -15,7 +15,7 @@ from storage.repositories.discovery_repository import (
 
 logger = logging.getLogger("openjobseu.discovery")
 
-MAX_COMPANIES_PER_RUN = 50
+MAX_COMPANIES_PER_RUN = 5
 QUALITY_MIN_JOBS = 1
 QUALITY_MIN_REMOTE_HITS = 0
 QUALITY_MAX_AGE_DAYS = 120
@@ -103,7 +103,8 @@ def run_ats_guessing() -> dict[str, int]:
     with engine.connect() as conn:
         companies = load_discovery_companies(conn, phase="ats_guessing", limit=MAX_COMPANIES_PER_RUN)
 
-    for row in companies:
+    total = len(companies)
+    for idx, row in enumerate(companies, 1):
         metrics["companies_scanned"] += 1
         company_id = None
 

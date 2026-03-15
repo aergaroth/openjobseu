@@ -4,11 +4,12 @@ import re
 import io
 import zipfile
 import requests
+from sqlalchemy import text
 
 from storage.db_engine import get_engine
 from storage.repositories.discovery_repository import insert_source_company
 
-# Re-eksporty dla zachowania kompatybilności z endpointami w internal.py
+# Re-exports for compatibility with endpoints  internal.py
 from app.workers.discovery.ats_guessing import run_ats_guessing
 from app.workers.discovery.careers_crawler import run_careers_discovery
 from app.workers.discovery.ats_probe import probe_ats
@@ -64,9 +65,14 @@ def run_company_source_discovery():
 
     engine = get_engine()
 
+    with engine.connect() as conn:
+        existing = conn.execute(text("SELECT brand_name FROM companies WHERE brand_name IS NOT NULL")).fetchall()
+        existing_names = {row[0].lower() for row in existing}
+
     metrics = {
         "companies_found": 0,
         "companies_inserted": 0,
+        "companies_skipped": 0,
     }
 
     # Aggregate sources
@@ -75,9 +81,14 @@ def run_company_source_discovery():
     ]
     companies = [item for sublist in sources for item in sublist]
 
-    for c in companies:
-
+    total = len(companies)
+    for idx, c in enumerate(companies, 1):
         metrics["companies_found"] += 1
+
+        name = c.get("name") or "Unknown"
+        if name.lower() in existing_names:
+            metrics["companies_skipped"] += 1
+            continue
 
         homepage = c.get("url")
         if not homepage:
@@ -88,7 +99,7 @@ def run_company_source_discovery():
         for url in candidate_urls:
             try:
                 # Use a HEAD request for efficiency to find the first working URL
-                response = requests.head(url, timeout=5, allow_redirects=True)
+                response = requests.head(url, timeout=3, allow_redirects=True)
                 if response.ok:
                     careers_url = response.url  # Use the final URL after redirects
                     break
@@ -98,12 +109,19 @@ def run_company_source_discovery():
         with engine.begin() as conn:
             inserted = insert_source_company(
                 conn,
-                name=c.get("name") or "Unknown",
+                name=name,
                 careers_url=careers_url,
             )
 
         if inserted:
             metrics["companies_inserted"] += 1
+            existing_names.add(name.lower())
+            
+        if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
+            pct = int((idx / total) * 100)
+            filled = int(20 * idx / total)
+            bar = "█" * filled + "-" * (20 - filled)
+            logger.info(f"company_sources progress: [{bar}] {pct}% ({idx}/{total})")
 
     logger.info(
         "company_source_discovery",

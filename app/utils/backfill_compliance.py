@@ -139,7 +139,10 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
                 logger.error(f"Failed to update batch: {e}")
 
         processed += len(batch)
-        logger.info(f"Progress: {processed}/{total_found} (updated: {updated})")
+        pct = int((processed / total_found) * 100)
+        filled = int(20 * processed / total_found)
+        bar = "█" * filled + "-" * (20 - filled)
+        logger.info(f"compliance_backfill progress: [{bar}] {pct}% ({processed}/{total_found}) | updated: {updated}")
 
     logger.info(f"Backfill finished. Total jobs updated: {updated}")
     return updated
