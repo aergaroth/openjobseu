@@ -11,13 +11,6 @@ def test_maintenance_pipeline_updates_company_stats(clean_db):
     comp2_id = str(uuid.uuid4())
 
     with engine.begin() as conn:
-        # Ensure new columns exist in the persistent test database (in case migrations haven't run)
-        conn.execute(text("""
-            ALTER TABLE companies ADD COLUMN IF NOT EXISTS total_jobs_count INTEGER NOT NULL DEFAULT 0;
-            ALTER TABLE companies ADD COLUMN IF NOT EXISTS rejected_jobs_count INTEGER NOT NULL DEFAULT 0;
-            ALTER TABLE companies ADD COLUMN IF NOT EXISTS last_active_job_at TIMESTAMP WITH TIME ZONE;
-        """))
-
         # Insert dummy companies
         conn.execute(text("""
             INSERT INTO companies (company_id, legal_name, bootstrap, is_active, hq_country, remote_posture, eu_entity_verified, created_at, updated_at)
