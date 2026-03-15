@@ -1,7 +1,7 @@
 import uuid
 from sqlalchemy import text
 from storage.db_engine import get_engine
-from storage.db_logic import init_db, upsert_job
+from storage.db_logic import upsert_job
 
 
 def make_job(**overrides):
@@ -25,7 +25,6 @@ def make_job(**overrides):
 def test_upsert_job_extracts_and_normalizes_salary_to_eur():
     # 1. Setup
     engine = get_engine()
-    init_db()  # Ensure schema is up to date
 
     # 2. Test Data
     job_to_insert = make_job(

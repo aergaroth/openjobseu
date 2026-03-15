@@ -4,77 +4,11 @@ while keeping its original public API.
 '''
 
 import logging
-from pathlib import Path
-from datetime import datetime, timezone
-from sqlalchemy import text
-from sqlalchemy.engine import Connection
 from storage.db_engine import get_engine
 from app.domain.taxonomy.taxonomy import classify_taxonomy
-from .common import _string_like, _derive_source_fields, _require_open_conn
 
 engine = get_engine()
-MIGRATIONS_PATH = Path("storage/migrations")
 logger = logging.getLogger(__name__)
-
-def init_db():
-    db_engine = get_engine()
-
-    with db_engine.begin() as conn:
-        conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS schema_migrations (
-                version INTEGER PRIMARY KEY,
-                applied_at TIMESTAMPTZ NOT NULL
-            )
-        """))
-
-        applied_rows = conn.execute(text("SELECT version FROM schema_migrations"))
-        applied_versions = {row[0] for row in applied_rows}
-
-        migration_files = sorted(MIGRATIONS_PATH.glob("*.sql"))
-        migration_versions = {int(file.name.split("_")[0]) for file in migration_files}
-
-        if not applied_versions:
-            existing_jobs = conn.execute(
-                text("SELECT to_regclass('public.jobs')")
-            ).scalar_one_or_none()
-            existing_companies = conn.execute(
-                text("SELECT to_regclass('public.companies')")
-            ).scalar_one_or_none()
-
-            if existing_jobs and existing_companies:
-                # Legacy databases may already contain baseline tables but miss
-                # the migration ledger. Mark only baseline schema as applied so
-                # newer migrations still run.
-                baseline_versions = {1, 2} & migration_versions
-                now = datetime.now(timezone.utc)
-                conn.execute(
-                    text("""
-                        INSERT INTO schema_migrations (version, applied_at)
-                        VALUES (:version, :applied_at)
-                        ON CONFLICT (version) DO NOTHING
-                    """),
-                    [
-                        {"version": version, "applied_at": now}
-                        for version in sorted(baseline_versions)
-                    ],
-                )
-                applied_versions = set(baseline_versions)
-
-        for migration_file in migration_files:
-            version = int(migration_file.name.split("_")[0])
-            if version in applied_versions:
-                continue
-
-            sql = migration_file.read_text()
-            conn.execute(text(sql))
-            conn.execute(
-                text("""
-                    INSERT INTO schema_migrations (version, applied_at)
-                    VALUES (:version, :applied_at)
-                """),
-                {"version": version, "applied_at": datetime.now(timezone.utc)},
-            )
-
 
 # -------------------------------------------------------------------
 # Public storage facade

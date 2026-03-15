@@ -9,12 +9,14 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
+from sqlalchemy import text
 from storage.db_engine import get_engine, db_healthcheck
-from storage.db_logic import init_db
 from app.internal import router as internal_router
 from app.api.jobs import router as jobs_router
 from app.security.auth import auth_router, configure_oauth
 from app.logging import configure_logging
+from alembic import command
+from alembic.config import Config
 
 
 configure_logging()
@@ -27,7 +29,21 @@ READINESS_EXEMPT_PATHS = {"/health", "/ready"}
 
 
 def _run_db_bootstrap_once() -> None:
-    init_db()
+    alembic_cfg = Config("alembic.ini")
+    alembic_cfg.attributes["configure_logger"] = False
+    engine = get_engine()
+
+    # Auto-adopt existing legacy databases (e.g. Neon Prod/Dev) without crashing
+    with engine.connect() as conn:
+        jobs_exist = conn.execute(text("SELECT to_regclass('public.jobs')")).scalar_one_or_none()
+        alembic_exists = conn.execute(text("SELECT to_regclass('public.alembic_version')")).scalar_one_or_none()
+        
+        if jobs_exist and not alembic_exists:
+            logger.info("Legacy database schema detected. Auto-stamping Alembic baseline.")
+            command.stamp(alembic_cfg, "head")
+            conn.commit()
+
+    command.upgrade(alembic_cfg, "head")
     db_healthcheck()
 
 

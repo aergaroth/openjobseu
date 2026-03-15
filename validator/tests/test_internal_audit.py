@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 import app.internal as internal_api
 from app.domain.taxonomy.enums import ComplianceStatus, GeoClass, RemoteClass
 from app.main import app
-from storage.db_logic import init_db, upsert_job
+from storage.db_logic import upsert_job
 from storage.db_engine import get_engine
 from sqlalchemy import text
 
@@ -129,7 +129,6 @@ def test_internal_audit_filter_registry():
 
 
 def test_internal_audit_jobs_filters_and_counts():
-    init_db()
     marker = "audit-panel-20260221"
 
     job_1 = _make_job(
@@ -239,7 +238,6 @@ def test_internal_audit_tick_dev_runs_tick_with_text_output(monkeypatch):
 
 
 def test_internal_audit_company_stats():
-    init_db()
     marker = "audit-company-stats-20260304"
     company_low = _insert_company(f"{marker}-low")
     company_high = _insert_company(f"{marker}-high")
@@ -335,7 +333,6 @@ def test_internal_audit_company_stats():
 
 
 def test_internal_audit_source_stats_7d():
-    init_db()
     marker = "audit-source-stats-20260304"
     now = datetime.now(timezone.utc)
 
@@ -435,7 +432,6 @@ def test_internal_audit_source_stats_7d():
 
 
 def test_internal_discovery_audit_returns_recent_discovered_ats():
-    init_db()
     marker = "audit-discovery-20260313"
     company_one = _insert_company(f"{marker}-one")
     company_two = _insert_company(f"{marker}-two")
@@ -508,7 +504,6 @@ def test_internal_discovery_audit_returns_recent_discovered_ats():
 
 
 def test_internal_discovery_candidates_returns_companies_without_ats():
-    init_db()
     marker = "discovery-candidates-20260313"
     company_null_checked = _insert_company(f"{marker}-null-checked")
     company_old_checked = _insert_company(f"{marker}-old-checked")

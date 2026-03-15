@@ -1,7 +1,7 @@
 from sqlalchemy import text
 
 from storage.db_engine import get_engine
-from storage.db_logic import init_db, upsert_job
+from storage.db_logic import upsert_job
 
 engine = get_engine()
 
@@ -30,7 +30,6 @@ def _make_job(
 
 
 def test_upsert_merges_same_fingerprint_from_different_sources():
-    init_db()
 
     job_a = _make_job(
         "greenhouse:acme:123",
@@ -71,7 +70,6 @@ def test_upsert_merges_same_fingerprint_from_different_sources():
 
 
 def test_upsert_reuses_same_source_mapping():
-    init_db()
 
     first = _make_job(
         "remotive:first",

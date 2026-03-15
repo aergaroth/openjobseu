@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 from app.main import app
 from storage.db_engine import get_engine
-from storage.db_logic import init_db, upsert_job
+from storage.db_logic import upsert_job
 
 client = TestClient(app)
 engine = get_engine()
@@ -40,7 +40,6 @@ def test_jobs_compliance_stats_7d_empty():
 
 
 def test_jobs_compliance_stats_7d_aggregates_recent_rows():
-    init_db()
 
     with engine.begin() as conn:
         upsert_job(_make_job("stats:approved_recent"), conn=conn)
