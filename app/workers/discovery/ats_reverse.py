@@ -10,6 +10,11 @@ from sqlalchemy import text
 
 from app.workers.discovery.ats_probe import probe_ats
 from storage.db_engine import get_engine
+from storage.repositories.discovery_repository import (
+    check_ats_exists,
+    get_or_create_placeholder_company,
+    insert_discovered_company_ats,
+)
 
 logger = logging.getLogger("openjobseu.discovery")
 
@@ -98,81 +103,64 @@ def run_ats_reverse_discovery() -> dict[str, int]:
     for provider in PROVIDERS_TO_PROBE:
         for slug in slugs_to_test:
             idx += 1
-            # Deduplication check before querying API to save requests
-            with engine.connect() as conn:
-                exists = conn.execute(
-                    text("SELECT 1 FROM company_ats WHERE provider = :provider AND ats_slug = :slug LIMIT 1"),
-                    {"provider": provider, "slug": slug}
-                ).fetchone()
-                if exists:
-                    metrics["ats_duplicates"] += 1
+            try:
+                # Deduplication check before querying API to save requests
+                with engine.connect() as conn:
+                    if check_ats_exists(conn, provider, slug):
+                        metrics["ats_duplicates"] += 1
+                        continue
+
+                metrics["slugs_tested"] += 1
+                probe_result = probe_ats(provider, slug)
+                if not probe_result:
                     continue
 
-            metrics["slugs_tested"] += 1
-            probe_result = probe_ats(provider, slug)
-            if not probe_result:
-                continue
+                metrics["ats_detected"] += 1
 
-            metrics["ats_detected"] += 1
+                try:
+                    jobs_total = int(probe_result.get("jobs_total") or 0)
+                except (ValueError, TypeError):
+                    jobs_total = 0
 
-            try:
-                jobs_total = int(probe_result.get("jobs_total") or 0)
-            except (ValueError, TypeError):
-                jobs_total = 0
+                try:
+                    remote_hits = int(probe_result.get("remote_hits") or 0)
+                except (ValueError, TypeError):
+                    remote_hits = 0
 
-            try:
-                remote_hits = int(probe_result.get("remote_hits") or 0)
-            except (ValueError, TypeError):
-                remote_hits = 0
+                recent_job_at = probe_result.get("recent_job_at")
 
-            recent_job_at = probe_result.get("recent_job_at")
+                if (
+                    jobs_total < QUALITY_MIN_JOBS
+                    or remote_hits < QUALITY_MIN_REMOTE_HITS
+                    or not _is_recent(recent_job_at)
+                ):
+                    metrics["ats_skipped_quality"] += 1
+                    continue
 
-            if (
-                jobs_total < QUALITY_MIN_JOBS
-                or remote_hits < QUALITY_MIN_REMOTE_HITS
-                or not _is_recent(recent_job_at)
-            ):
-                metrics["ats_skipped_quality"] += 1
-                continue
+                with engine.begin() as conn:
+                    name = slug.capitalize()
+                    company_id = get_or_create_placeholder_company(conn, name)
 
-            with engine.begin() as conn:
-                company_id = str(uuid.uuid4())
-                name = slug.capitalize()
-                
-                # Because we operate independently of company list crawlers (reverse),
-                # we need to create a base company entry (placeholder) to link the mapped ATS to it.
-                conn.execute(
-                    text("""
-                        INSERT INTO companies (
-                            company_id, brand_name, legal_name, hq_country, eu_entity_verified,
-                            remote_posture, is_active, bootstrap, created_at, updated_at
-                        )
-                        VALUES (
-                            :uid, :name, :name, 'ZZ', false, 'UNKNOWN', true, true, NOW(), NOW()
-                        )
-                    """),
-                    {"uid": company_id, "name": name}
-                )
+                    inserted = insert_discovered_company_ats(
+                        conn,
+                        company_id=company_id,
+                        provider=provider,
+                        ats_slug=slug,
+                        careers_url=None
+                    )
 
-                inserted = conn.execute(
-                    text("""
-                        INSERT INTO company_ats (
-                            company_id, provider, ats_slug, is_active, created_at, updated_at
-                        )
-                        VALUES (
-                            :company_id, :provider, :ats_slug, true, NOW(), NOW()
-                        )
-                        ON CONFLICT DO NOTHING
-                        RETURNING company_ats_id
-                    """),
-                    {"company_id": company_id, "provider": provider, "ats_slug": slug}
-                ).fetchone()
+                if inserted:
+                    metrics["ats_inserted"] += 1
+                else:
+                    metrics["ats_duplicates"] += 1
+                    
+            except Exception as e:
+                logger.error("error processing slug in ats_reverse", exc_info=True, extra={
+                    "provider": provider,
+                    "slug": slug,
+                    "component": "discovery"
+                })
 
-            if inserted:
-                metrics["ats_inserted"] += 1
-            else:
-                metrics["ats_duplicates"] += 1
-                
             if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
                 pct = int((idx / total) * 100)
                 filled = int(20 * idx / total)

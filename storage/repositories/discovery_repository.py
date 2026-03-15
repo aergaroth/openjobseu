@@ -66,13 +66,46 @@ def update_discovery_last_checked_at(conn: Connection, company_id: str, phase: s
     )
 
 
+def check_ats_exists(conn: Connection, provider: str, ats_slug: str) -> bool:
+    exists = conn.execute(
+        text("SELECT 1 FROM company_ats WHERE provider = :provider AND ats_slug = :slug LIMIT 1"),
+        {"provider": provider, "slug": ats_slug}
+    ).fetchone()
+    return bool(exists)
+
+
+def get_or_create_placeholder_company(conn: Connection, name: str) -> str:
+    existing_company = conn.execute(
+        text("SELECT company_id FROM companies WHERE lower(legal_name) = lower(:name) LIMIT 1"),
+        {"name": name}
+    ).fetchone()
+
+    if existing_company:
+        return str(existing_company[0])
+
+    company_id = str(uuid.uuid4())
+    conn.execute(
+        text("""
+            INSERT INTO companies (
+                company_id, brand_name, legal_name, hq_country, eu_entity_verified,
+                remote_posture, is_active, bootstrap, created_at, updated_at
+            )
+            VALUES (
+                :uid, :name, :name, 'ZZ', false, 'UNKNOWN', true, true, NOW(), NOW()
+            )
+        """),
+        {"uid": company_id, "name": name}
+    )
+    return company_id
+
+
 def insert_discovered_company_ats(
     conn: Connection,
     *,
     company_id: str,
     provider: str,
     ats_slug: str,
-    careers_url: str,
+    careers_url: str | None = None,
 ) -> bool:
     result = conn.execute(
         text("""
