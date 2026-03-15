@@ -18,7 +18,7 @@ def probe_ats(provider: str, slug: str) -> Dict[str, Any] | None:
         adapter = get_adapter(normalized_provider)
     except ValueError as exc:
         logger.warning(
-            "discovery probe skipped due to unsupported ats provider",
+            f"discovery probe skipped due to unsupported ats provider [{normalized_provider}]",
             extra={
                 "component": "discovery",
                 "phase": "probe",
@@ -33,7 +33,7 @@ def probe_ats(provider: str, slug: str) -> Dict[str, Any] | None:
         result = adapter.probe_jobs(slug)
     except NotImplementedError as exc:
         logger.warning(
-            "discovery probe skipped because adapter probe is not implemented",
+            f"discovery probe skipped because adapter probe is not implemented [{normalized_provider}]",
             extra={
                 "component": "discovery",
                 "phase": "probe",
@@ -46,7 +46,7 @@ def probe_ats(provider: str, slug: str) -> Dict[str, Any] | None:
     except requests.RequestException as exc:
         # 404s and network errors are expected during blind probing/guessing
         logger.debug(
-            "discovery probe request failed",
+            f"discovery probe request failed [{normalized_provider}/{normalized_slug}]: {exc}",
             extra={
                 "component": "discovery",
                 "phase": "probe",
@@ -57,7 +57,8 @@ def probe_ats(provider: str, slug: str) -> Dict[str, Any] | None:
         return None
     except Exception as exc:
         logger.warning(
-            "discovery probe unexpected error",
+            f"discovery probe unexpected error [{normalized_provider}/{normalized_slug}]: {exc}",
+            exc_info=True,
             extra={
                 "component": "discovery",
                 "phase": "probe",

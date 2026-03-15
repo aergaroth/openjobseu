@@ -100,7 +100,7 @@ def _fetch_careers_page(url: str) -> requests.Response | None:
         return response
     except Exception as exc:
         logger.warning(
-            "discovery fetch careers failed",
+            f"discovery fetch careers failed [{url}]: {exc}",
             extra={
                 "component": "discovery",
                 "phase": "careers_discovery",
