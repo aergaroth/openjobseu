@@ -4,10 +4,9 @@ import re
 import io
 import zipfile
 import requests
-from sqlalchemy import text
 
 from storage.db_engine import get_engine
-from storage.repositories.discovery_repository import insert_source_company
+from storage.repositories.discovery_repository import insert_source_company, get_existing_brand_names
 
 # Re-exports for compatibility with endpoints  internal.py
 from app.workers.discovery.ats_guessing import run_ats_guessing
@@ -66,8 +65,7 @@ def run_company_source_discovery():
     engine = get_engine()
 
     with engine.connect() as conn:
-        existing = conn.execute(text("SELECT brand_name FROM companies WHERE brand_name IS NOT NULL")).fetchall()
-        existing_names = {row[0].lower() for row in existing}
+        existing_names = get_existing_brand_names(conn)
 
     metrics = {
         "companies_found": 0,

@@ -18,6 +18,8 @@ def test_tick_pipeline_returns_runtime_metrics(monkeypatch):
     )
     monkeypatch.setattr(pipeline, "run_availability_pipeline", lambda: None)
     monkeypatch.setattr(pipeline, "run_lifecycle_pipeline", lambda: None)
+    monkeypatch.setattr(pipeline, "run_market_metrics_worker", lambda: None)
+    monkeypatch.setattr(pipeline, "run_maintenance_pipeline", lambda: None)
 
     result = pipeline.run_pipeline()
 
@@ -42,6 +44,8 @@ def test_tick_pipeline_runs_post_ingestion_on_ingestion_failure(monkeypatch):
     monkeypatch.setattr(pipeline, "run_employer_ingestion", _broken_ingestion)
     monkeypatch.setattr(pipeline, "run_availability_pipeline", lambda: None)
     monkeypatch.setattr(pipeline, "run_lifecycle_pipeline", _fake_lifecycle)
+    monkeypatch.setattr(pipeline, "run_market_metrics_worker", lambda: None)
+    monkeypatch.setattr(pipeline, "run_maintenance_pipeline", lambda: None)
 
     result = pipeline.run_pipeline()
 

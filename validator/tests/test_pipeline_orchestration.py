@@ -24,10 +24,15 @@ def test_pipeline_runs_steps_in_order(monkeypatch):
         "run_market_metrics_worker",
         lambda: order.append("market_metrics"),
     )
+    monkeypatch.setattr(
+        pipeline,
+        "run_maintenance_pipeline",
+        lambda: order.append("maintenance"),
+    )
 
     pipeline.run_pipeline()
 
-    assert order == ["lifecycle", "availability", "market_metrics"]
+    assert order == ["lifecycle", "availability", "market_metrics", "maintenance"]
 
 
 def test_pipeline_orchestration_full_flow(monkeypatch):
@@ -58,11 +63,16 @@ def test_pipeline_orchestration_full_flow(monkeypatch):
         order.append("market_metrics")
         return {"metrics": {"component": "market_metrics", "jobs_created": 10}}
 
+    def _fake_maintenance():
+        order.append("maintenance")
+        return {"metrics": {"component": "maintenance", "job_stats_updated": 5, "scores_updated": 5}}
+
     info_calls = []
     monkeypatch.setattr(pipeline, "run_employer_ingestion", _fake_employer_ingestion)
     monkeypatch.setattr(pipeline, "run_lifecycle_pipeline", _fake_lifecycle)
     monkeypatch.setattr(pipeline, "run_availability_pipeline", _fake_availability)
     monkeypatch.setattr(pipeline, "run_market_metrics_worker", _fake_market_metrics)
+    monkeypatch.setattr(pipeline, "run_maintenance_pipeline", _fake_maintenance)
     monkeypatch.setattr(
         pipeline.logger,
         "info",
@@ -73,7 +83,7 @@ def test_pipeline_orchestration_full_flow(monkeypatch):
 
     result = pipeline.run_pipeline()
 
-    assert order == ["ingestion", "lifecycle", "availability", "market_metrics"]
+    assert order == ["ingestion", "lifecycle", "availability", "market_metrics", "maintenance"]
     assert result["actions"] == ["employer_ingestion_completed"]
     assert result["metrics"]["ingestion"]["source"] == "employer_ing"
     assert result["metrics"]["availability"]["checked"] == 5

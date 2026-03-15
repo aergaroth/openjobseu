@@ -7,6 +7,7 @@ from app.workers.ingestion.employer import run_employer_ingestion
 from app.workers.availability import run_availability_pipeline
 from app.workers.lifecycle import run_lifecycle_pipeline
 from app.workers.market_metrics import run_market_metrics_worker
+from app.workers.maintenance import run_maintenance_pipeline
 
 logger = logging.getLogger("openjobseu.pipeline")
 
@@ -19,6 +20,7 @@ PIPELINE_STEPS = [
     ("lifecycle", "run_lifecycle_pipeline"),
     ("availability", "run_availability_pipeline"),
     ("market_metrics", "run_market_metrics_worker"),
+    ("maintenance", "run_maintenance_pipeline"),
 ]
 
 def _int_metric(value, default: int = 0) -> int:

@@ -166,3 +166,11 @@ def get_discovery_candidates(limit: int = 50) -> list[dict]:
         ).mappings().all()
 
     return [dict(row) for row in rows]
+
+
+def get_existing_brand_names(conn: Connection) -> set[str]:
+    """Fetches a set of all non-null brand names in lowercase."""
+    rows = conn.execute(
+        text("SELECT brand_name FROM companies WHERE brand_name IS NOT NULL")
+    ).fetchall()
+    return {row[0].lower() for row in rows}
