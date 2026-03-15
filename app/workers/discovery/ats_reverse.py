@@ -155,7 +155,7 @@ def run_ats_reverse_discovery() -> dict[str, int]:
                     metrics["ats_duplicates"] += 1
                     
             except Exception as e:
-                logger.error("error processing slug in ats_reverse", exc_info=True, extra={
+                logger.error(f"error processing slug in ats_reverse [{provider}/{slug}]: {e}", exc_info=True, extra={
                     "provider": provider,
                     "slug": slug,
                     "component": "discovery"

@@ -178,7 +178,7 @@ def run_ats_guessing() -> dict[str, int]:
                     found_ats = True
                     break
         except Exception as e:
-            logger.error("error processing company in ats_guessing", exc_info=True, extra={
+            logger.error(f"error processing company in ats_guessing [{company_id}]: {e}", exc_info=True, extra={
                 "company_id": company_id,
                 "component": "discovery"
             })
@@ -186,6 +186,12 @@ def run_ats_guessing() -> dict[str, int]:
             if company_id:
                 with engine.begin() as conn:
                     update_discovery_last_checked_at(conn, company_id=company_id, phase="ats_guessing")
+                    
+        if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
+            pct = int((idx / total) * 100)
+            filled = int(20 * idx / total)
+            bar = "█" * filled + "-" * (20 - filled)
+            logger.info(f"ats_guessing progress: [{bar}] {pct}% ({idx}/{total})")
 
     logger.info(
         "ats_guessing_summary",

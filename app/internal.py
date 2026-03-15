@@ -156,6 +156,58 @@ def audit_jobs(
     )
 
 
+@router.get("/audit/companies", dependencies=[Depends(require_user_api_access)])
+def audit_companies(
+    name: str | None = Query(None),
+    ats_provider: str | None = Query(None),
+    is_active: bool | None = Query(None),
+    min_score: int | None = Query(None, ge=0),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    engine = get_engine()
+    where_clauses = []
+    params = {"limit": limit, "offset": offset}
+
+    if name:
+        where_clauses.append("(legal_name ILIKE :name OR brand_name ILIKE :name)")
+        params["name"] = f"%{name}%"
+    if ats_provider:
+        where_clauses.append("ats_provider = :ats_provider")
+        params["ats_provider"] = ats_provider
+    if is_active is not None:
+        where_clauses.append("is_active = :is_active")
+        params["is_active"] = is_active
+    if min_score is not None:
+        where_clauses.append("signal_score >= :min_score")
+        params["min_score"] = min_score
+
+    where_sql = ""
+    if where_clauses:
+        where_sql = "WHERE " + " AND ".join(where_clauses)
+
+    with engine.connect() as conn:
+        total = conn.execute(text(f"SELECT COUNT(*) FROM companies {where_sql}"), params).scalar()
+        query = f"""
+            SELECT 
+                company_id, legal_name, brand_name, hq_country, eu_entity_verified, 
+                remote_posture, ats_provider, ats_slug, signal_score, 
+                approved_jobs_count, rejected_jobs_count, total_jobs_count, 
+                last_active_job_at, is_active, created_at
+            FROM companies 
+            {where_sql}
+            ORDER BY signal_score DESC, created_at DESC
+            LIMIT :limit OFFSET :offset
+        """
+        rows = conn.execute(text(query), params).mappings().all()
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "items": [dict(r) for r in rows]
+    }
+
 @router.get("/audit/filters", dependencies=[Depends(require_user_api_access)])
 def audit_filter_registry():
     payload = get_audit_filter_registry()

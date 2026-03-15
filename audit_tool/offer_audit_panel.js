@@ -21,6 +21,43 @@ const registrySelectIds = [
   "compliance_status"
 ];
 
+const JOB_COLS_DEF = [
+  { key: "job_id", label: "ID", render: (j) => `<td class="mono">${esc(j.job_id)}</td>` },
+  { key: "source", label: "Source", render: (j) => `<td>${esc(j.source)}</td>` },
+  { key: "title", label: "Title", render: (j) => `<td>${esc(j.title)}</td>` },
+  { key: "company_name", label: "Company", render: (j) => `<td>${esc(j.company_name)}</td>` },
+  { key: "source_department", label: "Source Dept", render: (j) => `<td>${esc(j.source_department)}</td>` },
+  { key: "status", label: "Status", render: (j) => `<td>${esc(j.status)}</td>` },
+  { key: "remote_class", label: "Remote class", render: (j) => `<td>${esc(j.remote_class)}</td>` },
+  { key: "geo_class", label: "Geo class", render: (j) => `<td>${esc(j.geo_class)}</td>` },
+  { key: "compliance_status", label: "Compliance", render: (j) => `<td>${esc(j.compliance_status)}</td>` },
+  { key: "compliance_score", label: "Score", render: (j) => `<td>${esc(j.compliance_score)}</td>` },
+  { key: "first_seen_at", label: "First seen", render: (j) => `<td class="mono">${esc(j.first_seen_at)}</td>` },
+  { key: "last_seen_at", label: "Last seen", render: (j) => `<td class="mono">${esc(j.last_seen_at)}</td>` },
+  { key: "url", label: "URL", render: (j) => {
+    const u = esc(j.source_url || "");
+    return `<td>${u ? `<a href="${u}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">open</a>` : ""}</td>`;
+  }}
+];
+let jobColsActive = JSON.parse(localStorage.getItem('jobColsActive')) || JOB_COLS_DEF.map(c => c.key);
+let currentJobs = [];
+
+const COMP_COLS_DEF = [
+  { key: "company_id", label: "ID", render: (c) => `<td class="mono" style="font-size: 0.75rem;">${esc(c.company_id).split('-')[0]}...</td>` },
+  { key: "legal_name", label: "Legal Name", render: (c) => `<td><strong>${esc(c.legal_name)}</strong><br/><span style="color:var(--muted); font-size:0.75rem;">${esc(c.brand_name)}</span></td>` },
+  { key: "hq_country", label: "HQ", render: (c) => `<td>${esc(c.hq_country)}</td>` },
+  { key: "remote_posture", label: "Posture", render: (c) => `<td>${esc(c.remote_posture)}</td>` },
+  { key: "eu_entity_verified", label: "EU", render: (c) => `<td>${c.eu_entity_verified ? 'Yes' : 'No'}</td>` },
+  { key: "ats_provider", label: "ATS", render: (c) => `<td>${esc(c.ats_provider)}<br/><span class="mono" style="color:var(--muted); font-size:0.75rem;">${esc(c.ats_slug)}</span></td>` },
+  { key: "signal_score", label: "Score", render: (c) => `<td><strong>${esc(c.signal_score)}</strong></td>` },
+  { key: "total_jobs_count", label: "Jobs", render: (c) => `<td>${esc(c.total_jobs_count)}</td>` },
+  { key: "approved_jobs_count", label: "Approv.", render: (c) => `<td>${esc(c.approved_jobs_count)}</td>` },
+  { key: "last_active_job_at", label: "Last Active", render: (c) => `<td class="mono">${c.last_active_job_at ? esc(c.last_active_job_at).substring(0, 10) : ''}</td>` },
+  { key: "is_active", label: "Active", render: (c) => `<td>${c.is_active ? 'Yes' : 'No'}</td>` }
+];
+let compColsActive = JSON.parse(localStorage.getItem('compColsActive')) || COMP_COLS_DEF.map(c => c.key);
+let currentCompanies = [];
+
 let debounceTimer = null;
 
 function esc(value) {
@@ -56,7 +93,45 @@ function renderCountMap(nodeId, counts) {
     .join("");
 }
 
-function toggleJobRow(row) {
+function renderJobColsMenu() {
+  const menu = document.getElementById('job-cols-menu');
+  if(!menu) return;
+  menu.innerHTML = JOB_COLS_DEF.map(c => `<label><input type="checkbox" value="${c.key}" ${jobColsActive.includes(c.key) ? 'checked' : ''} onchange="toggleJobCol(this)" /> ${c.label}</label>`).join('');
+}
+function toggleJobCol(cb) {
+  if (cb.checked) jobColsActive.push(cb.value);
+  else jobColsActive = jobColsActive.filter(k => k !== cb.value);
+  jobColsActive = JOB_COLS_DEF.map(c => c.key).filter(k => jobColsActive.includes(k));
+  localStorage.setItem('jobColsActive', JSON.stringify(jobColsActive));
+  renderJobHeaders(); renderJobRows(currentJobs); updateTopScrollbar();
+}
+function renderJobHeaders() {
+  const head = document.getElementById("jobs-head");
+  if(head) head.innerHTML = JOB_COLS_DEF.filter(c => jobColsActive.includes(c.key)).map(c => `<th>${c.label}</th>`).join("");
+}
+
+function renderCompColsMenu() {
+  const menu = document.getElementById('comp-cols-menu');
+  if(!menu) return;
+  menu.innerHTML = COMP_COLS_DEF.map(c => `<label><input type="checkbox" value="${c.key}" ${compColsActive.includes(c.key) ? 'checked' : ''} onchange="toggleCompCol(this)" /> ${c.label}</label>`).join('');
+}
+function toggleCompCol(cb) {
+  if (cb.checked) compColsActive.push(cb.value);
+  else compColsActive = compColsActive.filter(k => k !== cb.value);
+  compColsActive = COMP_COLS_DEF.map(c => c.key).filter(k => compColsActive.includes(k));
+  localStorage.setItem('compColsActive', JSON.stringify(compColsActive));
+  renderCompHeaders(); renderCompRows(currentCompanies); updateTopScrollbar();
+}
+function renderCompHeaders() {
+  const head = document.getElementById("comp-head");
+  if(head) head.innerHTML = COMP_COLS_DEF.filter(c => compColsActive.includes(c.key)).map(c => `<th>${c.label}</th>`).join("");
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.column-toggler')) document.querySelectorAll('.column-toggler-menu').forEach(m => m.classList.remove('open'));
+});
+
+function toggleExpandRow(row) {
   const isSelected = row.classList.contains('selected');
   
   document.querySelectorAll('.job-row.selected').forEach(el => el.classList.remove('selected'));
@@ -68,36 +143,46 @@ function toggleJobRow(row) {
   }
 }
 
-function renderRows(items) {
+function renderJobRows(items) {
   const body = document.getElementById("rows");
   if (!body) return;
   if (!items || items.length === 0) {
-    body.innerHTML = '<tr><td colspan="13">No jobs found for current filter.</td></tr>';
+    body.innerHTML = `<tr><td colspan="${jobColsActive.length}">No jobs found for current filter.</td></tr>`;
     return;
   }
   body.innerHTML = items.map((job) => {
-    const url = esc(job.source_url || "");
-    const label = url ? "open" : "";
     const jobJson = esc(JSON.stringify(job, null, 2));
+    const cells = JOB_COLS_DEF.filter(c => jobColsActive.includes(c.key)).map(c => c.render(job)).join("");
     return `
-      <tr class="job-row" onclick="toggleJobRow(this)" title="Click to view raw JSON">
-        <td class="mono">${esc(job.job_id)}</td>
-        <td>${esc(job.source)}</td>
-        <td>${esc(job.title)}</td>
-        <td>${esc(job.company_name)}</td>
-        <td>${esc(job.source_department)}</td>
-        <td>${esc(job.status)}</td>
-        <td>${esc(job.remote_class)}</td>
-        <td>${esc(job.geo_class)}</td>
-        <td>${esc(job.compliance_status)}</td>
-        <td>${esc(job.compliance_score)}</td>
-        <td class="mono">${esc(job.first_seen_at)}</td>
-        <td class="mono">${esc(job.last_seen_at)}</td>
-        <td>${url ? `<a href="${url}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">${label}</a>` : ""}</td>
+      <tr class="job-row" onclick="toggleExpandRow(this)" title="Click to view raw JSON">
+        ${cells}
       </tr>
       <tr class="details-row">
-        <td colspan="13">
+        <td colspan="${jobColsActive.length}">
           <pre class="json-dump">${jobJson}</pre>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function renderCompRows(items) {
+  const body = document.getElementById("comp-rows");
+  if (!body) return;
+  if (!items || items.length === 0) {
+    body.innerHTML = `<tr><td colspan="${compColsActive.length}">No companies match current filter.</td></tr>`;
+    return;
+  }
+  body.innerHTML = items.map((comp) => {
+    const compJson = esc(JSON.stringify(comp, null, 2));
+    const cells = COMP_COLS_DEF.filter(c => compColsActive.includes(c.key)).map(c => c.render(comp)).join("");
+    return `
+      <tr class="job-row" onclick="toggleExpandRow(this)" title="Click to view raw JSON">
+        ${cells}
+      </tr>
+      <tr class="details-row">
+        <td colspan="${compColsActive.length}">
+          <pre class="json-dump">${compJson}</pre>
         </td>
       </tr>
     `;
@@ -188,8 +273,54 @@ async function loadJobs() {
   renderCountMap("count-status", data.counts?.status || {});
   renderCountMap("count-source", data.counts?.source || {});
   renderCountMap("count-compliance", data.counts?.compliance_status || {});
-  renderRows(data.items || []);
+  currentJobs = data.items || [];
+  renderJobHeaders();
+  renderJobRows(currentJobs);
   updateTopScrollbar();
+
+async function loadCompanies() {
+  const params = new URLSearchParams();
+  for (const id of ["comp_name", "comp_ats", "comp_active", "comp_min_score", "comp_limit", "comp_offset"]) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const val = (el.value || "").trim();
+    if (val !== "") params.set(id.replace("comp_", ""), val);
+  }
+  
+  const res = await fetch(`/internal/audit/companies?${params.toString()}`);
+  if (!res.ok) throw new Error(`Companies request failed: ${res.status}`);
+  const data = await res.json();
+  
+  currentCompanies = data.items || [];
+  document.getElementById("comp-total-count").textContent = String(data.total || 0);
+  
+  const offset = parseInt(document.getElementById("comp_offset").value || "0", 10);
+  const limit = parseInt(document.getElementById("comp_limit").value || "50", 10);
+  const total = data.total || 0;
+  
+  const pageInfo = document.getElementById("comp-page-info");
+  if (pageInfo) {
+    const end = total === 0 ? 0 : Math.min(offset + limit, total);
+    pageInfo.textContent = total === 0 ? "0 - 0 of 0" : `${offset + 1} - ${end} of ${total}`;
+  }
+
+  document.getElementById("comp-prev-btn").disabled = offset <= 0;
+  document.getElementById("comp-next-btn").disabled = (offset + limit) >= total;
+
+  renderCompHeaders();
+  renderCompRows(currentCompanies);
+  updateTopScrollbar();
+}
+
+async function safeLoadCompanies() {
+  try {
+    await loadCompanies();
+  } catch (error) {
+    const body = document.getElementById("comp-rows");
+    if(body) body.innerHTML = `<tr><td class="error" colspan="${compColsActive.length}">${esc(error.message)}</td></tr>`;
+    updateTopScrollbar();
+  }
+}
 
   // Update pagination state
   const offsetEl = document.getElementById("offset");
@@ -329,6 +460,35 @@ async function loadMetrics() {
 async function safeLoadMetrics() {
   try { await loadMetrics(); } catch (error) { document.getElementById("metric-last-tick-at").textContent = "Error"; }
 }
+
+async function safeLoadAll() {
+  await Promise.all([safeLoadJobs(), safeLoadCompanies(), safeLoadAuditStats(), safeLoadMetrics(), safeLoadAtsHealth()]);
+let compDebounceTimer = null;
+function scheduleCompLoad() {
+  if (compDebounceTimer) clearTimeout(compDebounceTimer);
+  compDebounceTimer = setTimeout(safeLoadCompanies, 250);
+}
+for (const id of ["comp_name", "comp_ats", "comp_active", "comp_min_score", "comp_limit", "comp_offset"]) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.addEventListener("input", scheduleCompLoad);
+    el.addEventListener("change", scheduleCompLoad);
+  }
+}
+
+document.getElementById("comp-prev-btn").addEventListener("click", () => {
+  const el = document.getElementById("comp_offset");
+  const limit = parseInt(document.getElementById("comp_limit").value || "50", 10);
+  el.value = Math.max(0, parseInt(el.value || "0", 10) - limit);
+  safeLoadCompanies();
+});
+
+document.getElementById("comp-next-btn").addEventListener("click", () => {
+  const el = document.getElementById("comp_offset");
+  const limit = parseInt(document.getElementById("comp_limit").value || "50", 10);
+  el.value = parseInt(el.value || "0", 10) + limit;
+  safeLoadCompanies();
+});
 
 async function safeLoadAll() {
   await Promise.all([safeLoadJobs(), safeLoadAuditStats(), safeLoadMetrics(), safeLoadAtsHealth()]);
@@ -579,6 +739,13 @@ async function runInternalAsync(taskName, btn) {
   }
 }
 
+const compTopScrollWrap = document.getElementById("comp-top-scroll-wrap");
+const compTableWrap = document.getElementById("comp-table-wrap");
+if (compTopScrollWrap && compTableWrap) {
+  compTopScrollWrap.addEventListener("scroll", () => { compTableWrap.scrollLeft = compTopScrollWrap.scrollLeft; });
+  compTableWrap.addEventListener("scroll", () => { compTopScrollWrap.scrollLeft = compTableWrap.scrollLeft; });
+}
+
 function scheduleLoad() {
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(safeLoadJobs, 250);
@@ -635,6 +802,9 @@ function updateTopScrollbar() {
   if (table && dummy) {
     dummy.style.width = table.offsetWidth + "px";
   }
+  const cTable = compTableWrap?.querySelector("table");
+  const cDummy = document.getElementById("comp-top-scroll-dummy");
+  if (cTable && cDummy) cDummy.style.width = cTable.offsetWidth + "px";
 }
 window.addEventListener("resize", updateTopScrollbar);
 
@@ -642,6 +812,14 @@ document.getElementById("refresh-btn").addEventListener("click", safeLoadAll);
 document.getElementById("tick-btn").addEventListener("click", runTickDev);
 
 (async () => {
+  const hostname = window.location.hostname;
+  if (hostname.startsWith('openjobseu') && !hostname.startsWith('dev-')) {
+    document.body.classList.add('is-prod');
+  }
+  renderJobColsMenu();
+  renderCompColsMenu();
+  renderJobHeaders();
+  renderCompHeaders();
   try {
     await loadFilterRegistry();
   } catch (error) {

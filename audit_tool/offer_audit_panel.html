@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/internal/audit/style.css" />
 </head>
 <body>
+  <div class="prod-watermark">PRODUCTION</div>
   <div class="wrap">
     <div class="head">
       <h1>Admin Audit Panel</h1>
@@ -49,6 +50,13 @@
     </div>
 
     <div class="panel">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="margin: 0;">Jobs Database</h3>
+        <div class="column-toggler">
+          <button type="button" class="btn-secondary" style="min-width:auto; padding: 4px 10px; font-size: 0.8rem;" onclick="document.getElementById('job-cols-menu').classList.toggle('open')">Columns ⚙️</button>
+          <div id="job-cols-menu" class="column-toggler-menu"></div>
+        </div>
+      </div>
       <div class="filters" id="filters">
         <label>Status
           <select id="status">
@@ -82,6 +90,48 @@
         <label>Max score<input id="max_compliance_score" type="number" min="0" max="100" /></label>
         <label>Limit<input id="limit" type="number" min="1" max="500" value="50" /></label>
         <label>Offset<input id="offset" type="number" min="0" value="0" /></label>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="margin: 0;">Companies Database</h3>
+        <div class="column-toggler">
+          <button type="button" class="btn-secondary" style="min-width:auto; padding: 4px 10px; font-size: 0.8rem;" onclick="document.getElementById('comp-cols-menu').classList.toggle('open')">Columns ⚙️</button>
+          <div id="comp-cols-menu" class="column-toggler-menu"></div>
+        </div>
+      </div>
+      <div class="filters" id="comp-filters">
+        <label>Name<input id="comp_name" placeholder="contains..." /></label>
+        <label>ATS Provider<input id="comp_ats" placeholder="exact..." /></label>
+        <label>Active
+          <select id="comp_active">
+            <option value="">All</option>
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        </label>
+        <label>Min score<input id="comp_min_score" type="number" min="0" /></label>
+        <label>Limit<input id="comp_limit" type="number" min="1" max="500" value="50" /></label>
+        <label>Offset<input id="comp_offset" type="number" min="0" value="0" /></label>
+      </div>
+      <div class="summary" style="margin-top: 14px;">
+        <strong id="comp-total-count">0</strong>
+        <small>companies match current filter</small>
+      </div>
+      <div class="top-scrollbar-wrap" id="comp-top-scroll-wrap">
+        <div class="top-scrollbar-dummy" id="comp-top-scroll-dummy"></div>
+      </div>
+      <div class="table-wrap" id="comp-table-wrap">
+        <table>
+          <thead><tr id="comp-head"></tr></thead>
+          <tbody id="comp-rows"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span id="comp-page-info" style="font-size: 0.85rem; color: var(--muted);"></span>
+        <button id="comp-prev-btn" type="button" style="min-width: 100px;">&laquo; Previous</button>
+        <button id="comp-next-btn" type="button" style="min-width: 100px;">Next &raquo;</button>
       </div>
     </div>
 
@@ -219,21 +269,7 @@
       <div class="table-wrap" id="main-table-wrap">
       <table>
         <thead>
-          <tr>
-            <th>ID</th>
-            <th>Source</th>
-            <th>Title</th>
-            <th>Company</th>
-            <th>Source Dept</th>
-            <th>Status</th>
-            <th>Remote class</th>
-            <th>Geo class</th>
-            <th>Compliance</th>
-            <th>Score</th>
-            <th>First seen</th>
-            <th>Last seen</th>
-            <th>URL</th>
-          </tr>
+          <tr id="jobs-head"></tr>
         </thead>
         <tbody id="rows"></tbody>
       </table>

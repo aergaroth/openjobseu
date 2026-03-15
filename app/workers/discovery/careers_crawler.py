@@ -269,7 +269,7 @@ def run_careers_discovery() -> Dict[str, int]:
             else:
                 metrics["ats_duplicates"] += 1
         except Exception as e:
-            logger.error("error processing company in careers_crawler", exc_info=True, extra={
+            logger.error(f"error processing company in careers_crawler [{company_id}]: {e}", exc_info=True, extra={
                 "company_id": company_id,
                 "component": "discovery"
             })
@@ -277,6 +277,12 @@ def run_careers_discovery() -> Dict[str, int]:
             if company_id:
                 with engine.begin() as conn:
                     update_discovery_last_checked_at(conn, company_id=company_id, phase="careers")
+                    
+        if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
+            pct = int((idx / total) * 100)
+            filled = int(20 * idx / total)
+            bar = "█" * filled + "-" * (20 - filled)
+            logger.info(f"careers_crawler progress: [{bar}] {pct}% ({idx}/{total})")
 
     logger.info(
         "discovery_summary",
