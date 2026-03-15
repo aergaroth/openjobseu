@@ -17,7 +17,7 @@ Every record goes through:
 
 - **Type:** Curated company list + ATS API fetch
 - **Worker:** `app/workers/ingestion/employer.py`
-- **Adapter registry:** `app/ats/registry.py`
+- **Adapter registry:** `app/adapters/ats/registry.py`
 - **Current ATS support:** Greenhouse (Lever present but inactive)
 
 Input set is loaded from `companies` rows where:

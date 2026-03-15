@@ -4,198 +4,59 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>OpenJobsEU Audit Panel</title>
-  <style>
-    :root {
-      --bg: #f4f2ec;
-      --card: #fffaf0;
-      --line: #d8d0be;
-      --text: #1e2a32;
-      --muted: #61717a;
-      --accent: #0d6b56;
-      --accent-2: #17425f;
-      --danger: #8a3b2f;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-      color: var(--text);
-      background:
-        radial-gradient(1200px 500px at 90% -10%, #d6e2dc 0%, transparent 60%),
-        radial-gradient(1000px 400px at -10% 0%, #f0dcc7 0%, transparent 60%),
-        var(--bg);
-    }
-    .wrap {
-      max-width: 1280px;
-      margin: 24px auto;
-      padding: 0 16px 32px;
-    }
-    .head {
-      display: flex;
-      gap: 12px;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-    h1 {
-      margin: 0;
-      font-size: 1.4rem;
-      letter-spacing: 0.02em;
-    }
-    .head-actions { display: flex; gap: 8px; }
-    .panel {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
-      margin-bottom: 14px;
-      padding: 14px;
-    }
-    .filters {
-      display: grid;
-      grid-template-columns: repeat(5, minmax(150px, 1fr));
-      gap: 10px;
-    }
-    label { font-size: 0.78rem; color: var(--muted); display: block; }
-    input, select, button {
-      width: 100%;
-      border: 1px solid var(--line);
-      background: #fff;
-      color: var(--text);
-      border-radius: 8px;
-      padding: 8px 10px;
-      margin-top: 4px;
-      font-size: 0.9rem;
-    }
-    button {
-      cursor: pointer;
-      width: auto;
-      min-width: 140px;
-      border: 0;
-      color: #fff;
-      background: linear-gradient(130deg, var(--accent-2), var(--accent));
-      transition: transform .12s ease, opacity .2s ease;
-    }
-    button:disabled { opacity: .65; cursor: wait; }
-    button:hover { transform: translateY(-1px); }
-    .stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px;
-      font-size: 0.88rem;
-    }
-    .chip-box {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px;
-      background: #fff;
-      min-height: 84px;
-    }
-    .chip-box h3 {
-      margin: 0 0 8px;
-      font-size: 0.85rem;
-      color: var(--muted);
-      font-weight: 600;
-    }
-    .chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    .chip {
-      display: inline-block;
-      border-radius: 999px;
-      border: 1px solid #c9c1af;
-      background: #fff;
-      padding: 2px 8px;
-      font-size: 0.77rem;
-      color: #31424d;
-    }
-    .summary {
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-    .summary strong { font-size: 1.2rem; }
-    .summary small { color: var(--muted); }
-    .table-wrap { overflow: auto; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 980px;
-      font-size: 0.85rem;
-    }
-    .audit-stats-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    .audit-stats-card {
-      min-height: auto;
-    }
-    .audit-stats-card .table-wrap {
-      max-height: 260px;
-      overflow: auto;
-    }
-    .audit-stats-card table {
-      min-width: 420px;
-      font-size: 0.82rem;
-    }
-    .audit-stats-meta {
-      margin-top: 8px;
-      font-size: 0.8rem;
-      color: var(--muted);
-    }
-    th, td {
-      border-bottom: 1px solid var(--line);
-      text-align: left;
-      vertical-align: top;
-      padding: 8px 6px;
-    }
-    th {
-      background: #f5f0e5;
-      color: #35454f;
-      position: sticky;
-      top: 0;
-      z-index: 1;
-    }
-    td a { color: var(--accent-2); text-decoration: none; }
-    td a:hover { text-decoration: underline; }
-    .mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
-    .tick-output {
-      margin-top: 8px;
-      border: 1px solid #cbbca5;
-      border-radius: 8px;
-      background: #2a3238;
-      color: #e8edf1;
-      padding: 10px;
-      white-space: pre-wrap;
-      min-height: 80px;
-      max-height: 260px;
-      overflow: auto;
-      font-size: 0.8rem;
-    }
-    .error { color: var(--danger); font-weight: 600; }
-    @media (max-width: 1080px) {
-      .filters { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
-      .stats { grid-template-columns: 1fr; }
-      .audit-stats-grid { grid-template-columns: 1fr; }
-      .head { flex-direction: column; align-items: flex-start; }
-    }
-  </style>
+  <link rel="stylesheet" href="/internal/audit/style.css" />
 </head>
 <body>
+  <div class="prod-watermark">PRODUCTION</div>
   <div class="wrap">
     <div class="head">
-      <h1>Offer Audit Panel</h1>
+      <h1>Admin Audit Panel</h1>
       <div class="head-actions">
+        <button id="clear-btn" type="button" class="btn-secondary">Clear Filters</button>
         <button id="refresh-btn" type="button">Refresh</button>
         <button id="tick-btn" type="button">Run /internal/tick</button>
+        <button id="logout-btn" type="button" class="btn-danger" onclick="window.location.href='/logout'">Logout</button>
       </div>
     </div>
 
     <div class="panel">
+      <div class="metrics-grid">
+        <div class="chip-box">
+          <h3>Total Jobs</h3>
+          <div class="summary">
+            <strong id="metric-jobs-total">-</strong>
+            <span id="metric-jobs-24h" class="diff zero">+0 (24h)</span>
+          </div>
+        </div>
+        <div class="chip-box">
+          <h3>Total Companies</h3>
+          <div class="summary">
+            <strong id="metric-companies-total">-</strong>
+            <span id="metric-companies-24h" class="diff zero">+0 (24h)</span>
+          </div>
+        </div>
+        <div class="chip-box">
+          <h3>Company ATS</h3>
+          <div class="summary">
+            <strong id="metric-company-ats-total">-</strong>
+            <span id="metric-company-ats-24h" class="diff zero">+0 (24h)</span>
+          </div>
+        </div>
+        <div class="chip-box">
+          <h3>Last Tick At</h3>
+          <div class="summary"><strong id="metric-last-tick-at" style="font-size: 1rem;">-</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="margin: 0;">Jobs Database</h3>
+        <div class="column-toggler">
+          <button type="button" class="btn-secondary" style="min-width:auto; padding: 4px 10px; font-size: 0.8rem;" onclick="document.getElementById('job-cols-menu').classList.toggle('open')">Columns ⚙️</button>
+          <div id="job-cols-menu" class="column-toggler-menu"></div>
+        </div>
+      </div>
       <div class="filters" id="filters">
         <label>Status
           <select id="status">
@@ -229,6 +90,48 @@
         <label>Max score<input id="max_compliance_score" type="number" min="0" max="100" /></label>
         <label>Limit<input id="limit" type="number" min="1" max="500" value="50" /></label>
         <label>Offset<input id="offset" type="number" min="0" value="0" /></label>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="margin: 0;">Companies Database</h3>
+        <div class="column-toggler">
+          <button type="button" class="btn-secondary" style="min-width:auto; padding: 4px 10px; font-size: 0.8rem;" onclick="document.getElementById('comp-cols-menu').classList.toggle('open')">Columns ⚙️</button>
+          <div id="comp-cols-menu" class="column-toggler-menu"></div>
+        </div>
+      </div>
+      <div class="filters" id="comp-filters">
+        <label>Name<input id="comp_name" placeholder="contains..." /></label>
+        <label>ATS Provider<input id="comp_ats" placeholder="exact..." /></label>
+        <label>Active
+          <select id="comp_active">
+            <option value="">All</option>
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        </label>
+        <label>Min score<input id="comp_min_score" type="number" min="0" /></label>
+        <label>Limit<input id="comp_limit" type="number" min="1" max="500" value="50" /></label>
+        <label>Offset<input id="comp_offset" type="number" min="0" value="0" /></label>
+      </div>
+      <div class="summary" style="margin-top: 14px;">
+        <strong id="comp-total-count">0</strong>
+        <small>companies match current filter</small>
+      </div>
+      <div class="top-scrollbar-wrap" id="comp-top-scroll-wrap">
+        <div class="top-scrollbar-dummy" id="comp-top-scroll-dummy"></div>
+      </div>
+      <div class="table-wrap" id="comp-table-wrap">
+        <table>
+          <thead><tr id="comp-head"></tr></thead>
+          <tbody id="comp-rows"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span id="comp-page-info" style="font-size: 0.85rem; color: var(--muted);"></span>
+        <button id="comp-prev-btn" type="button" style="min-width: 100px;">&laquo; Previous</button>
+        <button id="comp-next-btn" type="button" style="min-width: 100px;">Next &raquo;</button>
       </div>
     </div>
 
@@ -295,319 +198,88 @@
       </div>
     </div>
 
-    <div class="panel table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Source</th>
-            <th>Title</th>
-            <th>Company</th>
-            <th>Status</th>
-            <th>Remote class</th>
-            <th>Geo class</th>
-            <th>Compliance</th>
-            <th>Score</th>
-            <th>First seen</th>
-            <th>Last seen</th>
-            <th>URL</th>
-          </tr>
-        </thead>
-        <tbody id="rows"></tbody>
-      </table>
+    <div class="panel">
+      <div class="chip-box audit-stats-card">
+        <h3 style="color: var(--danger);">Dead / Stale ATS Integrations (> 3 days without sync)</h3>
+        <div class="table-wrap" style="max-height: 260px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>Provider</th>
+                <th>Slug</th>
+                <th>Last Sync</th>
+                <th>Created</th>
+                <th>Careers URL</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="ats-health-rows"></tbody>
+          </table>
+        </div>
+        <div class="audit-stats-meta" id="ats-health-meta">loading...</div>
+      </div>
     </div>
 
     <div class="panel">
-      <strong>/internal/tick output</strong>
+      <h3>Pipeline controls</h3>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+
+        <button onclick="runTick(this)">Run tick</button>
+        <button onclick="runTickIngestion(this)">Run tick (ingestion)</button>
+        <button onclick="runTickMaintenance(this)">Run tick (maintenance)</button>
+
+        <button onclick="runDiscovery(this)">Run discovery</button>
+
+        <button onclick="runCareers(this)">Run careers crawler</button>
+
+        <button onclick="runGuess(this)">Run ATS guessing</button>
+
+        <button onclick="runAtsReverse(this)">Run ATS reverse discovery</button>
+
+        <button onclick="runBackfillDepartment(this)">Backfill Departments</button>
+
+        <button onclick="runBackfillCompliance(this)">Backfill Compliance</button>
+
+        <button onclick="runBackfillSalary(this)">Backfill Salary</button>
+
+      </div>
+
+    </div>
+
+    <div class="panel">
+      <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <strong>Output:</strong>
+        <button id="download-output-btn" style="min-width:auto; padding: 4px 12px; font-size:0.75rem; background: var(--accent-2);" title="Shortcut: Alt+D">Download Logs (.log)</button>
+      </div>
       <div id="tick-meta"></div>
+      <div id="task-status-container" style="display: none; margin-top: 14px;">
+        <div id="task-status-header" style="margin-bottom: 12px;"></div>
+        <div id="task-status-grid" class="task-status-grid"></div>
+      </div>
       <pre class="tick-output" id="tick-output">No run yet.</pre>
     </div>
   </div>
 
-  <script>
-    const ids = [
-      "status",
-      "source",
-      "company",
-      "title",
-      "remote_scope",
-      "remote_class",
-      "geo_class",
-      "compliance_status",
-      "min_compliance_score",
-      "max_compliance_score",
-      "limit",
-      "offset"
-    ];
-
-    const registrySelectIds = [
-      "status",
-      "source",
-      "remote_class",
-      "geo_class",
-      "compliance_status"
-    ];
-
-    let debounceTimer = null;
-
-    function esc(value) {
-      return String(value ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#39;");
-    }
-
-    function paramsFromFilters() {
-      const params = new URLSearchParams();
-      for (const id of ids) {
-        const el = document.getElementById(id);
-        if (!el) continue;
-        const value = (el.value || "").trim();
-        if (value !== "") params.set(id, value);
-      }
-      return params;
-    }
-
-    function renderCountMap(nodeId, counts) {
-      const node = document.getElementById(nodeId);
-      if (!node) return;
-      const entries = Object.entries(counts || {});
-      if (entries.length === 0) {
-        node.innerHTML = '<span class="chip">none</span>';
-        return;
-      }
-      node.innerHTML = entries
-        .map(([key, value]) => `<span class="chip">${esc(key)}: ${esc(value)}</span>`)
-        .join("");
-    }
-
-    function renderRows(items) {
-      const body = document.getElementById("rows");
-      if (!body) return;
-      if (!items || items.length === 0) {
-        body.innerHTML = '<tr><td colspan="12">No jobs found for current filter.</td></tr>';
-        return;
-      }
-      body.innerHTML = items.map((job) => {
-        const url = esc(job.source_url || "");
-        const label = url ? "open" : "";
-        return `
-          <tr>
-            <td class="mono">${esc(job.job_id)}</td>
-            <td>${esc(job.source)}</td>
-            <td>${esc(job.title)}</td>
-            <td>${esc(job.company_name)}</td>
-            <td>${esc(job.status)}</td>
-            <td>${esc(job.remote_class)}</td>
-            <td>${esc(job.geo_class)}</td>
-            <td>${esc(job.compliance_status)}</td>
-            <td>${esc(job.compliance_score)}</td>
-            <td class="mono">${esc(job.first_seen_at)}</td>
-            <td class="mono">${esc(job.last_seen_at)}</td>
-            <td>${url ? `<a href="${url}" target="_blank" rel="noreferrer">${label}</a>` : ""}</td>
-          </tr>
-        `;
-      }).join("");
-    }
-
-    function formatRatio(value) {
-      if (value === null || value === undefined || Number.isNaN(Number(value))) {
-        return "N/A";
-      }
-      return `${Number(value).toFixed(2)}%`;
-    }
-
-    function renderCompanyStatsRows(items) {
-      const body = document.getElementById("company-stats-rows");
-      if (!body) return;
-      if (!items || items.length === 0) {
-        body.innerHTML = '<tr><td colspan="5">No companies match threshold.</td></tr>';
-        return;
-      }
-
-      body.innerHTML = items.map((row) => `
-        <tr>
-          <td>${esc(row.legal_name)}</td>
-          <td>${esc(row.total_jobs)}</td>
-          <td>${esc(row.approved)}</td>
-          <td>${esc(row.rejected)}</td>
-          <td>${esc(formatRatio(row.approved_ratio_pct))}</td>
-        </tr>
-      `).join("");
-    }
-
-    function renderSourceStatsRows(items) {
-      const body = document.getElementById("source-stats-rows");
-      if (!body) return;
-      if (!items || items.length === 0) {
-        body.innerHTML = '<tr><td colspan="5">No source stats in the last 7 days.</td></tr>';
-        return;
-      }
-
-      body.innerHTML = items.map((row) => `
-        <tr>
-          <td>${esc(row.source ?? "null")}</td>
-          <td>${esc(row.total_jobs)}</td>
-          <td>${esc(row.approved)}</td>
-          <td>${esc(row.rejected)}</td>
-          <td>${esc(formatRatio(row.approved_ratio_pct))}</td>
-        </tr>
-      `).join("");
-    }
-
-    function populateSelectOptions(selectId, values) {
-      const node = document.getElementById(selectId);
-      if (!node) return;
-      const currentValue = node.value || "";
-      node.innerHTML = '<option value="">All</option>';
-      for (const value of (values || [])) {
-        const opt = document.createElement("option");
-        opt.value = String(value);
-        opt.textContent = String(value);
-        node.appendChild(opt);
-      }
-      node.value = currentValue;
-      if (node.value !== currentValue) {
-        node.value = "";
-      }
-    }
-
-    async function loadFilterRegistry() {
-      const response = await fetch("/internal/audit/filters");
-      if (!response.ok) {
-        throw new Error(`audit filter registry request failed with status ${response.status}`);
-      }
-      const registry = await response.json();
-      for (const id of registrySelectIds) {
-        populateSelectOptions(id, registry?.[id] || []);
-      }
-    }
-
-    async function loadJobs() {
-      const params = paramsFromFilters();
-      const response = await fetch(`/internal/audit/jobs?${params.toString()}`);
-      if (!response.ok) {
-        throw new Error(`audit request failed with status ${response.status}`);
-      }
-      const data = await response.json();
-      document.getElementById("total-count").textContent = String(data.total || 0);
-      renderCountMap("count-status", data.counts?.status || {});
-      renderCountMap("count-source", data.counts?.source || {});
-      renderCountMap("count-compliance", data.counts?.compliance_status || {});
-      renderRows(data.items || []);
-    }
-
-    async function safeLoadJobs() {
-      try {
-        await loadJobs();
-      } catch (error) {
-        const body = document.getElementById("rows");
-        body.innerHTML = `<tr><td class="error" colspan="12">${esc(error.message)}</td></tr>`;
-      }
-    }
-
-    async function loadAuditStats() {
-      const [companyResponse, sourceResponse] = await Promise.all([
-        fetch("/internal/audit/stats/company"),
-        fetch("/internal/audit/stats/source-7d"),
-      ]);
-
-      if (!companyResponse.ok) {
-        throw new Error(`company stats request failed with status ${companyResponse.status}`);
-      }
-      if (!sourceResponse.ok) {
-        throw new Error(`source stats request failed with status ${sourceResponse.status}`);
-      }
-
-      const companyPayload = await companyResponse.json();
-      const sourcePayload = await sourceResponse.json();
-
-      renderCompanyStatsRows(companyPayload.items || []);
-      renderSourceStatsRows(sourcePayload.items || []);
-
-      const companyMeta = document.getElementById("company-stats-meta");
-      const sourceMeta = document.getElementById("source-stats-meta");
-      if (companyMeta) {
-        companyMeta.textContent =
-          `${(companyPayload.items || []).length} companies · threshold: total jobs > ${companyPayload.min_total_jobs}`;
-      }
-      if (sourceMeta) {
-        sourceMeta.textContent =
-          `${(sourcePayload.items || []).length} sources · window: ${sourcePayload.window}`;
-      }
-    }
-
-    async function safeLoadAuditStats() {
-      try {
-        await loadAuditStats();
-      } catch (error) {
-        const companyBody = document.getElementById("company-stats-rows");
-        const sourceBody = document.getElementById("source-stats-rows");
-        const msg = esc(error.message);
-        if (companyBody) {
-          companyBody.innerHTML = `<tr><td class="error" colspan="5">${msg}</td></tr>`;
-        }
-        if (sourceBody) {
-          sourceBody.innerHTML = `<tr><td class="error" colspan="5">${msg}</td></tr>`;
-        }
-      }
-    }
-
-    async function safeLoadAll() {
-      await Promise.all([safeLoadJobs(), safeLoadAuditStats()]);
-    }
-
-    async function runTickDev() {
-      const button = document.getElementById("tick-btn");
-      const meta = document.getElementById("tick-meta");
-      const out = document.getElementById("tick-output");
-      button.disabled = true;
-      meta.textContent = "running...";
-      out.textContent = "";
-
-      try {
-        const response = await fetch("/internal/tick?format=text", { method: "POST" });
-        const bodyText = await response.text();
-        if (!response.ok) {
-          throw new Error(`tick request failed with status ${response.status}\n${bodyText}`);
-        }
-        meta.textContent = "POST /internal/tick?format=text";
-        out.textContent = bodyText || "(empty)";
-      } catch (error) {
-        meta.textContent = "failed";
-        out.textContent = String(error);
-      } finally {
-        button.disabled = false;
-      }
-    }
-
-    function scheduleLoad() {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(safeLoadJobs, 250);
-    }
-
-    for (const id of ids) {
-      const node = document.getElementById(id);
-      if (!node) continue;
-      node.addEventListener("input", scheduleLoad);
-      node.addEventListener("change", scheduleLoad);
-    }
-
-    document.getElementById("refresh-btn").addEventListener("click", safeLoadAll);
-    document.getElementById("tick-btn").addEventListener("click", runTickDev);
-
-    (async () => {
-      try {
-        await loadFilterRegistry();
-      } catch (error) {
-        const body = document.getElementById("rows");
-        body.innerHTML = `<tr><td class="error" colspan="12">${esc(error.message)}</td></tr>`;
-        return;
-      }
-      safeLoadAll();
-    })();
-  </script>
+    <div class="panel">
+      <div class="top-scrollbar-wrap" id="top-scroll-wrap">
+        <div class="top-scrollbar-dummy" id="top-scroll-dummy"></div>
+      </div>
+      <div class="table-wrap" id="main-table-wrap">
+      <table>
+        <thead>
+          <tr id="jobs-head"></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      </div>
+      <div class="pagination">
+        <span id="page-info" style="font-size: 0.85rem; color: var(--muted);"></span>
+        <button id="prev-btn" type="button" style="min-width: 100px;">&laquo; Previous</button>
+        <button id="next-btn" type="button" style="min-width: 100px;">Next &raquo;</button>
+      </div>
+    </div>
+  <script src="/internal/audit/script.js"></script>
 </body>
 </html>

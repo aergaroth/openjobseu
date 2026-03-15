@@ -1,6 +1,7 @@
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
+import pytest
 
 # guarantee that the database mode is configured even during module import.
 os.environ.setdefault("DB_MODE", "standard")
@@ -8,9 +9,9 @@ os.environ.setdefault("DB_MODE", "standard")
 from fastapi.testclient import TestClient
 
 import app.internal as internal_api
-from app.domain.classification.enums import ComplianceStatus, GeoClass, RemoteClass
+from app.domain.taxonomy.enums import ComplianceStatus, GeoClass, RemoteClass
 from app.main import app
-from storage.db_logic import init_db, upsert_job
+from storage.db_logic import upsert_job
 from storage.db_engine import get_engine
 from sqlalchemy import text
 
@@ -106,7 +107,7 @@ def test_internal_audit_page_renders_html():
     response = client.get("/internal/audit")
     assert response.status_code == 200
     assert response.headers.get("content-type", "").startswith("text/html")
-    assert "Offer Audit Panel" in response.text
+    assert "Admin Audit Panel" in response.text
 
 
 def test_internal_audit_filter_registry():
@@ -128,7 +129,6 @@ def test_internal_audit_filter_registry():
 
 
 def test_internal_audit_jobs_filters_and_counts():
-    init_db()
     marker = "audit-panel-20260221"
 
     job_1 = _make_job(
@@ -238,7 +238,6 @@ def test_internal_audit_tick_dev_runs_tick_with_text_output(monkeypatch):
 
 
 def test_internal_audit_company_stats():
-    init_db()
     marker = "audit-company-stats-20260304"
     company_low = _insert_company(f"{marker}-low")
     company_high = _insert_company(f"{marker}-high")
@@ -334,7 +333,6 @@ def test_internal_audit_company_stats():
 
 
 def test_internal_audit_source_stats_7d():
-    init_db()
     marker = "audit-source-stats-20260304"
     now = datetime.now(timezone.utc)
 
@@ -431,3 +429,167 @@ def test_internal_audit_source_stats_7d():
     assert items[0]["rejected"] == 3
     assert items[0]["approved_ratio_pct"] == 25.0
     assert items[1]["approved_ratio_pct"] == 100.0
+
+
+def test_internal_discovery_audit_returns_recent_discovered_ats():
+    marker = "audit-discovery-20260313"
+    company_one = _insert_company(f"{marker}-one")
+    company_two = _insert_company(f"{marker}-two")
+
+    with engine.begin() as conn:
+        conn.execute(
+            text("""
+                INSERT INTO company_ats (
+                    company_id,
+                    provider,
+                    ats_slug,
+                    careers_url,
+                    created_at,
+                    updated_at
+                )
+                VALUES (
+                    :company_id,
+                    :provider,
+                    :ats_slug,
+                    :careers_url,
+                    :created_at,
+                    NOW()
+                )
+            """),
+            [
+                {
+                    "company_id": company_one,
+                    "provider": "greenhouse",
+                    "ats_slug": f"{marker}-greenhouse",
+                    "careers_url": f"https://{marker}-one.example.com/careers",
+                    "created_at": datetime.now(timezone.utc) - timedelta(hours=2),
+                },
+                {
+                    "company_id": company_two,
+                    "provider": "lever",
+                    "ats_slug": f"{marker}-lever",
+                    "careers_url": f"https://{marker}-two.example.com/careers",
+                    "created_at": datetime.now(timezone.utc) - timedelta(hours=1),
+                },
+            ],
+        )
+
+    response = client.get("/internal/discovery/audit")
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert "count" in payload
+    assert "results" in payload
+    assert payload["count"] >= 2
+
+    marker_results = [
+        item
+        for item in payload["results"]
+        if str(item.get("company_name", "")).startswith(marker)
+    ]
+    assert len(marker_results) == 2
+
+    assert marker_results[0]["company_name"] == f"{marker}-two"
+    assert marker_results[0]["provider"] == "lever"
+    assert marker_results[0]["ats_slug"] == f"{marker}-lever"
+    assert marker_results[0]["careers_url"] == f"https://{marker}-two.example.com/careers"
+    assert marker_results[0]["created_at"] >= marker_results[1]["created_at"]
+
+    assert marker_results[1]["company_name"] == f"{marker}-one"
+    assert marker_results[1]["provider"] == "greenhouse"
+    assert marker_results[1]["ats_slug"] == f"{marker}-greenhouse"
+    assert marker_results[1]["careers_url"] == f"https://{marker}-one.example.com/careers"
+
+    assert len(payload["results"]) <= 100
+
+
+def test_internal_discovery_candidates_returns_companies_without_ats():
+    marker = "discovery-candidates-20260313"
+    company_null_checked = _insert_company(f"{marker}-null-checked")
+    company_old_checked = _insert_company(f"{marker}-old-checked")
+    company_with_ats = _insert_company(f"{marker}-with-ats")
+    company_without_careers = _insert_company(f"{marker}-no-careers")
+
+    with engine.begin() as conn:
+        conn.execute(
+            text("""
+                UPDATE companies
+                SET
+                    careers_url = :careers_url,
+                    ats_provider = :ats_provider,
+                    careers_last_checked_at = :checked_at,
+                    ats_guess_last_checked_at = :checked_at
+                WHERE company_id = :company_id
+            """),
+            [
+                {
+                    "company_id": company_null_checked,
+                    "careers_url": f"https://{marker}-null.example.com/careers",
+                    "ats_provider": None,
+                    "checked_at": None,
+                },
+                {
+                    "company_id": company_old_checked,
+                    "careers_url": f"https://{marker}-old.example.com/careers",
+                    "ats_provider": None,
+                    "checked_at": datetime.now(timezone.utc) - timedelta(days=1),
+                },
+                {
+                    "company_id": company_with_ats,
+                    "careers_url": f"https://{marker}-ats.example.com/careers",
+                    "ats_provider": "greenhouse",
+                    "checked_at": None,
+                },
+                {
+                    "company_id": company_without_careers,
+                    "careers_url": None,
+                    "ats_provider": None,
+                    "checked_at": None,
+                },
+            ],
+        )
+
+    response = client.get("/internal/discovery/candidates")
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert "count" in payload
+    assert "results" in payload
+    assert payload["count"] == len(payload["results"])
+    assert len(payload["results"]) <= 50
+
+    marker_results = [
+        row
+        for row in payload["results"]
+        if str(row.get("legal_name", "")).startswith(marker)
+    ]
+    assert len(marker_results) == 2
+
+    assert marker_results[0]["legal_name"] == f"{marker}-null-checked"
+    assert marker_results[0]["careers_last_checked_at"] is None
+    assert marker_results[0]["ats_guess_last_checked_at"] is None
+    assert marker_results[1]["legal_name"] == f"{marker}-old-checked"
+    assert marker_results[1]["careers_last_checked_at"] is not None
+    assert marker_results[1]["ats_guess_last_checked_at"] is not None
+
+
+def test_internal_discovery_run_returns_metrics(monkeypatch):
+    fake_result = {
+        "status": "ok",
+        "metrics": {
+            "pipeline": "discovery",
+            "careers": {"checked": 10, "queued": 4},
+            "ats_guessing": {"detected": 3},
+        }
+    }
+    
+    monkeypatch.setattr(internal_api, "run_discovery_pipeline", lambda: fake_result)
+    
+    response = client.post("/internal/discovery/run")
+    assert response.status_code == 200
+    payload = response.json()
+    
+    assert payload.get("status") == "ok"
+    assert payload.get("metrics", {})["pipeline"] == "discovery"
+    assert payload.get("metrics", {})["careers"]["checked"] == 10
+    assert payload.get("metrics", {})["ats_guessing"]["detected"] == 3

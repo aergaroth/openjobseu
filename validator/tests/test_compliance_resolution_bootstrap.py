@@ -1,4 +1,4 @@
-from app.domain.classification.enums import GeoClass, RemoteClass
+from app.domain.taxonomy.enums import GeoClass, RemoteClass
 from app.domain.compliance.engine import apply_policy
 
 

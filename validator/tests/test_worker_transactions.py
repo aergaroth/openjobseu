@@ -57,17 +57,20 @@ def test_availability_pipeline_uses_single_transaction_conn(monkeypatch):
 
     def _fake_update(*, updates, conn=None):
         for item in updates:
-            seen.append((item["job_id"], item["status"], bool(item["failure"]), conn))
+            seen.append((item["job_id"], item["availability_status"], bool(item["failure"]), conn))
 
     monkeypatch.setattr(availability, "update_jobs_availability", _fake_update)
 
     summary = availability.run_availability_pipeline()
 
     assert summary == {
-        "checked": 3,
-        "active": 1,
-        "expired": 1,
-        "unreachable": 1,
+        "metrics": {
+            "checked": 3,
+            "active": 1,
+            "expired": 1,
+            "unreachable": 1,
+            "status": "ok",
+        }
     }
     assert [item[0] for item in seen] == ["a", "b", "c"]
     assert all(item[3] is not None for item in seen)
@@ -75,33 +78,38 @@ def test_availability_pipeline_uses_single_transaction_conn(monkeypatch):
 
 
 def test_lifecycle_pipeline_uses_single_transaction_conn(monkeypatch):
-    jobs = [
-        {"job_id": "a"},
-        {"job_id": "b"},
-        {"job_id": "c"},
-    ]
-    transitions = {"a": "expired", "b": None, "c": "stale"}
-    seen = []
+    calls = []
 
-    monkeypatch.setattr(lifecycle, "get_jobs_for_verification", lambda limit=50: jobs)
-    monkeypatch.setattr(
-        lifecycle,
-        "apply_lifecycle_rules",
-        lambda job, now: transitions[job["job_id"]],
-    )
+    def _fake_expire(conn):
+        calls.append(("expire", conn))
+
+    def _fake_stale(conn):
+        calls.append(("stale", conn))
+
+    def _fake_activate(conn):
+        calls.append(("activate", conn))
+
+    def _fake_reactivate(conn):
+        calls.append(("reactivate", conn))
+
+    def _fake_repost(conn):
+        calls.append(("repost", conn))
+
+    monkeypatch.setattr(lifecycle, "expire_jobs_due_to_lifecycle", _fake_expire)
+    monkeypatch.setattr(lifecycle, "stale_active_jobs_due_to_lifecycle", _fake_stale)
+    monkeypatch.setattr(lifecycle, "activate_new_jobs_due_to_lifecycle", _fake_activate)
+    monkeypatch.setattr(lifecycle, "reactivate_stale_jobs_due_to_lifecycle", _fake_reactivate)
+    monkeypatch.setattr(lifecycle, "mark_reposts_due_to_lifecycle", _fake_repost)
     monkeypatch.setattr(lifecycle, "get_engine", lambda: _NoopEngine())
-
-    def _fake_update(*, updates, conn=None):
-        for item in updates:
-            seen.append((item["job_id"], item["status"], item["failure"], conn))
-
-    monkeypatch.setattr(lifecycle, "update_jobs_availability", _fake_update)
 
     lifecycle.run_lifecycle_pipeline()
 
-    assert [(item[0], item[1]) for item in seen] == [("a", "expired"), ("c", "stale")]
-    assert all(item[3] is not None for item in seen)
-    assert len({id(item[3]) for item in seen}) == 1
+    assert len(calls) == 5
+    assert [c[0] for c in calls] == ["expire", "stale", "activate", "reactivate", "repost"]
+    
+    # Verify that all calls shared the same connection object
+    assert all(c[1] is not None for c in calls)
+    assert len({id(c[1]) for c in calls}) == 1
 
 
 def test_worker_write_helpers_are_called_with_explicit_conn_kwarg():

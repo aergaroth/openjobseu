@@ -1,12 +1,44 @@
-resource "google_cloud_scheduler_job" "tick" {
-  name      = "openjobseu-tick"
+resource "google_cloud_scheduler_job" "tick_ingestion" {
+  name      = "openjobseu-tick-ingestion"
   region    = var.scheduler_region
   schedule  = "*/15 * * * *" # every 15 minutes
   time_zone = "UTC"
 
   http_target {
     http_method = "POST"
-    uri         = "${google_cloud_run_v2_service.this.uri}/internal/tick"
+    uri         = "${google_cloud_run_v2_service.this.uri}/internal/tick?group=ingestion"
+
+    headers = {
+      Content-Type = "application/json"
+    }
+  }
+}
+
+resource "google_cloud_scheduler_job" "tick_maintenance" {
+  name      = "openjobseu-tick-maintenance"
+  region    = var.scheduler_region
+  schedule  = "0 * * * *" # at minute 0 past every hour
+  time_zone = "UTC"
+
+  http_target {
+    http_method = "POST"
+    uri         = "${google_cloud_run_v2_service.this.uri}/internal/tick?group=maintenance"
+
+    headers = {
+      Content-Type = "application/json"
+    }
+  }
+}
+
+resource "google_cloud_scheduler_job" "discovery" {
+  name      = "openjobseu-discovery"
+  region    = var.scheduler_region
+  schedule  = "0 */6 * * *" # at minute 0 past every 6th hour
+  time_zone = "UTC"
+
+  http_target {
+    http_method = "POST"
+    uri         = "${google_cloud_run_v2_service.this.uri}/internal/discovery/run"
 
     headers = {
       Content-Type = "application/json"

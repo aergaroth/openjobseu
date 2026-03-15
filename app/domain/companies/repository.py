@@ -16,7 +16,7 @@ class CompanyRepository:
 
     def get_many_by_legal_names(self, conn, names: set[str]) -> dict[str, Company]:
         """
-        Zwraca mapę:
+        Returns a map:
         lower(legal_name) -> Company
         """
 
@@ -44,8 +44,8 @@ class CompanyRepository:
 
     def bulk_create_bootstrap(self, conn, names: set[str]) -> None:
         """
-        Tworzy bootstrap companies dla brakujących nazw.
-        ON CONFLICT DO NOTHING zabezpiecza przed race condition.
+        Creates bootstrap companies for missing names.
+        ON CONFLICT DO NOTHING protects against race conditions.
         """
 
         if not names:

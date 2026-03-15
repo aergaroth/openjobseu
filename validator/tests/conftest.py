@@ -41,7 +41,8 @@ else:
 # if any modules create an engine at import time we want it pointed at the
 # right database; grab it now so the fixture below can reset state easily.
 from storage.db_engine import get_engine
-from storage.db_logic import init_db
+from alembic import command
+from alembic.config import Config
 
 _engine = None
 
@@ -51,7 +52,7 @@ def clean_db():
     """Truncate the main tables before each test so state doesn't leak.
 
     We deliberately use ``BEGIN/COMMIT`` semantics rather than ``DROP`` so
-    that the migration state remains intact and ``init_db()`` can be invoked
+    that the migration state remains intact and Alembic migrations can be invoked
     multiple times in a single session without any special handling.
     If the database is unreachable we skip the entire test session rather
     than hard-fail; that keeps the repository usable without a running
@@ -60,8 +61,19 @@ def clean_db():
     global _engine
     try:
         if _engine is None:
-            init_db()
+            alembic_cfg = Config("alembic.ini")
+            alembic_cfg.attributes["configure_logger"] = False
             _engine = get_engine()
+
+            # Auto-adopt legacy test database
+            with _engine.connect() as conn:
+                jobs_exist = conn.execute(text("SELECT to_regclass('public.jobs')")).scalar_one_or_none()
+                alembic_exists = conn.execute(text("SELECT to_regclass('public.alembic_version')")).scalar_one_or_none()
+                if jobs_exist and not alembic_exists:
+                    command.stamp(alembic_cfg, "head")
+                    conn.commit()
+
+            command.upgrade(alembic_cfg, "head")
         with _engine.begin() as conn:
             conn.execute(text("TRUNCATE jobs, companies CASCADE"))
     except (OperationalError, InterfaceError) as exc:  # pragma: no cover - network/auth errors etc
@@ -69,6 +81,6 @@ def clean_db():
     except ProgrammingError as exc:
         raise RuntimeError(
             "test database schema is missing (e.g. table 'jobs' or 'companies'). "
-            "Run init_db() before pytest."
+            "Ensure Alembic migrations are up to date."
         ) from exc
     yield

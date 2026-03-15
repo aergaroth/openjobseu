@@ -1,6 +1,0 @@
-BEGIN;
-
-ALTER TABLE company_ats
-ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMPTZ;
-
-COMMIT;

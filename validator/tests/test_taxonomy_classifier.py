@@ -1,5 +1,5 @@
 import pytest
-from app.domain.classification.taxonomy import classify_taxonomy
+from app.domain.taxonomy.taxonomy import classify_taxonomy
 
 
 class TestClassifyTaxonomyJobFamily:
@@ -292,32 +292,32 @@ class TestClassifyTaxonomyCombined:
 
 
 class TestDeriveTaxonomy:
-    """Test the _derive_taxonomy wrapper in db_logic."""
+    """Test the compute_job_taxonomy wrapper in db_logic."""
 
     def test_derive_taxonomy_from_job_dict(self):
-        from storage.db_logic import _derive_taxonomy
+        from storage.db_logic import compute_job_taxonomy
 
         job = {"title": "Senior Software Engineer"}
-        result = _derive_taxonomy(job)
+        result = compute_job_taxonomy(job)
         assert result["job_family"] == "software_development"
         assert result["job_role"] == "engineer"
         assert result["seniority"] == "senior"
 
     def test_derive_taxonomy_missing_title(self):
-        from storage.db_logic import _derive_taxonomy
+        from storage.db_logic import compute_job_taxonomy
 
         job = {}
-        result = _derive_taxonomy(job)
+        result = compute_job_taxonomy(job)
         assert result["job_family"] == "unknown"
         assert result["job_role"] == "unknown"
         assert result["seniority"] == "unknown"
         assert result["specialization"] == "unknown"
 
     def test_derive_taxonomy_none_title(self):
-        from storage.db_logic import _derive_taxonomy
+        from storage.db_logic import compute_job_taxonomy
 
         job = {"title": None}
-        result = _derive_taxonomy(job)
+        result = compute_job_taxonomy(job)
         assert result["job_family"] == "unknown"
         assert result["job_role"] == "unknown"
         assert result["seniority"] == "unknown"

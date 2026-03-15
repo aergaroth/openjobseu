@@ -1,4 +1,4 @@
-from app.domain.classification.enums import RemoteClass
+from app.domain.taxonomy.enums import RemoteClass
 from app.domain.compliance.classifiers.remote import classify_remote_model
 
 

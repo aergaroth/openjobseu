@@ -1,4 +1,4 @@
-[![Dev Flow](https://github.com/aergaroth/openjobseu/actions/workflows/prod_flow.yml/badge.svg)](https://github.com/aergaroth/openjobseu/actions/workflows/dev_flow.yml)
+[![Prod Flow](https://github.com/aergaroth/openjobseu/actions/workflows/prod_flow.yml/badge.svg)](https://github.com/aergaroth/openjobseu/actions/workflows/prod_flow.yml)
 
 # OpenJobsEU
 
@@ -25,10 +25,11 @@ OpenJobsEU runs as a tick-based pipeline:
 2. Employer ATS ingestion runs (`employer_ing`)
 3. Adapters normalize data, policy is applied, and taxonomy is classified
 4. Canonical rows are upserted into PostgreSQL
-5. Post-ingestion workers run availability checks and lifecycle transitions
+5. Post-ingestion workers run lifecycle transitions, availability checks, and market metrics computation
 
 ### Active ingestion source
 - `employer_ing` (curated employers table + ATS APIs)
+- ATS Adapters are located in `app/adapters/ats/`
 
 ---
 
@@ -42,13 +43,23 @@ Public/read-only:
 - `GET /jobs/stats/compliance-7d`
 
 Internal/ops:
-- `POST /internal/tick`
-- `GET /internal/audit`
-- `GET /internal/audit/jobs`
-- `GET /internal/audit/filters`
-- `GET /internal/audit/stats/company`
-- `GET /internal/audit/stats/source-7d`
+*Auth:* `/login`, `/auth`, `/logout`
+*Pipelines:* 
+- `POST /internal/tick` (Main ingestion)
+- `POST /internal/discovery/run` (ATS discovery)
+*Audit UI:* 
+- `GET /internal/audit` (Protected by Google OAuth)
+- `GET /internal/metrics`
+- `GET /internal/audit/jobs`, `/filters`, `/stats/company`, `/stats/source-7d`
+- `GET /internal/audit/ats-health`
+*Actions/Ops:*
 - `POST /internal/audit/tick-dev`
+- `POST /internal/audit/ats-force-sync/{id}`
+- `POST /internal/audit/ats-deactivate/{id}`
+- `POST /internal/backfill-compliance`
+- `POST /internal/backfill-salary`
+- `POST /internal/backfill-department`
+*Discovery granular:* `/internal/discovery/careers`, `/internal/discovery/guess`, `/internal/discovery/ats-reverse`, `/internal/discovery/company-sources`
 
 Feed contract:
 - `/jobs/feed` returns only visible jobs (`new`, `active`)
@@ -73,8 +84,12 @@ Database backend:
 - or `DB_MODE=cloudsql` with `INSTANCE_CONNECTION_NAME`, `DB_NAME`, `DB_USER`
 
 Ingestion orchestration:
-- `run_tick_pipeline()` is the single worker orchestrator
-- pipeline executes `run_employer_ingestion()` then `run_post_ingestion()`
+- `run_pipeline()` is the main tick orchestrator
+- Pipeline executes `run_employer_ingestion()`, `run_lifecycle_pipeline()`, `run_availability_pipeline()`, and `run_market_metrics_worker()`
+
+Authentication (Audit Panel):
+- Google OAuth protects `/internal/audit` and its API calls. Requires `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `SESSION_SECRET_KEY`.
+- Automated GCP services (Cloud Scheduler/Cloud Run) bypass OAuth via `X-Goog-Authenticated-User-Email` headers or local dev exceptions.
 
 Log rendering:
 - `APP_RUNTIME=local` forces text logs/tick text output in `format=auto`
