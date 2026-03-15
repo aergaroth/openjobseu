@@ -246,7 +246,9 @@ def _insert_job_snapshot_in_conn(conn: Connection, job: dict) -> None:
                 company_name,
                 salary_min,
                 salary_max,
-                salary_currency
+                salary_currency,
+                remote_class,
+                geo_class
             )
             VALUES (
                 :job_id,
@@ -255,7 +257,9 @@ def _insert_job_snapshot_in_conn(conn: Connection, job: dict) -> None:
                 :company_name,
                 :salary_min,
                 :salary_max,
-                :salary_currency
+                :salary_currency,
+                :remote_class,
+                :geo_class
             )
         """),
         job,
@@ -310,7 +314,9 @@ def _upsert_job_in_conn(
                 company_name,
                 salary_min,
                 salary_max,
-                salary_currency
+                salary_currency,
+                remote_class,
+                geo_class
             FROM jobs
             WHERE job_id = :job_id
         """),

@@ -43,3 +43,40 @@ def test_upsert_job_extracts_and_normalizes_salary_to_eur():
 
         assert result["salary_min_eur"] == expected_min_eur
         assert result["salary_max_eur"] == expected_max_eur
+
+
+def test_upsert_job_creates_snapshot_on_fingerprint_change():
+    engine = get_engine()
+
+    # 1. Create an initial job
+    job_data = make_job(
+        title="Original Title",
+        description="Original description text.",
+        remote_class="REMOTE_ONLY",
+        geo_class="EU_REGION",
+        salary_min=10000,
+        salary_max=20000,
+        salary_currency="EUR",
+    )
+
+    with engine.begin() as conn:
+        job_id = upsert_job(job_data, conn=conn)
+
+        # 2. Simulate ATS fetching the same job but with an updated description (changes fingerprint)
+        updated_job_data = job_data.copy()
+        updated_job_data["description"] = "New description that alters the fingerprint."
+        # Remove existing fingerprint to force recalculation
+        updated_job_data.pop("job_fingerprint", None)
+
+        upsert_job(updated_job_data, conn=conn)
+
+        # 3. Verify snapshot was created properly and includes the newly added compliance classes
+        snapshot = conn.execute(
+            text("SELECT * FROM job_snapshots WHERE job_id = :job_id ORDER BY captured_at DESC LIMIT 1"),
+            {"job_id": job_id}
+        ).mappings().one()
+
+        assert snapshot["title"] == "Original Title"
+        assert snapshot["salary_min"] == 10000
+        assert snapshot["remote_class"] == "REMOTE_ONLY"
+        assert snapshot["geo_class"] == "EU_REGION"

@@ -48,6 +48,10 @@ jobs:
     env:
       TF_VAR_project_id: openjobseu
       TF_VAR_image: europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu:pr-placeholder
+      TF_VAR_google_client_id: "dummy-client-id"
+      TF_VAR_google_client_secret: "dummy-client-secret"
+      TF_VAR_session_secret_key: "dummy-session-key"
+      TF_VAR_allowed_auth_email: "dummy@example.com"
 
     steps:
       - uses: actions/checkout@v4
