@@ -93,7 +93,7 @@ def _is_recent(recent_job_at: Any) -> bool:
     return recent_job_at >= cutoff
 
 
-def _fetch_careers_page(url: str) -> tuple[str, str] | None:
+def _fetch_careers_page(url: str) -> requests.Response | None:
     try:
         response = requests.get(url, timeout=15, allow_redirects=True)
         response.raise_for_status()
@@ -154,7 +154,8 @@ def _detect_provider_with_shallow_crawl(final_url: str, html: str) -> tuple[str,
         response = _fetch_careers_page(link)
         if not response:
             continue
-        next_url, next_html = response
+        next_url = response.url
+        next_html = response.text
         detection = _detect_provider_from_fetch(next_url, next_html)
         if detection:
             return detection
