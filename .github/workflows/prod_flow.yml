@@ -102,4 +102,8 @@ jobs:
           terraform init -input=false
           terraform apply -auto-approve \
             -var="project_id=openjobseu" \
-            -var="image=europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu:${{ github.sha }}"
+            -var="image=europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu:${{ github.sha }}" \
+            -var="google_client_id=${{ secrets.PROD_GOOGLE_CLIENT_ID }}" \
+            -var="google_client_secret=${{ secrets.PROD_GOOGLE_CLIENT_SECRET }}" \
+            -var="session_secret_key=${{ secrets.PROD_SESSION_SECRET_KEY }}" \
+            -var="allowed_auth_email=${{ secrets.PROD_ALLOWED_AUTH_EMAIL }}"

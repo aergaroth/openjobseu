@@ -1,1 +1,0 @@
-ALTER TABLE jobs ADD COLUMN IF NOT EXISTS availability_status VARCHAR(50);

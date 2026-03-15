@@ -367,6 +367,14 @@ async function runTick(btn) {
   await runInternal("/internal/tick?format=text", btn);
 }
 
+async function runTickIngestion(btn) {
+  await runInternal("/internal/tick?format=text&group=ingestion", btn);
+}
+
+async function runTickMaintenance(btn) {
+  await runInternal("/internal/tick?format=text&group=maintenance", btn);
+}
+
 async function runDiscovery(btn) {
   await runInternalAsync("discovery", btn);
 }

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import logging
 from time import perf_counter
+import concurrent.futures
 
 import app.adapters.ats as ats  # noqa: F401
 from app.adapters.ats.registry import get_adapter
@@ -142,35 +143,36 @@ def run_employer_ingestion() -> dict:
         )
 
         ingestion_loop_started = perf_counter()
-        for company in companies:
-            try:
-                result = ingest_company(company)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {executor.submit(ingest_company, company): company for company in companies}
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    result = future.result()
 
-                if "error" in result:
+                    if "error" in result:
+                        companies_failed += 1
+                        if result.get("error") == "invalid_ats_slug":
+                            companies_invalid_slug += 1
+                        continue
+
+                    synced_ats_count += 1
+                    total_fetched += int(result.get("fetched", 0) or 0)
+                    total_normalized += int(result.get("normalized_count", 0) or 0)
+                    total_accepted += int(result.get("accepted", 0) or 0)
+                    total_skipped += int(result.get("skipped", 0) or 0)
+                    total_rejected_policy += int(result.get("rejected_policy_count", 0) or 0)
+                    source_reasons = result.get("rejected_by_reason", {}) or {}
+                    rejected_by_reason[RemoteClass.NON_REMOTE.value] += int(
+                        source_reasons.get(RemoteClass.NON_REMOTE.value, 0) or 0
+                    )
+                    rejected_by_reason["geo_restriction"] += int(source_reasons.get("geo_restriction", 0) or 0)
+                    source_remote_model = result.get("remote_model_counts", {}) or {}
+                    for key in remote_model_counts:
+                        remote_model_counts[key] += int(source_remote_model.get(key, 0) or 0)
+                    total_hard_geo_rejected += int(result.get("hard_geo_rejected_count", 0) or 0)
+
+                except Exception:
                     companies_failed += 1
-                    if result.get("error") == "invalid_ats_slug":
-                        companies_invalid_slug += 1
-                    continue
-
-                synced_ats_count += 1
-                total_fetched += int(result.get("fetched", 0) or 0)
-                total_normalized += int(result.get("normalized_count", 0) or 0)
-                total_accepted += int(result.get("accepted", 0) or 0)
-                total_skipped += int(result.get("skipped", 0) or 0)
-                total_rejected_policy += int(result.get("rejected_policy_count", 0) or 0)
-                source_reasons = result.get("rejected_by_reason", {}) or {}
-                rejected_by_reason[RemoteClass.NON_REMOTE.value] += int(
-                    source_reasons.get(RemoteClass.NON_REMOTE.value, 0) or 0
-                )
-                rejected_by_reason["geo_restriction"] += int(source_reasons.get("geo_restriction", 0) or 0)
-                source_remote_model = result.get("remote_model_counts", {}) or {}
-                for key in remote_model_counts:
-                    remote_model_counts[key] += int(source_remote_model.get(key, 0) or 0)
-                total_hard_geo_rejected += int(result.get("hard_geo_rejected_count", 0) or 0)
-
-            except Exception:
-                companies_failed += 1
-                continue
         ingestion_loop_duration_ms = int((perf_counter() - ingestion_loop_started) * 1000)
 
     except Exception as exc:

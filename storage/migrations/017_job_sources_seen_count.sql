@@ -1,2 +1,0 @@
-ALTER TABLE job_sources
-ADD COLUMN seen_count INTEGER NOT NULL DEFAULT 1;

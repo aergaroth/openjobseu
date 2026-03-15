@@ -10,7 +10,7 @@ class TestRunEmployerIngestion(unittest.TestCase):
     @patch("app.workers.ingestion.employer.load_active_ats_companies")
     @patch("app.workers.ingestion.employer.ingest_company")
     @patch("app.workers.ingestion.employer.log_ingestion")
-    @patch("app.workers.ingestion.employer.perf_counter", side_effect=[1, 2, 3, 4, 5, 6])
+    @patch("app.workers.ingestion.employer.perf_counter", side_effect=list(range(1, 100)))
     def test_run_employer_ingestion_happy_path(
         self, mock_perf_counter, mock_log_ingestion, mock_ingest_company, mock_load_companies, mock_get_engine
     ):
@@ -84,7 +84,7 @@ class TestRunEmployerIngestion(unittest.TestCase):
     @patch("app.workers.ingestion.employer.load_active_ats_companies")
     @patch("app.workers.ingestion.employer.ingest_company")
     @patch("app.workers.ingestion.employer.log_ingestion")
-    @patch("app.workers.ingestion.employer.perf_counter", side_effect=[1, 2, 3, 4, 5, 6])
+    @patch("app.workers.ingestion.employer.perf_counter", side_effect=list(range(1, 100)))
     def test_run_employer_ingestion_with_failures(
         self, mock_perf_counter, mock_log_ingestion, mock_ingest_company, mock_load_companies, mock_get_engine
     ):
@@ -130,7 +130,7 @@ class TestRunEmployerIngestion(unittest.TestCase):
     @patch("app.workers.ingestion.employer.load_active_ats_companies")
     @patch("app.workers.ingestion.employer.ingest_company")
     @patch("app.workers.ingestion.employer.log_ingestion")
-    @patch("app.workers.ingestion.employer.perf_counter", side_effect=[1, 2, 3, 4, 5, 6])
+    @patch("app.workers.ingestion.employer.perf_counter", side_effect=list(range(1, 100)))
     def test_run_employer_ingestion_no_companies(
         self, mock_perf_counter, mock_log_ingestion, mock_ingest_company, mock_load_companies, mock_get_engine
     ):

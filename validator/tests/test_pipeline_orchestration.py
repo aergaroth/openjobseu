@@ -7,7 +7,7 @@ def test_pipeline_runs_steps_in_order(monkeypatch):
     monkeypatch.setattr(
         pipeline,
         "run_employer_ingestion",
-        lambda: {"actions": [], "metrics": {"status": "ok", "persisted_count": 0}},
+        lambda: order.append("ingestion") or {"actions": [], "metrics": {"status": "ok", "persisted_count": 0}},
     )
     monkeypatch.setattr(
         pipeline,
@@ -32,6 +32,14 @@ def test_pipeline_runs_steps_in_order(monkeypatch):
 
     pipeline.run_pipeline()
 
+    assert order == ["ingestion", "lifecycle", "availability", "market_metrics", "maintenance"]
+    
+    order.clear()
+    pipeline.run_pipeline("ingestion")
+    assert order == ["ingestion"]
+    
+    order.clear()
+    pipeline.run_pipeline("maintenance")
     assert order == ["lifecycle", "availability", "market_metrics", "maintenance"]
 
 

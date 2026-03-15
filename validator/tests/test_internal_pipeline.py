@@ -30,7 +30,7 @@ def _fake_pipeline_result():
 def pipeline_spy(monkeypatch):
     calls = []
 
-    def _fake_run_pipeline():
+    def _fake_run_pipeline(*args, **kwargs):
         calls.append({})
         return _fake_pipeline_result()
 

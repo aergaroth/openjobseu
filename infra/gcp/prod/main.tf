@@ -45,6 +45,23 @@ resource "google_cloud_run_v2_service" "this" {
         }
       }
 
+      env {
+        name  = "GOOGLE_CLIENT_ID"
+        value = var.google_client_id
+      }
+      env {
+        name  = "GOOGLE_CLIENT_SECRET"
+        value = var.google_client_secret
+      }
+      env {
+        name  = "SESSION_SECRET_KEY"
+        value = var.session_secret_key
+      }
+      env {
+        name  = "ALLOWED_AUTH_EMAIL"
+        value = var.allowed_auth_email
+      }
+
       ports {
         container_port = 8000
       }

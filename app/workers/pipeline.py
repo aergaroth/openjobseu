@@ -15,8 +15,11 @@ logger = logging.getLogger("openjobseu.pipeline")
 # functions on the ``pipeline`` module. If we stored the callables directly, the
 # references would be bound at import time and monkeypatching would have no
 # effect, causing the orchestration order tests to fail.
-PIPELINE_STEPS = [
+PIPELINE_STEPS_INGESTION = [
     ("ingestion", "run_employer_ingestion"),
+]
+
+PIPELINE_STEPS_MAINTENANCE = [
     ("lifecycle", "run_lifecycle_pipeline"),
     ("availability", "run_availability_pipeline"),
     ("market_metrics", "run_market_metrics_worker"),
@@ -32,17 +35,24 @@ def _int_metric(value, default: int = 0) -> int:
         return default
 
 
-def run_pipeline() -> dict:
+def run_pipeline(group: str = "all") -> dict:
     """
     Execute full tick pipeline using declarative steps
+    Group can be 'all', 'ingestion', or 'maintenance'.
     """
     tick_started_at = datetime.now(timezone.utc).isoformat()
     tick_started_perf = perf_counter()
 
     actions = []
     metrics = {}
+    
+    steps = []
+    if group in ("all", "ingestion"):
+        steps.extend(PIPELINE_STEPS_INGESTION)
+    if group in ("all", "maintenance"):
+        steps.extend(PIPELINE_STEPS_MAINTENANCE)
 
-    for step_name, step_fn_name in PIPELINE_STEPS:
+    for step_name, step_fn_name in steps:
         try:
             step_callable = getattr(sys.modules[__name__], step_fn_name)
             result = step_callable() or {}

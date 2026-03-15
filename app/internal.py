@@ -437,13 +437,14 @@ def manual_tick(
         alias="format",
         pattern="^(auto|text|json)$",
     ),
+    group: str = Query("all", pattern="^(all|ingestion|maintenance)$"),
 ):
-    return tick(response_format=response_format)
+    return tick(response_format=response_format, group=group)
 
 
-def tick(*, response_format: str = "auto", force_text: bool = False):
+def tick(*, response_format: str = "auto", force_text: bool = False, group: str = "all"):
     ingestion_mode = "prod"
-    tick_sources = [TICK_SOURCE]
+    tick_sources = [TICK_SOURCE] if group in ("all", "ingestion") else []
 
     logger.info(
         "tick_start",
@@ -452,10 +453,11 @@ def tick(*, response_format: str = "auto", force_text: bool = False):
             "phase": "tick_start",
             "mode": ingestion_mode,
             "sources": tick_sources,
+            "group": group,
         },
     )
 
-    result = run_pipeline()
+    result = run_pipeline(group=group)
 
     payload = {
         "status": "ok",
