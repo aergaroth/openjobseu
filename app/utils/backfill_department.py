@@ -29,7 +29,7 @@ def backfill_missing_departments() -> int:
     updated_count = 0
 
     with engine.connect() as conn:
-        companies = load_active_ats_companies(conn, limit=10000)
+        companies = load_active_ats_companies(conn)
 
     for row in companies:
         company = dict(row)

@@ -232,7 +232,7 @@
 <body>
   <div class="wrap">
     <div class="head">
-      <h1>Offer Audit Panel</h1>
+      <h1>Admin Audit Panel</h1>
       <div class="head-actions">
         <button id="clear-btn" type="button" class="btn-secondary">Clear Filters</button>
         <button id="refresh-btn" type="button">Refresh</button>
@@ -411,6 +411,10 @@
 
         <button onclick="runBackfillDepartment(this)">Backfill Departments</button>
 
+        <button onclick="runBackfillCompliance(this)">Backfill Compliance</button>
+
+        <button onclick="runBackfillSalary(this)">Backfill Salary</button>
+
       </div>
 
     </div>
@@ -446,7 +450,7 @@
     </div>
 
     <div class="panel">
-      <strong>/internal/tick output</strong>
+      <strong>Output:</strong>
       <div id="tick-meta"></div>
       <pre class="tick-output" id="tick-output">No run yet.</pre>
     </div>
@@ -821,6 +825,14 @@
 
     async function runBackfillDepartment(btn) {
       await runInternal("/internal/backfill-department", btn);
+    }
+
+    async function runBackfillCompliance(btn) {
+      await runInternal("/internal/backfill-compliance", btn);
+    }
+
+    async function runBackfillSalary(btn) {
+      await runInternal("/internal/backfill-salary", btn);
     }
 
     async function runForceSync(btn, companyAtsId) {
