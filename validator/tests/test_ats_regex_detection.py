@@ -1,3 +1,4 @@
+from unittest.mock import Mock
 from app.workers.discovery.careers_crawler import (
     _detect_provider,
     INVALID_SLUG_KEYWORDS,
@@ -53,7 +54,10 @@ def test_shallow_crawl_follows_candidate_links(monkeypatch):
     html = '<a href="/jobs">See jobs</a>'
     def fake_fetch(url: str):
         if url.endswith('/jobs'):
-            return ('https://boards.greenhouse.io/acme-team', '<html>')
+            resp = Mock()
+            resp.url = 'https://boards.greenhouse.io/acme-team'
+            resp.text = '<html>'
+            return resp
         return None
     monkeypatch.setattr(
         'app.workers.discovery.careers_crawler._fetch_careers_page',

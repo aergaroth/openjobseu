@@ -154,6 +154,7 @@ def _detect_provider_with_shallow_crawl(final_url: str, html: str) -> tuple[str,
         response = _fetch_careers_page(link)
         if not response:
             continue
+        
         next_url = response.url
         next_html = response.text
         detection = _detect_provider_from_fetch(next_url, next_html)
