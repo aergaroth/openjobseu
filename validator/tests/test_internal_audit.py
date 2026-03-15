@@ -107,7 +107,7 @@ def test_internal_audit_page_renders_html():
     response = client.get("/internal/audit")
     assert response.status_code == 200
     assert response.headers.get("content-type", "").startswith("text/html")
-    assert "Offer Audit Panel" in response.text
+    assert "Admin Audit Panel" in response.text
 
 
 def test_internal_audit_filter_registry():
