@@ -216,7 +216,7 @@ def run_discovery():
     return run_discovery_pipeline()
 
 
-@router.post("/discovery/company-sources", dependencies=[Depends(require_internal_access)])
+@router.post("/discovery/company-sources", dependencies=[Depends(require_internal_or_user_api_access)])
 def run_company_sources():
     return run_company_source_discovery()
 
@@ -231,19 +231,19 @@ def run_tick_from_audit():
     return result
 
 
-@router.post("/backfill-compliance", dependencies=[Depends(require_internal_access)])
+@router.post("/backfill-compliance", dependencies=[Depends(require_internal_or_user_api_access)])
 def backfill_compliance(limit: int = Query(1000, ge=1, le=10000)):
     updated_count = backfill_missing_compliance_classes(limit=limit)
     return {"status": "ok", "updated_jobs_count": updated_count}
 
 
-@router.post("/backfill-salary", dependencies=[Depends(require_internal_access)])
+@router.post("/backfill-salary", dependencies=[Depends(require_internal_or_user_api_access)])
 def backfill_salary(limit: int = Query(1000, ge=1, le=10000)):
     updated_count = backfill_missing_salary_fields(limit=limit)
     return {"status": "ok", "updated_jobs_count": updated_count}
 
 
-@router.post("/backfill-department", dependencies=[Depends(require_internal_access)])
+@router.post("/backfill-department", dependencies=[Depends(require_internal_or_user_api_access)])
 def backfill_department():
     updated_count = backfill_missing_departments()
     return {"status": "ok", "updated_jobs_count": updated_count}
