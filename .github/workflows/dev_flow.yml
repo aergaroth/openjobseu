@@ -64,7 +64,7 @@ jobs:
 
       - name: Initialize schema
         run: |
-          python -c "from storage.db_logic import init_db; init_db()"
+          alembic upgrade head
 
       - name: Run tests
         run: pytest -q
