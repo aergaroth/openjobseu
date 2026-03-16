@@ -29,7 +29,7 @@ Current provider behavior:
 - supported provider -> fetch + normalize + policy + persist
 - unsupported/inactive provider -> skipped with ingestion metrics
 
-`geo_restriction_hard` offers are counted in metrics and skipped from persistence.
+`geo_restriction_hard` offers are flagged in metrics and persisted with a rejected status to enable broader market analytics.
 
 ---
 

@@ -8,6 +8,8 @@ on:
       - "README.md"
       - "docs/**"
   pull_request:
+    branches-ignore:
+      - main
     paths-ignore:
       - "README.md"
       - "docs/**"

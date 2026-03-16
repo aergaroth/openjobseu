@@ -44,30 +44,32 @@ def process_company_jobs(
             compliance_payload = (job or normalized).get("_compliance", {})
             reason = report.get("policy_reason")
             remote_model = compliance_payload.get("remote_model")
+            compliance_status = compliance_payload.get("compliance_status")
 
             metrics.observe_remote_model(remote_model)
 
             if not job:
-                metrics.observe_rejection(reason)
                 metrics.observe_skip()
-            else:
-                # Log salary detection (from worker as requested)
-                salary_source = job.get("salary_source")
-                if salary_source:
-                    logger.info(
-                        f"salary_{salary_source}_detected",
-                        extra={"job_id": job.get("job_id")},
-                    )
-                else:
-                    logger.info("salary_missing", extra={"job_id": job.get("job_id")})
+                continue
 
-                canonical_job_id = upsert_job(job, conn=conn, company_id=company_id)
+            if compliance_status == "approved":
                 metrics.observe_accept()
-                report["job_id"] = canonical_job_id
+            else:
+                metrics.observe_rejection(reason)
 
-            # Persist compliance report only when a canonical job exists.
-            # Rejected jobs are not upserted into jobs table, therefore they
-            # don't have a valid FK target for compliance_reports.job_id.
+            # Log salary detection (from worker as requested)
+            salary_source = job.get("salary_source")
+            if salary_source:
+                logger.info(
+                    f"salary_{salary_source}_detected",
+                    extra={"job_id": job.get("job_id")},
+                )
+            else:
+                logger.info("salary_missing", extra={"job_id": job.get("job_id")})
+
+            canonical_job_id = upsert_job(job, conn=conn, company_id=company_id)
+            report["job_id"] = canonical_job_id
+
             if report.get("job_id"):
                 insert_compliance_report(
                     conn,

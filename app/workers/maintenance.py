@@ -2,7 +2,10 @@ import logging
 from time import perf_counter
 
 from storage.db_engine import get_engine
-from storage.repositories.maintenance_repository import update_company_job_stats_bulk, update_company_signal_scores_bulk
+from storage.repositories.maintenance_repository import (
+    update_company_job_stats_bulk,
+    update_company_signal_scores_bulk,
+)
 
 logger = logging.getLogger("openjobseu.maintenance")
 

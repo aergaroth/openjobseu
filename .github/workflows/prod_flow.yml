@@ -6,6 +6,11 @@ on:
     paths-ignore:
       - "README.md"
       - "docs/**"
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "README.md"
+      - "docs/**"
   workflow_dispatch:
 
 env:
@@ -66,6 +71,7 @@ jobs:
 
   build-deploy-prod:
     needs: pytest
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
