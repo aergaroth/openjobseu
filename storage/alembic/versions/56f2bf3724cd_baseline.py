@@ -650,9 +650,9 @@ ON job_snapshots(captured_at);
     # --- 015_companies_discovery_last_checked_at.sql ---
     op.execute("""
 ALTER TABLE companies
-ADD COLUMN discovery_last_checked_at TIMESTAMP WITH TIME ZONE;
+ADD COLUMN IF NOT EXISTS discovery_last_checked_at TIMESTAMP WITH TIME ZONE;
 
-CREATE INDEX idx_companies_discovery_last_checked_at
+CREATE INDEX IF NOT EXISTS idx_companies_discovery_last_checked_at
 ON companies (discovery_last_checked_at);
     """)
 
@@ -665,7 +665,7 @@ ON company_ats(provider, ats_slug);
     # --- 017_job_sources_seen_count.sql ---
     op.execute("""
 ALTER TABLE job_sources
-ADD COLUMN seen_count INTEGER NOT NULL DEFAULT 1;
+ADD COLUMN IF NOT EXISTS seen_count INTEGER NOT NULL DEFAULT 1;
     """)
 
     # --- 018_jobs_repost_markers.sql ---
@@ -679,7 +679,7 @@ ADD COLUMN IF NOT EXISTS repost_count INTEGER NOT NULL DEFAULT 0;
 
     # --- 019_market_daily_stats.sql ---
     op.execute("""
-CREATE TABLE market_daily_stats (
+CREATE TABLE IF NOT EXISTS market_daily_stats (
     date DATE PRIMARY KEY,
 
     jobs_created INTEGER NOT NULL,
@@ -695,13 +695,13 @@ CREATE TABLE market_daily_stats (
     remote_ratio NUMERIC
 );
 
-CREATE INDEX idx_market_daily_stats_date
+CREATE INDEX IF NOT EXISTS idx_market_daily_stats_date
 ON market_daily_stats(date);
     """)
 
     # --- 020_market_daily_stats_segments.sql ---
     op.execute("""
-CREATE TABLE market_daily_stats_segments (
+CREATE TABLE IF NOT EXISTS market_daily_stats_segments (
     date DATE NOT NULL,
 
     segment_type TEXT NOT NULL,
@@ -716,7 +716,7 @@ CREATE TABLE market_daily_stats_segments (
     PRIMARY KEY (date, segment_type, segment_value)
 );
 
-CREATE INDEX idx_market_segments_date
+CREATE INDEX IF NOT EXISTS idx_market_segments_date
 ON market_daily_stats_segments(date);
     """)
 
@@ -742,22 +742,29 @@ WHERE availability_status = 'active';
     # --- 022_split_discovery_timestamps.sql ---
     op.execute("""
 -- 1. Dodanie nowych kolumn do niezależnego śledzenia etapów
-ALTER TABLE companies ADD COLUMN careers_last_checked_at TIMESTAMP WITH TIME ZONE;
-ALTER TABLE companies ADD COLUMN ats_guess_last_checked_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS careers_last_checked_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS ats_guess_last_checked_at TIMESTAMP WITH TIME ZONE;
 
 -- 2. Migracja dotychczasowego stanu (jeśli firma była skanowana wcześniej)
-UPDATE companies 
-SET 
-    careers_last_checked_at = discovery_last_checked_at,
-    ats_guess_last_checked_at = discovery_last_checked_at
-WHERE discovery_last_checked_at IS NOT NULL;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'companies' AND column_name = 'discovery_last_checked_at'
+    ) THEN
+        EXECUTE 'UPDATE companies 
+                 SET careers_last_checked_at = discovery_last_checked_at,
+                     ats_guess_last_checked_at = discovery_last_checked_at
+                 WHERE discovery_last_checked_at IS NOT NULL';
+    END IF;
+END $$;
 
 -- 3. Usunięcie przestarzałej kolumny
-ALTER TABLE companies DROP COLUMN discovery_last_checked_at;
+ALTER TABLE companies DROP COLUMN IF EXISTS discovery_last_checked_at;
 
 -- 4. Utworzenie zoptymalizowanych, częściowych indeksów pod warunki zapytania
 -- Worker: careers_crawler
-CREATE INDEX idx_companies_careers_check 
+CREATE INDEX IF NOT EXISTS idx_companies_careers_check 
 ON companies (careers_last_checked_at ASC NULLS FIRST) 
 WHERE bootstrap = FALSE 
   AND is_active = TRUE 
@@ -765,7 +772,7 @@ WHERE bootstrap = FALSE
   AND careers_url IS NOT NULL;
 
 -- Worker: ats_guessing
-CREATE INDEX idx_companies_ats_guess_check 
+CREATE INDEX IF NOT EXISTS idx_companies_ats_guess_check 
 ON companies (ats_guess_last_checked_at ASC NULLS FIRST) 
 WHERE bootstrap = FALSE 
   AND is_active = TRUE 
@@ -776,7 +783,7 @@ WHERE bootstrap = FALSE
     # --- 023_add_source_department.sql ---
     op.execute("""
 -- Add column to store the raw department/category extracted directly from the ATS API
-ALTER TABLE jobs ADD COLUMN source_department VARCHAR(255);
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source_department VARCHAR(255);
     """)
 
     # --- 024_company_job_stats.sql ---
