@@ -28,6 +28,8 @@ PROVIDER_PATTERNS: Dict[str, re.Pattern] = {
     "lever": re.compile(r"jobs\.lever\.co/([a-zA-Z0-9_-]+)", re.IGNORECASE),
     "workable": re.compile(r"apply\.workable\.com/([a-zA-Z0-9_-]+)", re.IGNORECASE),
     "ashby": re.compile(r"jobs\.ashbyhq\.com/([a-zA-Z0-9_-]+)", re.IGNORECASE),
+    "personio": re.compile(r"([a-zA-Z0-9_-]+)\.jobs\.personio\.[a-z]{2,4}", re.IGNORECASE),
+    "recruitee": re.compile(r"([a-zA-Z0-9_-]+)\.recruitee\.com", re.IGNORECASE),
 }
 
 INVALID_SLUG_KEYWORDS = {
