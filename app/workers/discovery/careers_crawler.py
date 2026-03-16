@@ -6,6 +6,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, Iterable
 
 import requests
+import urllib3
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, parse_qs
 
@@ -18,6 +19,8 @@ from storage.repositories.discovery_repository import (
 )
 
 logger = logging.getLogger("openjobseu.discovery")
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 MAX_COMPANIES_PER_RUN = 10
 QUALITY_MIN_JOBS = 1
@@ -96,8 +99,11 @@ def _is_recent(recent_job_at: Any) -> bool:
 
 
 def _fetch_careers_page(url: str) -> requests.Response | None:
+    if not url or not url.startswith(("http://", "https://")):
+        return None
+
     try:
-        response = requests.get(url, timeout=15, allow_redirects=True)
+        response = requests.get(url, timeout=15, allow_redirects=True, verify=False)
         response.raise_for_status()
         return response
     except Exception as exc:

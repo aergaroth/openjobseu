@@ -4,6 +4,7 @@ import re
 import io
 import zipfile
 import requests
+import urllib3
 
 from storage.db_engine import get_engine
 from storage.repositories.discovery_repository import insert_source_company, get_existing_brand_names
@@ -14,6 +15,8 @@ from app.workers.discovery.careers_crawler import run_careers_discovery
 from app.workers.discovery.ats_probe import probe_ats
 
 logger = logging.getLogger("openjobseu.discovery")
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 CAREERS_PATHS = [
     "/careers",
@@ -97,7 +100,7 @@ def run_company_source_discovery():
         for url in candidate_urls:
             try:
                 # Use a HEAD request for efficiency to find the first working URL
-                response = requests.head(url, timeout=3, allow_redirects=True)
+                response = requests.head(url, timeout=3, allow_redirects=True, verify=False)
                 if response.ok:
                     careers_url = response.url  # Use the final URL after redirects
                     break
