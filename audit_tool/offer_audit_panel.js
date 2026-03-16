@@ -278,6 +278,23 @@ async function loadJobs() {
   renderJobRows(currentJobs);
   updateTopScrollbar();
 
+  // Update pagination state
+  const offsetEl = document.getElementById("offset");
+  const limitEl = document.getElementById("limit");
+  const offset = parseInt(offsetEl.value || "0", 10);
+  const limit = parseInt(limitEl.value || "50", 10);
+  const total = data.total || 0;
+
+  const pageInfo = document.getElementById("page-info");
+  if (pageInfo) {
+    const end = total === 0 ? 0 : Math.min(offset + limit, total);
+    pageInfo.textContent = total === 0 ? "0 - 0 of 0" : `${offset + 1} - ${end} of ${total}`;
+  }
+
+  document.getElementById("prev-btn").disabled = offset <= 0;
+  document.getElementById("next-btn").disabled = (offset + limit) >= total;
+}
+
 async function loadCompanies() {
   const params = new URLSearchParams();
   for (const id of ["comp_name", "comp_ats", "comp_active", "comp_min_score", "comp_limit", "comp_offset"]) {
@@ -320,23 +337,6 @@ async function safeLoadCompanies() {
     if(body) body.innerHTML = `<tr><td class="error" colspan="${compColsActive.length}">${esc(error.message)}</td></tr>`;
     updateTopScrollbar();
   }
-}
-
-  // Update pagination state
-  const offsetEl = document.getElementById("offset");
-  const limitEl = document.getElementById("limit");
-  const offset = parseInt(offsetEl.value || "0", 10);
-  const limit = parseInt(limitEl.value || "50", 10);
-  const total = data.total || 0;
-
-  const pageInfo = document.getElementById("page-info");
-  if (pageInfo) {
-    const end = total === 0 ? 0 : Math.min(offset + limit, total);
-    pageInfo.textContent = total === 0 ? "0 - 0 of 0" : `${offset + 1} - ${end} of ${total}`;
-  }
-
-  document.getElementById("prev-btn").disabled = offset <= 0;
-  document.getElementById("next-btn").disabled = (offset + limit) >= total;
 }
 
 async function safeLoadJobs() {
@@ -463,6 +463,7 @@ async function safeLoadMetrics() {
 
 async function safeLoadAll() {
   await Promise.all([safeLoadJobs(), safeLoadCompanies(), safeLoadAuditStats(), safeLoadMetrics(), safeLoadAtsHealth()]);
+}
 let compDebounceTimer = null;
 function scheduleCompLoad() {
   if (compDebounceTimer) clearTimeout(compDebounceTimer);
@@ -489,10 +490,6 @@ document.getElementById("comp-next-btn").addEventListener("click", () => {
   el.value = parseInt(el.value || "0", 10) + limit;
   safeLoadCompanies();
 });
-
-async function safeLoadAll() {
-  await Promise.all([safeLoadJobs(), safeLoadAuditStats(), safeLoadMetrics(), safeLoadAtsHealth()]);
-}
 
 async function runTickDev() {
   const button = document.getElementById("tick-btn");
