@@ -77,17 +77,9 @@ def process_ingested_job(job: dict, source: str) -> Tuple[Optional[dict], dict]:
         "policy_reason": reason
     }
 
-    if not job_after_policy or compliance_payload.get("compliance_status") != "approved":
-        # Finalize normalized fields even for rejected jobs if they exist
-        if job_after_policy:
-            job_after_policy["remote_class"] = normalize_remote_class(_string_like(compliance_payload.get("remote_model"))).value
-            job_after_policy["geo_class"] = normalize_geo_class(_string_like(compliance_payload.get("geo_class"))).value
-            job_after_policy["compliance_status"] = compliance_payload.get("compliance_status")
-            job_after_policy["compliance_score"] = compliance_payload.get("compliance_score")
-            job_after_policy["policy_version"] = compliance_report["policy_version"]
-            job_after_policy["salary_transparency_status"] = None
+    if not job_after_policy:
         return None, compliance_report
-
+        
     processed_job = job_after_policy
 
     # 3. Taxonomy

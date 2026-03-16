@@ -1,7 +1,7 @@
 import pytest
 from app.domain.jobs.job_processing import process_ingested_job
 
-def test_job_processing_only_for_approved(monkeypatch):
+def test_job_processing_handles_approved_and_rejected(monkeypatch):
     # Mock dependencies
     monkeypatch.setattr("app.domain.jobs.job_processing.apply_policy", 
                         lambda job, source: (job, "some_reason"))
@@ -52,7 +52,9 @@ def test_job_processing_only_for_approved(monkeypatch):
     
     processed_rejected, report_rej = process_ingested_job(job_rejected, source="s1")
     
-    assert processed_rejected is None
-    assert len(taxonomy_calls) == 0
-    assert len(salary_calls) == 0
+    assert processed_rejected is not None
+    assert "job_category" in processed_rejected
+    assert "salary_min" in processed_rejected
+    assert len(taxonomy_calls) == 1
+    assert len(salary_calls) == 1
     assert report_rej["final_status"] == "rejected"

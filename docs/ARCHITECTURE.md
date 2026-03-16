@@ -259,8 +259,8 @@ Per job in `process_company_jobs`:
    - quality score: `compute_job_quality_score`
 
 #### DB persistence
-- Approved jobs are upserted by `upsert_job` (`storage/repositories/jobs_repository.py`).
-- Compliance reports are persisted for processed jobs with `insert_compliance_report` (`storage/repositories/compliance_repository.py`).
+- All processed jobs (including rejected ones) are upserted by `upsert_job` (`storage/repositories/jobs_repository.py`) to support comprehensive market analytics and auditability.
+- Compliance reports are persisted for all processed jobs with `insert_compliance_report` (`storage/repositories/compliance_repository.py`).
 - `upsert_job` also:
   - maintains `job_sources` mapping,
   - snapshots previous version into `job_snapshots` when fingerprint changes.
