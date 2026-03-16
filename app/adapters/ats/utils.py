@@ -65,7 +65,10 @@ def normalize_source_datetime(raw_value: Any) -> str | None:
     elif isinstance(raw_value, (tuple, list)) and len(raw_value) >= 6:
         dt = datetime(*raw_value[:6], tzinfo=timezone.utc)
     elif isinstance(raw_value, (int, float)):
-        dt = datetime.fromtimestamp(raw_value, tz=timezone.utc)
+        ts_val = float(raw_value)
+        if ts_val > 10000000000:  # Wartość jest w milisekundach (rok > 2286 dla sekund)
+            ts_val = ts_val / 1000.0
+        dt = datetime.fromtimestamp(ts_val, tz=timezone.utc)
     elif isinstance(raw_value, str):
         value = raw_value.strip()
         if not value:
