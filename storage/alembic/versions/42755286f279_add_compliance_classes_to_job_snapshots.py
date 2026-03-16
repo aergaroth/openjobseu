@@ -18,14 +18,14 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute("""
-        ALTER TABLE job_snapshots 
+        ALTER TABLE IF EXISTS job_snapshots 
         ADD COLUMN IF NOT EXISTS remote_class TEXT,
         ADD COLUMN IF NOT EXISTS geo_class TEXT;
     """)
 
 def downgrade() -> None:
     op.execute("""
-        ALTER TABLE job_snapshots 
+        ALTER TABLE IF EXISTS job_snapshots 
         DROP COLUMN IF EXISTS remote_class,
         DROP COLUMN IF EXISTS geo_class;
     """)
