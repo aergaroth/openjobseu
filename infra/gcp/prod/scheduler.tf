@@ -9,7 +9,8 @@ resource "google_cloud_scheduler_job" "tick_ingestion" {
     uri         = "${google_cloud_run_v2_service.this.uri}/internal/tick?group=ingestion"
 
     headers = {
-      Content-Type = "application/json"
+      Content-Type      = "application/json"
+      X-Internal-Secret = random_password.internal_secret.result
     }
   }
 }
@@ -25,7 +26,8 @@ resource "google_cloud_scheduler_job" "tick_maintenance" {
     uri         = "${google_cloud_run_v2_service.this.uri}/internal/tick?group=maintenance"
 
     headers = {
-      Content-Type = "application/json"
+      Content-Type      = "application/json"
+      X-Internal-Secret = random_password.internal_secret.result
     }
   }
 }
@@ -41,7 +43,8 @@ resource "google_cloud_scheduler_job" "discovery" {
     uri         = "${google_cloud_run_v2_service.this.uri}/internal/discovery/run"
 
     headers = {
-      Content-Type = "application/json"
+      Content-Type      = "application/json"
+      X-Internal-Secret = random_password.internal_secret.result
     }
   }
 }

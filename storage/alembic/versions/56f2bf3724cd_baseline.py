@@ -435,13 +435,13 @@ SET job_fingerprint = md5(
     CONCAT(
         COALESCE(company_id::text, ''),
         '|',
-        lower(regexp_replace(COALESCE(company_name, ''), '\s+', ' ', 'g')),
+        lower(regexp_replace(COALESCE(company_name, ''), '\\s+', ' ', 'g')),
         '|',
-        lower(regexp_replace(COALESCE(title, ''), '\s+', ' ', 'g')),
+        lower(regexp_replace(COALESCE(title, ''), '\\s+', ' ', 'g')),
         '|',
-        lower(regexp_replace(COALESCE(remote_scope, ''), '\s+', ' ', 'g')),
+        lower(regexp_replace(COALESCE(remote_scope, ''), '\\s+', ' ', 'g')),
         '|',
-        left(lower(regexp_replace(COALESCE(description, ''), '\s+', ' ', 'g')), 500)
+        left(lower(regexp_replace(COALESCE(description, ''), '\\s+', ' ', 'g')), 500)
     )
 );
 
@@ -479,13 +479,13 @@ WITH canonical AS (
             CONCAT(
                 COALESCE(j.company_id::text, ''),
                 '|',
-                lower(regexp_replace(COALESCE(j.company_name, ''), '\s+', ' ', 'g')),
+                lower(regexp_replace(COALESCE(j.company_name, ''), '\\s+', ' ', 'g')),
                 '|',
-                lower(regexp_replace(COALESCE(j.title, ''), '\s+', ' ', 'g')),
+                lower(regexp_replace(COALESCE(j.title, ''), '\\s+', ' ', 'g')),
                 '|',
-                lower(regexp_replace(COALESCE(j.remote_scope, ''), '\s+', ' ', 'g')),
+                lower(regexp_replace(COALESCE(j.remote_scope, ''), '\\s+', ' ', 'g')),
                 '|',
-                left(lower(regexp_replace(COALESCE(j.description, ''), '\s+', ' ', 'g')), 500)
+                left(lower(regexp_replace(COALESCE(j.description, ''), '\\s+', ' ', 'g')), 500)
             )
         ) AS canonical_fingerprint
     FROM jobs j

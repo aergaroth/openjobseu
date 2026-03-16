@@ -85,12 +85,13 @@ def test_require_internal_or_user_api_access_allows_localhost():
     require_internal_or_user_api_access(request)
 
 
-def test_require_internal_or_user_api_access_allows_gcp_identity():
+def test_require_internal_or_user_api_access_allows_internal_secret(monkeypatch):
+    monkeypatch.setenv("INTERNAL_SECRET", "super-secret-test-key")
     scope = {
         "type": "http",
         "client": ("192.168.1.1", 12345),
         "session": {},
-        "headers": [(b"x-goog-authenticated-user-email", b"accounts.google.com:test-service-account@gserviceaccount.com")],
+        "headers": [(b"x-internal-secret", b"super-secret-test-key")],
     }
     request = Request(scope)
     

@@ -1,3 +1,4 @@
+import os
 from fastapi import Request, HTTPException, status
 
 
@@ -8,7 +9,7 @@ def require_internal_access(request: Request):
     Allowed:
     - localhost (development)
     - TestClient (for unit/integration tests)
-    - any authenticated Cloud Run identity (IAM verified)
+    - requests presenting the correct internal secret
     """
 
     client_host = request.client.host if request.client else None
@@ -17,14 +18,14 @@ def require_internal_access(request: Request):
     if client_host in ("127.0.0.1", "localhost", "testclient"):
         return
 
-    # Check for identity header from GCP services (e.g. Cloud Run, Scheduler).
-    # This header is added by the proxy when the request is authenticated with an OIDC token.
-    identity = request.headers.get("X-Goog-Authenticated-User-Email")
+    # Validate using a shared secret injected by infrastructure
+    expected_secret = os.getenv("INTERNAL_SECRET")
+    provided_secret = request.headers.get("X-Internal-Secret")
 
-    if identity:
+    if expected_secret and provided_secret == expected_secret:
         return
 
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
+        status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Authentication required for internal endpoints",
     )
