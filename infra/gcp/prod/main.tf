@@ -3,6 +3,11 @@ provider "google" {
   region  = var.region
 }
 
+resource "random_password" "internal_secret" {
+  length  = 32
+  special = false
+}
+
 resource "google_cloud_run_v2_service" "this" {
   name     = var.service_name
   location = var.region
@@ -60,6 +65,10 @@ resource "google_cloud_run_v2_service" "this" {
       env {
         name  = "ALLOWED_AUTH_EMAIL"
         value = var.allowed_auth_email
+      }
+      env {
+        name  = "INTERNAL_SECRET"
+        value = random_password.internal_secret.result
       }
 
       ports {
