@@ -138,7 +138,7 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
     monkeypatch.setattr(
         employer,
         "mark_ats_synced",
-        lambda _conn, company_ats_id: sync_markers.append(company_ats_id),
+        lambda _conn, company_ats_id, success=True: sync_markers.append(company_ats_id),
     )
 
     result = employer.ingest_company(company)
@@ -260,7 +260,7 @@ def test_ingest_company_accepts_uuid_company_identifiers(monkeypatch):
     monkeypatch.setattr(
         employer,
         "mark_ats_synced",
-        lambda _conn, company_ats_id: sync_markers.append(company_ats_id),
+        lambda _conn, company_ats_id, success=True: sync_markers.append(company_ats_id),
     )
 
     result = employer.ingest_company(company)
@@ -346,7 +346,7 @@ def test_ingest_company_rejected_job_does_not_insert_compliance_report_without_j
         "insert_compliance_report",
         lambda *args, **kwargs: report_calls.append(kwargs),
     )
-    monkeypatch.setattr(employer, "mark_ats_synced", lambda _conn, _company_ats_id: None)
+    monkeypatch.setattr(employer, "mark_ats_synced", lambda _conn, _company_ats_id, success=True: None)
 
     result = employer.ingest_company(company)
 

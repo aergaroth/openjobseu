@@ -176,7 +176,7 @@ class TestIngestCompany(unittest.TestCase):
         mock_process.assert_called_once()
         metrics_arg = mock_process.call_args.args[5]
         self.assertEqual(metrics_arg.fetched, 1)
-        mock_mark_synced.assert_called_once_with(mock_conn, "ats1")
+        mock_mark_synced.assert_called_once_with(mock_conn, "ats1", success=True)
         self.assertNotIn("error", result)
         self.assertEqual(result["fetched"], 1)
 
@@ -209,15 +209,21 @@ class TestIngestCompany(unittest.TestCase):
 
     @patch("app.workers.ingestion.employer.get_adapter")
     @patch("app.workers.ingestion.employer.fetch_company_jobs", return_value=(None, "fetch_failed"))
-    def test_ingest_company_fetch_error(self, mock_fetch, mock_get_adapter):
+    @patch("app.workers.ingestion.employer.get_engine")
+    @patch("app.workers.ingestion.employer.mark_ats_synced")
+    def test_ingest_company_fetch_error(self, mock_mark_synced, mock_get_engine, mock_fetch, mock_get_adapter):
         # Arrange
-        company = {"ats_provider": "test_provider"}
+        company = {"ats_provider": "test_provider", "company_ats_id": "ats1"}
         mock_get_adapter.return_value = MagicMock()
+        
+        mock_conn = MagicMock()
+        mock_get_engine.return_value.begin.return_value.__enter__.return_value = mock_conn
 
         # Act
         result = ingest_company(company)
 
         # Assert
+        mock_mark_synced.assert_called_once_with(mock_conn, "ats1", success=False)
         self.assertEqual(result["error"], "fetch_failed")
         self.assertEqual(result["fetched"], 0)
 

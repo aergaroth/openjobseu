@@ -64,6 +64,9 @@ def ingest_company(company: dict):
 
     raw_jobs, error = fetch_company_jobs(company, adapter, updated_since=updated_since)
     if error:
+        engine = get_engine()
+        with engine.begin() as conn:
+            mark_ats_synced(conn, company.get("company_ats_id"), success=False)
         return {
             "fetched": 0,
             "normalized_count": 0,
@@ -85,7 +88,7 @@ def ingest_company(company: dict):
                 provider,
                 metrics,
             )
-            mark_ats_synced(conn, company.get("company_ats_id"))
+            mark_ats_synced(conn, company.get("company_ats_id"), success=True)
 
     except Exception:
         return {
@@ -130,7 +133,7 @@ def run_employer_ingestion() -> dict:
     try:
         companies_load_started = perf_counter()
         with engine.connect() as conn:
-            companies = load_active_ats_companies(conn)
+            companies = load_active_ats_companies(conn, limit=100)
         companies_load_duration_ms = int((perf_counter() - companies_load_started) * 1000)
 
         total_companies = len(companies)

@@ -24,8 +24,10 @@ PROVIDERS_TO_PROBE = [
     "lever",
     "workable",
     "ashby",
+    "personio",
+    "recruitee",
 ]
-MAX_SLUG_CANDIDATES = 10
+MAX_SLUG_CANDIDATES = 30
 
 
 def _generate_slug_candidates(name: str) -> list[str]:
@@ -54,7 +56,10 @@ def _generate_slug_candidates(name: str) -> list[str]:
         if base not in candidates:
             candidates.append(base)
             
-    suffixes = ["hq", "inc", "labs", "jobs", "app", "careers"]
+    suffixes = [
+        "hq", "inc", "labs", "jobs", "app", "careers",
+        "gmbh", "de", "ltd", "uk", "sas", "fr", "spzoo", "pl"
+    ]
 
     for suffix in suffixes:
         for base in bases:
