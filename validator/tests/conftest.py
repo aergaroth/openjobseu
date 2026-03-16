@@ -70,7 +70,7 @@ def clean_db():
                 jobs_exist = conn.execute(text("SELECT to_regclass('public.jobs')")).scalar_one_or_none()
                 alembic_exists = conn.execute(text("SELECT to_regclass('public.alembic_version')")).scalar_one_or_none()
                 if jobs_exist and not alembic_exists:
-                    command.stamp(alembic_cfg, "head")
+                    command.stamp(alembic_cfg, "56f2bf3724cd")
                     conn.commit()
 
             command.upgrade(alembic_cfg, "head")

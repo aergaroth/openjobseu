@@ -40,7 +40,7 @@ def _run_db_bootstrap_once() -> None:
         
         if jobs_exist and not alembic_exists:
             logger.info("Legacy database schema detected. Auto-stamping Alembic baseline.")
-            command.stamp(alembic_cfg, "head")
+            command.stamp(alembic_cfg, "56f2bf3724cd")
             conn.commit()
 
     command.upgrade(alembic_cfg, "head")
