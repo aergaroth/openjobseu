@@ -8,6 +8,8 @@ on:
       - "README.md"
       - "docs/**"
   pull_request:
+    branches-ignore:
+      - main
     paths-ignore:
       - "README.md"
       - "docs/**"
@@ -71,7 +73,7 @@ jobs:
 
   build-deploy-dev:
     needs: pytest
-    if: github.ref == 'refs/heads/develop' || (github.event_name == 'pull_request' && github.base_ref != 'main')
+    if: github.ref == 'refs/heads/develop' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
