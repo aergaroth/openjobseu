@@ -34,10 +34,15 @@ ATS Adapters -> Employer Ingestion Worker -> Policy Signals -> DB Upsert -> Post
 
 Runtime path:
 - loads active ATS companies from `companies` table (`is_active=true`, `ats_provider`, `ats_slug`)
+  - batched to 100 companies per tick, ordered by `company_ats.updated_at ASC`
 - adapters resolved via `app/adapters/ats/registry.py`
 - current adapter implementations:
   - `app/adapters/ats/greenhouse.py`
-  - `app/adapters/ats/lever.py` (inactive)
+  - `app/adapters/ats/lever.py`
+  - `app/adapters/ats/workable.py`
+  - `app/adapters/ats/ashby.py`
+  - `app/adapters/ats/personio.py`
+  - `app/adapters/ats/recruitee.py`
 - normalization happens inside adapters (`normalize()`)
 - policy tagging uses `app/domain/compliance/engine.py` (`apply_policy`)
 
@@ -233,17 +238,21 @@ The orchestrator aggregates `actions` and step-level `metrics`; failures are cap
 - Base contract: `app/adapters/ats/base.py` (`fetch`, `normalize`, `probe_jobs`).
 - Registry: `app/adapters/ats/registry.py`.
 - Implementations in tree:
-  - `app/adapters/ats/greenhouse.py` (active, implemented)
-  - `app/adapters/ats/lever.py` (registered, inactive, methods raise `NotImplementedError`)
+  - `app/adapters/ats/greenhouse.py`
+  - `app/adapters/ats/lever.py`
+  - `app/adapters/ats/workable.py`
+  - `app/adapters/ats/ashby.py`
+  - `app/adapters/ats/personio.py`
+  - `app/adapters/ats/recruitee.py`
 
 #### Ingestion runtime flow
 Main worker: `app/workers/ingestion/employer.py`
-1. Load active ATS-company mappings via `load_active_ats_companies` (`storage/repositories/ats_repository.py`).
+1. Load active ATS-company mappings via `load_active_ats_companies` (`storage/repositories/ats_repository.py`) batched by 100 oldest synced records.
 2. For each company:
    - resolve adapter from registry,
-   - fetch raw jobs via `fetch_company_jobs` (`app/workers/ingestion/fetch.py`),
+   - fetch raw jobs incrementally via `fetch_company_jobs` using `last_sync_at` as a cursor,
    - open DB transaction and process jobs via `process_company_jobs` (`app/workers/ingestion/process_loop.py`),
-   - mark sync timestamp (`mark_ats_synced`).
+   - mark sync timestamp (`mark_ats_synced`) to rotate the queue (`updated_at`) and advance the fetch cursor (`last_sync_at`).
 
 #### Normalization + identity + policy/compliance
 Per job in `process_company_jobs`:
@@ -302,9 +311,10 @@ Discovery orchestrator: `app/workers/discovery/pipeline.py`
 
 #### ATS guessing flow (`app/workers/discovery/ats_guessing.py`)
 1. Generate slug candidates from company name.
-2. Probe providers in fixed list (`greenhouse`, `lever`, `workable`).
+2. Probe providers in fixed list (`greenhouse`, `lever`, `workable`, `ashby`, `personio`, `recruitee`).
 3. Apply same quality thresholds as crawler.
 4. Insert candidate into `company_ats` on successful probe.
+5. Update `companies.ats_guess_last_checked_at`.
 
 ### 6. Worker system
 
@@ -352,13 +362,13 @@ Schema source: `storage/migrations/*.sql` + repository usage in `storage/reposit
 
 #### `companies`
 - Purpose: company registry used for ingestion and discovery candidate selection.
-- Defined in: `002_companies.sql`, extended by `015_companies_discovery_last_checked_at.sql`.
-- Main fields: `company_id` (PK), `legal_name`, `brand_name`, `hq_country`, `remote_posture`, `ats_provider`, `ats_slug`, `careers_url`, `is_active`, `bootstrap`, `discovery_last_checked_at`, timestamps.
+- Defined in: `002_companies.sql`, extended by `022_split_discovery_timestamps.sql` and `024_company_job_stats.sql`.
+- Main fields: `company_id` (PK), `legal_name`, `brand_name`, `hq_country`, `remote_posture`, `ats_provider`, `ats_slug`, `careers_url`, `is_active`, `bootstrap`, `careers_last_checked_at`, `ats_guess_last_checked_at`, aggregated stats (`total_jobs_count`, `rejected_jobs_count`, `last_active_job_at`), timestamps.
 
 #### `company_ats`
 - Purpose: normalized mapping of company to ATS endpoints/configurations (multi-ATS structure).
 - Defined in: `003_ingestion_and_compliance.sql`; unique provider+slug in `016`.
-- Main fields: `company_ats_id` (PK), `company_id` (FK), `provider`, `ats_slug`, `ats_api_url`, `careers_url`, `is_active`, `last_sync_at`, timestamps.
+- Main fields: `company_ats_id` (PK), `company_id` (FK), `provider`, `ats_slug`, `ats_api_url`, `careers_url`, `is_active`, `last_sync_at` (incremental cursor), `updated_at` (queue ordering), timestamps.
 
 #### `job_sources`
 - Purpose: source-to-canonical mapping and source-level lifecycle visibility.

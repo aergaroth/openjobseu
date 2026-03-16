@@ -20,7 +20,7 @@ def test_run_employer_ingestion_reports_standardized_metrics(monkeypatch):
     monkeypatch.setattr(
         employer,
         "load_active_ats_companies",
-        lambda _conn: [{"company_id": "c1"}, {"company_id": "c2"}],
+        lambda *args, **kwargs: [{"company_id": "c1"}, {"company_id": "c2"}],
     )
 
     results = iter(
