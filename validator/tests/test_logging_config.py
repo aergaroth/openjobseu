@@ -68,7 +68,7 @@ def test_json_formatter_renders_json_with_extras():
 
     payload = json.loads(formatter.format(record))
 
-    assert payload["level"] == "INFO"
+    assert payload["severity"] == "INFO"
     assert payload["logger"] == "openjobseu.test"
     assert payload["message"] == "tick complete"
     assert payload["ingested"] == 5
