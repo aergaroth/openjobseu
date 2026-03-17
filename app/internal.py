@@ -48,6 +48,7 @@ from storage.repositories.discovery_repository import (
 from storage.db_engine import get_engine
 
 from app.security.internal_access import require_internal_access
+import app.workers.ingestion.employer as employer_worker
 
 logger = logging.getLogger("openjobseu.runtime")
 
@@ -490,13 +491,15 @@ def manual_tick(
         pattern="^(auto|text|json)$",
     ),
     group: str = Query("all", pattern="^(all|ingestion|maintenance)$"),
+    incremental: bool = Query(True, description="Enable incremental fetch based on last sync date"),
 ):
-    return tick(response_format=response_format, group=group)
+    return tick(response_format=response_format, group=group, incremental=incremental)
 
 
-def tick(*, response_format: str = "auto", force_text: bool = False, group: str = "all"):
+def tick(*, response_format: str = "auto", force_text: bool = False, group: str = "all", incremental: bool = True):
     ingestion_mode = "prod"
     tick_sources = [TICK_SOURCE] if group in ("all", "ingestion") else []
+    employer_worker.GLOBAL_INCREMENTAL_FETCH = incremental
 
     logger.info(
         "tick_start",
@@ -506,6 +509,7 @@ def tick(*, response_format: str = "auto", force_text: bool = False, group: str 
             "mode": ingestion_mode,
             "sources": tick_sources,
             "group": group,
+            "incremental": incremental,
         },
     )
 

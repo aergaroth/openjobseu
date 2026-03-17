@@ -6,9 +6,9 @@ from storage.db_engine import get_engine
 engine = get_engine()
 
 
-SOURCE = "remoteok"  # zmień na inne źródło do audytu
+SOURCE = "remoteok"  # change to another source for audit
 
-# --- heurystyki do audytu ---
+# --- audit heuristics ---
 
 NON_EU_TITLE_KEYWORDS = [
     "singapore",

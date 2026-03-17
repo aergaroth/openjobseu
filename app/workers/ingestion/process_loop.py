@@ -59,13 +59,7 @@ def process_company_jobs(
 
             # Log salary detection (from worker as requested)
             salary_source = job.get("salary_source")
-            if salary_source:
-                logger.info(
-                    f"salary_{salary_source}_detected",
-                    extra={"job_id": job.get("job_id")},
-                )
-            else:
-                logger.info("salary_missing", extra={"job_id": job.get("job_id")})
+            metrics.observe_salary(bool(salary_source))
 
             canonical_job_id = upsert_job(job, conn=conn, company_id=company_id)
             report["job_id"] = canonical_job_id

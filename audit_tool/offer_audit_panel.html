@@ -94,48 +94,6 @@
     </div>
 
     <div class="panel">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-        <h3 style="margin: 0;">Companies Database</h3>
-        <div class="column-toggler">
-          <button type="button" class="btn-secondary" style="min-width:auto; padding: 4px 10px; font-size: 0.8rem;" onclick="document.getElementById('comp-cols-menu').classList.toggle('open')">Columns ⚙️</button>
-          <div id="comp-cols-menu" class="column-toggler-menu"></div>
-        </div>
-      </div>
-      <div class="filters" id="comp-filters">
-        <label>Name<input id="comp_name" placeholder="contains..." /></label>
-        <label>ATS Provider<input id="comp_ats" placeholder="exact..." /></label>
-        <label>Active
-          <select id="comp_active">
-            <option value="">All</option>
-            <option value="true">Yes</option>
-            <option value="false">No</option>
-          </select>
-        </label>
-        <label>Min score<input id="comp_min_score" type="number" min="0" /></label>
-        <label>Limit<input id="comp_limit" type="number" min="1" max="500" value="50" /></label>
-        <label>Offset<input id="comp_offset" type="number" min="0" value="0" /></label>
-      </div>
-      <div class="summary" style="margin-top: 14px;">
-        <strong id="comp-total-count">0</strong>
-        <small>companies match current filter</small>
-      </div>
-      <div class="top-scrollbar-wrap" id="comp-top-scroll-wrap">
-        <div class="top-scrollbar-dummy" id="comp-top-scroll-dummy"></div>
-      </div>
-      <div class="table-wrap" id="comp-table-wrap">
-        <table>
-          <thead><tr id="comp-head"></tr></thead>
-          <tbody id="comp-rows"></tbody>
-        </table>
-      </div>
-      <div class="pagination">
-        <span id="comp-page-info" style="font-size: 0.85rem; color: var(--muted);"></span>
-        <button id="comp-prev-btn" type="button" style="min-width: 100px;">&laquo; Previous</button>
-        <button id="comp-next-btn" type="button" style="min-width: 100px;">Next &raquo;</button>
-      </div>
-    </div>
-
-    <div class="panel">
       <div class="summary">
         <strong id="total-count">0</strong>
         <small>jobs match current filter</small>
@@ -226,9 +184,8 @@
 
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
 
-        <button onclick="runTick(this)">Run tick</button>
-        <button onclick="runTickIngestion(this)">Run tick (ingestion)</button>
-        <button onclick="runTickMaintenance(this)">Run tick (maintenance)</button>
+        <button onclick="runTick(this, true)" title="Incremental jobs ingestion">Tick (inc)</button>
+        <button onclick="runTick(this, false)" title="Full jobs ingestion (incremental=false)">Tick (all)</button>
 
         <button onclick="runDiscovery(this)">Run discovery</button>
 
@@ -278,6 +235,48 @@
         <span id="page-info" style="font-size: 0.85rem; color: var(--muted);"></span>
         <button id="prev-btn" type="button" style="min-width: 100px;">&laquo; Previous</button>
         <button id="next-btn" type="button" style="min-width: 100px;">Next &raquo;</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="margin: 0;">Companies Database</h3>
+        <div class="column-toggler">
+          <button type="button" class="btn-secondary" style="min-width:auto; padding: 4px 10px; font-size: 0.8rem;" onclick="document.getElementById('comp-cols-menu').classList.toggle('open')">Columns ⚙️</button>
+          <div id="comp-cols-menu" class="column-toggler-menu"></div>
+        </div>
+      </div>
+      <div class="filters" id="comp-filters">
+        <label>Name<input id="comp_name" placeholder="contains..." /></label>
+        <label>ATS Provider<input id="comp_ats" placeholder="exact..." /></label>
+        <label>Active
+          <select id="comp_active">
+            <option value="">All</option>
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        </label>
+        <label>Min score<input id="comp_min_score" type="number" min="0" /></label>
+        <label>Limit<input id="comp_limit" type="number" min="1" max="500" value="50" /></label>
+        <label>Offset<input id="comp_offset" type="number" min="0" value="0" /></label>
+      </div>
+      <div class="summary" style="margin-top: 14px;">
+        <strong id="comp-total-count">0</strong>
+        <small>companies match current filter</small>
+      </div>
+      <div class="top-scrollbar-wrap" id="comp-top-scroll-wrap">
+        <div class="top-scrollbar-dummy" id="comp-top-scroll-dummy"></div>
+      </div>
+      <div class="table-wrap" id="comp-table-wrap">
+        <table>
+          <thead><tr id="comp-head"></tr></thead>
+          <tbody id="comp-rows"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span id="comp-page-info" style="font-size: 0.85rem; color: var(--muted);"></span>
+        <button id="comp-prev-btn" type="button" style="min-width: 100px;">&laquo; Previous</button>
+        <button id="comp-next-btn" type="button" style="min-width: 100px;">Next &raquo;</button>
       </div>
     </div>
   <script src="/internal/audit/script.js"></script>

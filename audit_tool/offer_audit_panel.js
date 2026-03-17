@@ -520,16 +520,8 @@ async function runTickDev() {
   }
 }
 
-async function runTick(btn) {
-  await runInternal("/internal/tick?format=text", btn);
-}
-
-async function runTickIngestion(btn) {
-  await runInternal("/internal/tick?format=text&group=ingestion", btn);
-}
-
-async function runTickMaintenance(btn) {
-  await runInternal("/internal/tick?format=text&group=maintenance", btn);
+async function runTick(btn, incremental = true) {
+  await runInternal(`/internal/tick?format=text&incremental=${incremental}`, btn);
 }
 
 async function runDiscovery(btn) {
@@ -718,7 +710,7 @@ async function runInternalAsync(taskName, btn) {
       out.dataset.rawJson = JSON.stringify(pureJson, null, 2);
 
       out.textContent = logs ? logs : "No logs emitted.";
-      out.scrollTop = out.scrollHeight; // Auto-scroll do nowych logów
+      out.scrollTop = out.scrollHeight; // Auto-scroll to new logs
 
       if (statusData.status === "completed" || statusData.status === "failed") {
         meta.textContent = `Task ${taskName} [${taskId}] finished in ${attempt} attempts.`;

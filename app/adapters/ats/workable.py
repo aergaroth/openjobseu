@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 class WorkableAdapter(ATSAdapter):
     source_name = "workable"
     active = True
-    INCREMENTAL_FETCH = True
     
     API_URL_TEMPLATE = "https://apply.workable.com/api/v3/accounts/{slug}/jobs"
     
@@ -62,8 +61,7 @@ class WorkableAdapter(ATSAdapter):
         if not isinstance(jobs, list):
             raise ValueError("Workable API did not return a results list")
 
-        if self.INCREMENTAL_FETCH:
-            jobs = self._filter_incremental_jobs(jobs, updated_since)
+        jobs = self._filter_incremental_jobs(jobs, updated_since)
 
         full_jobs = []
         for job in jobs:

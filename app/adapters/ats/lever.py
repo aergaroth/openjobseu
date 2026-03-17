@@ -15,7 +15,6 @@ from app.utils.cleaning import clean_description
 class LeverAdapter(ATSAdapter):
     source_name = "lever"
     active = True
-    INCREMENTAL_FETCH = True
     API_URL_TEMPLATE = "https://api.lever.co/v0/postings/{slug}?mode=json"
 
     REMOTE_KEYWORDS_NORMALIZE = [
@@ -49,8 +48,7 @@ class LeverAdapter(ATSAdapter):
         if not isinstance(jobs, list):
             raise ValueError("Lever API did not return a list payload")
 
-        if self.INCREMENTAL_FETCH:
-            jobs = self._filter_incremental_jobs(jobs, updated_since)
+        jobs = self._filter_incremental_jobs(jobs, updated_since)
 
         for job in jobs:
             if isinstance(job, dict):

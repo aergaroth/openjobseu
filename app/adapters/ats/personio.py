@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
+from app.adapters.ats.utils import to_utc_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class PersonioAdapter(ATSAdapter):
             
         jobs = []
         for position in root.findall("position"):
-            # Opisy w Personio są często podzielone na sekcje (np. wymagania, obowiązki)
+            # Descriptions in Personio are often split into sections (e.g., requirements, responsibilities)
             desc_texts = []
             for desc in position.findall(".//jobDescription/value"):
                 if desc.text:
@@ -46,8 +47,23 @@ class PersonioAdapter(ATSAdapter):
                 "_ats_slug": slug,
             }
             jobs.append(job)
-            
-        return jobs
+
+        return self._filter_incremental_jobs(jobs, updated_since)
+
+    def _filter_incremental_jobs(self, jobs: list[dict], updated_since: Any) -> list[dict]:
+        if updated_since in (None, ""):
+            return jobs
+
+        cutoff = to_utc_datetime(updated_since)
+        if cutoff is None:
+            return jobs
+
+        filtered_jobs: list[dict] = []
+        for job in jobs:
+            source_updated_at = to_utc_datetime(job.get("createdAt"))
+            if source_updated_at is None or source_updated_at >= cutoff:
+                filtered_jobs.append(job)
+        return filtered_jobs
 
     def normalize(self, raw_job: Dict) -> Dict | None:
         slug = raw_job.get("_ats_slug")
