@@ -57,12 +57,28 @@ def _load_slugs() -> list[str]:
     
     if url:
         try:
-            response = requests.get(url, timeout=10)
+            # stream=True zapobiega wczytaniu wielkiego pliku do RAM
+            response = requests.get(url, timeout=10, stream=True)
             response.raise_for_status()
-            for line in response.text.splitlines():
+            
+            content = b""
+            for chunk in response.iter_content(chunk_size=8192):
+                content += chunk
+                if len(content) > 1024 * 1024:  # Sztywny limit wielkości do 1MB
+                    raise ValueError("External slugs file is too large (>1MB)")
+
+            text_data = content.decode("utf-8", errors="replace")
+            added_count = 0
+            
+            for line in text_data.splitlines():
+                if added_count >= 5000:  # Zabezpieczenie przed "zadławieniem" pętli workera
+                    logger.warning("Max slugs limit reached, truncating parsing.")
+                    break
+                    
                 clean_slug = line.strip()
                 if clean_slug and not clean_slug.startswith("#"):
                     slugs.add(clean_slug)
+                    added_count += 1
             logger.info("external_slugs_loaded", extra={"url": url, "total_slugs": len(slugs)})
         except Exception as exc:
             logger.warning("external_slugs_fetch_failed", extra={"url": url, "error": str(exc)})

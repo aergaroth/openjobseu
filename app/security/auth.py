@@ -57,13 +57,16 @@ async def auth_callback(request: Request):
                 status_code=403
             )
 
+        # Prewencja Session Fixation - czyszczenie ewentualnej starej sesji
+        request.session.clear()
         request.session["user"] = dict(user)
     return RedirectResponse(url="/internal/audit")
 
 
 @auth_router.get("/logout")
 async def logout(request: Request):
-    request.session.pop("user", None)
+    # Całkowite niszczenie wora sesyjnego zamiast usuwania jednego klucza
+    request.session.clear()
     return RedirectResponse(url="/")
 
 

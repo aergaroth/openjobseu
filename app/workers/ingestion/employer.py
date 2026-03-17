@@ -110,15 +110,20 @@ def ingest_company(company: dict):
     engine = get_engine()
     metrics = IngestionMetrics(fetched_count=len(raw_jobs))
     try:
+        batch_size = 200
+        for i in range(0, len(raw_jobs), batch_size):
+            batch = raw_jobs[i : i + batch_size]
+            with engine.begin() as conn:
+                process_company_jobs(
+                    conn,
+                    batch,
+                    adapter,
+                    company_id,
+                    provider,
+                    metrics,
+                )
+                
         with engine.begin() as conn:
-            process_company_jobs(
-                conn,
-                raw_jobs,
-                adapter,
-                company_id,
-                provider,
-                metrics,
-            )
             mark_ats_synced(conn, company.get("company_ats_id"), success=True)
 
     except Exception:
@@ -177,9 +182,11 @@ def run_employer_ingestion() -> dict:
         )
 
         ingestion_loop_started = perf_counter()
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
+        try:
             futures = {executor.submit(ingest_company, company): company for company in companies}
-            for future in concurrent.futures.as_completed(futures):
+            # Ustawiamy absolutny maksymalny czas na cały przebieg (np. 15 minut)
+            for future in concurrent.futures.as_completed(futures, timeout=900):
                 try:
                     result = future.result()
 
@@ -207,6 +214,12 @@ def run_employer_ingestion() -> dict:
 
                 except Exception:
                     companies_failed += 1
+        except concurrent.futures.TimeoutError:
+            logger.error("employer_ingestion_pool_timeout", extra={"msg": "Thread pool exhausted on hanging adapters", "timeout_sec": 900})
+        finally:
+            # Niezwykle ważne: wait=False sprawi, że główny wątek (API/Worker) ucieknie 
+            # i dokończy tick, a cancel_futures przerwie oczekujące zadania w kolejce!
+            executor.shutdown(wait=False, cancel_futures=True)
         ingestion_loop_duration_ms = int((perf_counter() - ingestion_loop_started) * 1000)
 
     except Exception as exc:

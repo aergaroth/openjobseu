@@ -188,7 +188,12 @@ def audit_companies(
         where_sql = "WHERE " + " AND ".join(where_clauses)
 
     with engine.connect() as conn:
-        total = conn.execute(text(f"SELECT COUNT(*) FROM companies {where_sql}"), params).scalar()
+        if not where_sql:
+            total_query = "SELECT GREATEST(0, CAST(reltuples AS BIGINT)) FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid WHERE n.nspname = 'public' AND c.relname = 'companies'"
+        else:
+            total_query = f"SELECT COUNT(*) FROM companies {where_sql}"
+            
+        total = conn.execute(text(total_query), params).scalar()
         query = f"""
             SELECT 
                 company_id, legal_name, brand_name, hq_country, eu_entity_verified, 
@@ -400,6 +405,29 @@ def _cleanup_old_tasks(retention_seconds: float = 600.0):
     for tid in to_delete:
         del ASYNC_TASKS[tid]
 
+
+def run_backfill_compliance_task():
+    total = 0
+    while True:
+        count = backfill_missing_compliance_classes(limit=1000)
+        if not count:
+            break
+        total += count
+        logger.info("backfill_compliance chunk completed", extra={"chunk_updated": count, "total_updated": total})
+    return {"status": "completed", "updated_jobs_count": total}
+
+
+def run_backfill_salary_task():
+    total = 0
+    while True:
+        count = backfill_missing_salary_fields(limit=1000)
+        if not count:
+            break
+        total += count
+        logger.info("backfill_salary chunk completed", extra={"chunk_updated": count, "total_updated": total})
+    return {"status": "completed", "updated_jobs_count": total}
+
+
 @router.post("/tasks/{task_name}", dependencies=[Depends(require_internal_or_user_api_access)])
 def trigger_async_task(task_name: str, background_tasks: BackgroundTasks):
     _cleanup_old_tasks()
@@ -410,8 +438,8 @@ def trigger_async_task(task_name: str, background_tasks: BackgroundTasks):
         "ats-reverse": run_ats_reverse_discovery,
         "company-sources": run_company_source_discovery,
         "backfill-department": backfill_missing_departments,
-        "backfill-compliance": backfill_missing_compliance_classes,
-        "backfill-salary": backfill_missing_salary_fields,
+        "backfill-compliance": run_backfill_compliance_task,
+        "backfill-salary": run_backfill_salary_task,
     }
     if task_name not in task_map:
         raise HTTPException(status_code=404, detail="Task not found")

@@ -45,18 +45,17 @@ def process_ingested_job(job: dict, source: str) -> Tuple[Optional[dict], dict]:
     # Canonical cross-ATS identity for persisted jobs
     job["job_id"] = compute_canonical_job_id(job)
 
-    job["job_uid"] = compute_job_uid(company_id=company_id, title=title, location=location)
-    job["job_fingerprint"] = compute_job_fingerprint(
-        description,
-        title=title,
-        location=location,
-        company_id=company_id,
-        company_name=company_name,
-    )
-    # Note: source_schema_hash should be computed before normalization 
-    # but since we receive normalized job here, we assume it's already in the dict 
-    # or will be handled if raw_job was available. 
-    # For now, we preserve the flow where worker might have set it or we use a placeholder.
+    if "job_uid" not in job:
+        job["job_uid"] = compute_job_uid(company_id=company_id, title=title, location=location)
+        
+    if "job_fingerprint" not in job:
+        job["job_fingerprint"] = compute_job_fingerprint(
+            description,
+            title=title,
+            location=location,
+            company_id=company_id,
+            company_name=company_name,
+        )
 
     # 2. Compliance
     job_after_policy, reason = apply_policy(job, source=source)
@@ -71,6 +70,8 @@ def process_ingested_job(job: dict, source: str) -> Tuple[Optional[dict], dict]:
         "geo_class": compliance_payload.get("geo_class"),
         "hard_geo_flag": bool(compliance_payload.get("policy_reason") == "geo_restriction_hard"),
         "base_score": compliance_payload.get("compliance_score"),
+        "penalties": None,
+        "bonuses": None,
         "final_score": compliance_payload.get("compliance_score"),
         "final_status": compliance_payload.get("compliance_status"),
         "decision_vector": compliance_payload.get("decision_trace"),
@@ -90,15 +91,19 @@ def process_ingested_job(job: dict, source: str) -> Tuple[Optional[dict], dict]:
     processed_job.update(taxonomy)
 
     # 4. Salary
-    salary_info = {}
-    structured = extract_structured_salary(processed_job)
-    if structured:
-        salary_info = structured
+    salary_info = extract_structured_salary(processed_job)
+    if not salary_info:
+        salary_info = extract_salary(processed_job.get("description") or "")
+        if salary_info:
+            # Oznacz trudne przypadki do manualnej weryfikacji
+            confidence = salary_info.get("salary_confidence")
+            if confidence is not None and confidence < 80:
+                processed_job["_salary_parsing_case"] = salary_info
+                
+    if salary_info:
+        processed_job.update(salary_info)
     else:
-        regex_salary = extract_salary(processed_job.get("description") or "")
-        if regex_salary:
-            salary_info = regex_salary
-    processed_job.update(salary_info)
+        salary_info = {}
 
     salary_detected = bool(salary_info.get("salary_min") is not None or salary_info.get("salary_max") is not None)
     processed_job["salary_transparency_status"] = detect_salary_transparency(

@@ -41,10 +41,16 @@ def _fetch_github_remote_companies():
     companies = []
     
     try:
-        response = requests.get(url, timeout=15)
+        response = requests.get(url, timeout=15, stream=True)
         response.raise_for_status()
         
-        with zipfile.ZipFile(io.BytesIO(response.content)) as z:
+        content = b""
+        for chunk in response.iter_content(chunk_size=8192):
+            content += chunk
+            if len(content) > 20 * 1024 * 1024:  # Limit do 20MB na ZIP
+                raise ValueError("GitHub repository archive is too large (>20MB)")
+        
+        with zipfile.ZipFile(io.BytesIO(content)) as z:
             for filename in z.namelist():
                 if "src/companies/" in filename and filename.endswith(".md"):
                     content = z.read(filename).decode("utf-8")
@@ -107,16 +113,19 @@ def run_company_source_discovery():
             except requests.RequestException:
                 continue
 
-        with engine.begin() as conn:
-            inserted = insert_source_company(
-                conn,
-                name=name,
-                careers_url=careers_url,
-            )
+        try:
+            with engine.begin() as conn:
+                inserted = insert_source_company(
+                    conn,
+                    name=name,
+                    careers_url=careers_url,
+                )
 
-        if inserted:
-            metrics["companies_inserted"] += 1
-            existing_names.add(name.lower())
+            if inserted:
+                metrics["companies_inserted"] += 1
+                existing_names.add(name.lower())
+        except Exception as exc:
+            logger.error(f"error processing company in company_sources [{name}]: {exc}", exc_info=True)
             
         if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
             pct = int((idx / total) * 100)

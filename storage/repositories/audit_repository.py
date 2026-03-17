@@ -37,18 +37,18 @@ def _build_jobs_audit_filter_clauses(
 
     if company:
         param_counter += 1
-        clauses.append(f"LOWER(company_name) LIKE :p{param_counter}")
-        params[f"p{param_counter}"] = f"%{company.lower()}%"
+        clauses.append(f"company_name ILIKE :p{param_counter}")
+        params[f"p{param_counter}"] = f"%{company}%"
 
     if title:
         param_counter += 1
-        clauses.append(f"LOWER(title) LIKE :p{param_counter}")
-        params[f"p{param_counter}"] = f"%{title.lower()}%"
+        clauses.append(f"title ILIKE :p{param_counter}")
+        params[f"p{param_counter}"] = f"%{title}%"
 
     if remote_scope:
         param_counter += 1
-        clauses.append(f"LOWER(remote_scope) LIKE :p{param_counter}")
-        params[f"p{param_counter}"] = f"%{remote_scope.lower()}%"
+        clauses.append(f"remote_scope ILIKE :p{param_counter}")
+        params[f"p{param_counter}"] = f"%{remote_scope}%"
 
     if remote_class:
         param_counter += 1
@@ -144,12 +144,13 @@ def get_jobs_audit(
             query_params,
         ).mappings().all()
 
+        if not where_clause:
+            total_query = "SELECT GREATEST(0, CAST(reltuples AS BIGINT)) AS total FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid WHERE n.nspname = 'public' AND c.relname = 'jobs'"
+        else:
+            total_query = f"SELECT COUNT(*) AS total FROM jobs {where_clause}"
+
         total_row = conn.execute(
-            text(f"""
-                SELECT COUNT(*) AS total
-                FROM jobs
-                {where_clause}
-            """),
+            text(total_query),
             params,
         ).fetchone()
 
@@ -361,7 +362,8 @@ def get_ghost_jobs(days_threshold: int = 3) -> list[dict]:
                     last_seen_at,
                     (last_seen_at - first_seen_at) AS lifetime
                 FROM job_sources
-                WHERE last_seen_at - first_seen_at < (:days_threshold * INTERVAL '1 day')
+                WHERE first_seen_at > NOW() - INTERVAL '30 days'
+                  AND last_seen_at - first_seen_at < (:days_threshold * INTERVAL '1 day')
             """),
             {"days_threshold": int(days_threshold)},
         ).mappings().all()
@@ -379,6 +381,7 @@ def get_job_lifetime_stats() -> dict:
                     WITHIN GROUP (ORDER BY last_seen_at - first_seen_at)
                     AS median_lifetime
                 FROM job_sources
+                    WHERE first_seen_at > NOW() - INTERVAL '30 days'
             """)
         ).mappings().one()
 
@@ -405,7 +408,8 @@ def get_repost_candidates(days_threshold: int = 30) -> list[dict]:
                  AND j.company_name = prev.company_name
                  AND j.title = prev.title
                  AND j.job_id <> prev.job_id
-                WHERE j.first_seen_at > prev.last_seen_at
+                WHERE j.first_seen_at > NOW() - ((:days_threshold + 15) * INTERVAL '1 day')
+                  AND j.first_seen_at > prev.last_seen_at
                   AND j.first_seen_at - prev.last_seen_at < (:days_threshold * INTERVAL '1 day')
                 ORDER BY j.first_seen_at DESC
             """),

@@ -67,6 +67,47 @@ def insert_compliance_report(
         },
     )
 
+def insert_compliance_reports(conn: Connection, reports: list[dict]) -> None:
+    """Insert multiple compliance reports in a single bulk operation."""
+    if not reports:
+        return
+        
+    for r in reports:
+        if r.get("penalties") is not None:
+            r["penalties"] = json.dumps(r["penalties"], default=str)
+        if r.get("bonuses") is not None:
+            r["bonuses"] = json.dumps(r["bonuses"], default=str)
+        if r.get("decision_vector") is not None:
+            r["decision_vector"] = json.dumps(r["decision_vector"], default=str)
+
+    conn.execute(
+        text("""
+            INSERT INTO compliance_reports (
+                job_id, job_uid, policy_version, remote_class, geo_class,
+                hard_geo_flag, base_score, penalties, bonuses,
+                final_score, final_status, decision_vector, created_at
+            )
+            VALUES (
+                :job_id, :job_uid, :policy_version, :remote_class, :geo_class,
+                :hard_geo_flag, :base_score, :penalties, :bonuses,
+                :final_score, :final_status, :decision_vector, NOW()
+            )
+            ON CONFLICT (job_uid, policy_version) DO UPDATE SET
+                job_id = EXCLUDED.job_id,
+                remote_class = EXCLUDED.remote_class,
+                geo_class = EXCLUDED.geo_class,
+                hard_geo_flag = EXCLUDED.hard_geo_flag,
+                base_score = EXCLUDED.base_score,
+                penalties = EXCLUDED.penalties,
+                bonuses = EXCLUDED.bonuses,
+                final_score = EXCLUDED.final_score,
+                final_status = EXCLUDED.final_status,
+                decision_vector = EXCLUDED.decision_vector,
+                created_at = NOW()
+        """),
+        reports,
+    )
+
 def count_jobs_missing_compliance() -> int:
     with engine.connect() as conn:
         row = conn.execute(

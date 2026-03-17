@@ -1,10 +1,15 @@
 import re
+from functools import lru_cache
 from typing import Dict
 from .enums import JobFamily, JobRole, Seniority, Specialization
 
 
+@lru_cache(maxsize=256)
+def _get_word_regex(word: str) -> re.Pattern:
+    return re.compile(r"\b" + re.escape(word) + r"\b")
+
 def _has_word(title_lower: str, word: str) -> bool:
-    return bool(re.search(r"\b" + re.escape(word) + r"\b", title_lower))
+    return bool(_get_word_regex(word).search(title_lower))
 
 
 def _has_any_word(title_lower: str, words: list[str]) -> bool:

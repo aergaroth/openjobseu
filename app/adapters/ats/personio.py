@@ -19,34 +19,47 @@ class PersonioAdapter(ATSAdapter):
 
         url = f"https://{slug}.jobs.personio.de/xml"
         # Let exceptions bubble up to the worker for centralized error handling.
-        resp = self.session.get(url, timeout=15.0)
+        resp = self.session.get(url, timeout=15.0, stream=True)
         resp.raise_for_status()
-            
+        
+        jobs = []
+        bytes_read = 0
+        parser = ET.XMLPullParser(['end'])
+
         try:
-            root = ET.fromstring(resp.text)
+            for chunk in resp.iter_content(chunk_size=8192):
+                bytes_read += len(chunk)
+                if bytes_read > 10 * 1024 * 1024:  # Sztywny limit wielkości do 10MB dla kanału XML
+                    raise ValueError(f"Personio XML feed is too large (>10MB) for slug: {slug}")
+                
+                # Na bieżąco karmimy parser paczkami z sieci
+                parser.feed(chunk)
+                
+                for event, elem in parser.read_events():
+                    if elem.tag == 'position':
+                        desc_texts = []
+                        for desc in elem.findall(".//jobDescription/value"):
+                            if desc.text:
+                                desc_texts.append(desc.text.strip())
+                                
+                        job = {
+                            "id": elem.findtext("id"),
+                            "name": elem.findtext("name"),
+                            "description": "\n\n".join(desc_texts),
+                            "office": elem.findtext("office"),
+                            "department": elem.findtext("department"),
+                            "createdAt": elem.findtext("createdAt"),
+                            "_ats_slug": slug,
+                        }
+                        jobs.append(job)
+                        
+                        # Błyskawiczne zwolnienie pamięci po przeprocesowaniu całego węzła
+                        elem.clear()
+            
+            parser.close()
         except ET.ParseError as e:
-            # Log the specific parsing error but re-raise to signal failure to the worker.
             logger.warning("Personio XML parse failed for slug: %s", slug, exc_info=True)
             raise ValueError(f"Personio XML parse failed for {slug}") from e
-            
-        jobs = []
-        for position in root.findall("position"):
-            # Descriptions in Personio are often split into sections (e.g., requirements, responsibilities)
-            desc_texts = []
-            for desc in position.findall(".//jobDescription/value"):
-                if desc.text:
-                    desc_texts.append(desc.text.strip())
-                    
-            job = {
-                "id": position.findtext("id"),
-                "name": position.findtext("name"),
-                "description": "\n\n".join(desc_texts),
-                "office": position.findtext("office"),
-                "department": position.findtext("department"),
-                "createdAt": position.findtext("createdAt"),
-                "_ats_slug": slug,
-            }
-            jobs.append(job)
 
         return self._filter_incremental_jobs(jobs, updated_since)
 

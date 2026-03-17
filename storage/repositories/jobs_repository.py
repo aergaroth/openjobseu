@@ -7,6 +7,7 @@ from storage.common import _derive_source_fields, _require_open_conn
 from app.domain.jobs.identity import compute_job_fingerprint, compute_job_uid
 from app.domain.jobs.canonical_identity import compute_canonical_job_id
 from app.domain.money.salary_parser import extract_salary
+from .snapshots_repository import insert_job_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -33,13 +34,13 @@ def get_jobs(
 
     if company:
         param_counter += 1
-        clauses.append(f"LOWER(company_name) LIKE :p{param_counter}")
-        params[f"p{param_counter}"] = f"%{company.lower()}%"
+        clauses.append(f"company_name ILIKE :p{param_counter}")
+        params[f"p{param_counter}"] = f"%{company}%"
 
     if title:
         param_counter += 1
-        clauses.append(f"LOWER(title) LIKE :p{param_counter}")
-        params[f"p{param_counter}"] = f"%{title.lower()}%"
+        clauses.append(f"title ILIKE :p{param_counter}")
+        params[f"p{param_counter}"] = f"%{title}%"
 
     if source:
         param_counter += 1
@@ -140,17 +141,6 @@ def _find_job_id_by_fingerprint(conn: Connection, *, job_fingerprint: str) -> st
         return str(row[0])
     return None
 
-def _job_exists(conn: Connection, *, job_id: str) -> bool:
-    row = conn.execute(
-        text("""
-            SELECT 1
-            FROM jobs
-            WHERE job_id = :job_id
-            LIMIT 1
-        """),
-        {"job_id": job_id},
-    ).fetchone()
-    return bool(row)
 
 def _resolve_canonical_job_id(
     conn: Connection,
@@ -174,9 +164,6 @@ def _resolve_canonical_job_id(
     )
     if by_source_mapping:
         return by_source_mapping
-
-    if _job_exists(conn, job_id=incoming_job_id):
-        return incoming_job_id
 
     return incoming_job_id
 
@@ -234,35 +221,6 @@ def _upsert_job_source_mapping_in_conn(
             "created_at": now,
             "updated_at": now,
         },
-    )
-
-def _insert_job_snapshot_in_conn(conn: Connection, job: dict) -> None:
-    conn.execute(
-        text("""
-            INSERT INTO job_snapshots (
-                job_id,
-                job_fingerprint,
-                title,
-                company_name,
-                salary_min,
-                salary_max,
-                salary_currency,
-                remote_class,
-                geo_class
-            )
-            VALUES (
-                :job_id,
-                :job_fingerprint,
-                :title,
-                :company_name,
-                :salary_min,
-                :salary_max,
-                :salary_currency,
-                :remote_class,
-                :geo_class
-            )
-        """),
-        job,
     )
 
 def _upsert_job_in_conn(
@@ -327,18 +285,39 @@ def _upsert_job_in_conn(
         existing_fingerprint = existing_job["job_fingerprint"]
         new_fingerprint = str(job["job_fingerprint"])
 
-        if existing_fingerprint and existing_fingerprint != new_fingerprint:
+        new_salary_min = int(job["salary_min"]) if job.get("salary_min") is not None else None
+        new_salary_max = int(job["salary_max"]) if job.get("salary_max") is not None else None
+        new_salary_currency = job.get("salary_currency")
+
+        salary_changed = (
+            existing_job.get("salary_min") != new_salary_min or
+            existing_job.get("salary_max") != new_salary_max or
+            existing_job.get("salary_currency") != new_salary_currency
+        )
+        title_changed = existing_job.get("title") != job.get("title")
+
+        if (existing_fingerprint and existing_fingerprint != new_fingerprint) or salary_changed or title_changed:
             # Snapshot the PREVIOUS state
-            snapshot_data = dict(existing_job)
-            snapshot_data["job_id"] = canonical_job_id
-            
-            _insert_job_snapshot_in_conn(conn, snapshot_data)
+            insert_job_snapshot(
+                conn=conn,
+                job_id=canonical_job_id,
+                job_fingerprint=existing_fingerprint,
+                title=existing_job.get("title"),
+                company_name=existing_job.get("company_name"),
+                salary_min=existing_job.get("salary_min"),
+                salary_max=existing_job.get("salary_max"),
+                salary_currency=existing_job.get("salary_currency"),
+                remote_class=existing_job.get("remote_class"),
+                geo_class=existing_job.get("geo_class"),
+            )
 
             logger.debug(
                 "job_snapshot_created",
                 extra={
                     "job_id": canonical_job_id,
-                    "fingerprint": new_fingerprint
+                    "fingerprint": new_fingerprint,
+                    "salary_changed": salary_changed,
+                    "title_changed": title_changed,
                 }
             )
 

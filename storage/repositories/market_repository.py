@@ -1,19 +1,22 @@
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 
 def compute_market_stats(conn: Connection, date: date) -> dict:
+    start_time = datetime(date.year, date.month, date.day, tzinfo=timezone.utc)
+    end_time = start_time + timedelta(days=1)
+
     jobs_created = conn.execute(
         text(
             """
             SELECT COUNT(*)
             FROM jobs
-            WHERE DATE(first_seen_at) = :date
+            WHERE first_seen_at >= :start_time AND first_seen_at < :end_time
             """
         ),
-        {"date": date},
+        {"start_time": start_time, "end_time": end_time},
     ).scalar_one()
 
     jobs_expired = conn.execute(
@@ -22,10 +25,10 @@ def compute_market_stats(conn: Connection, date: date) -> dict:
             SELECT COUNT(*)
             FROM jobs
             WHERE availability_status = 'expired'
-              AND DATE(last_seen_at) = :date
+              AND last_seen_at >= :start_time AND last_seen_at < :end_time
             """
         ),
-        {"date": date},
+        {"start_time": start_time, "end_time": end_time},
     ).scalar_one()
 
     jobs_active = conn.execute(
@@ -42,14 +45,12 @@ def compute_market_stats(conn: Connection, date: date) -> dict:
         text(
             """
             SELECT COUNT(*)
-            FROM (
-                SELECT job_fingerprint
-                FROM jobs
-                GROUP BY job_fingerprint
-                HAVING COUNT(*) > 1
-            ) t
+            FROM jobs
+            WHERE is_repost = TRUE
+              AND first_seen_at >= :start_time AND first_seen_at < :end_time
             """
-        )
+        ),
+        {"start_time": start_time, "end_time": end_time},
     ).scalar_one()
 
     avg_salary_eur = conn.execute(
@@ -58,6 +59,7 @@ def compute_market_stats(conn: Connection, date: date) -> dict:
             SELECT AVG(salary_min_eur)
             FROM jobs
             WHERE salary_min_eur IS NOT NULL
+              AND availability_status = 'active'
             """
         )
     ).scalar_one()
@@ -69,6 +71,7 @@ def compute_market_stats(conn: Connection, date: date) -> dict:
             WITHIN GROUP (ORDER BY salary_min_eur)
             FROM jobs
             WHERE salary_min_eur IS NOT NULL
+              AND availability_status = 'active'
             """
         )
     ).scalar_one()
@@ -78,9 +81,10 @@ def compute_market_stats(conn: Connection, date: date) -> dict:
             """
             SELECT AVG(last_seen_at - first_seen_at)
             FROM job_sources
-            WHERE last_seen_at IS NOT NULL
+            WHERE last_seen_at >= :start_time AND last_seen_at < :end_time
             """
-        )
+        ),
+        {"start_time": start_time, "end_time": end_time},
     ).scalar_one()
 
     remote_ratio = conn.execute(
@@ -95,6 +99,7 @@ def compute_market_stats(conn: Connection, date: date) -> dict:
                     END
                 )
             FROM jobs
+            WHERE availability_status = 'active'
             """
         )
     ).scalar_one()

@@ -1,9 +1,35 @@
 from abc import ABC, abstractmethod
 from typing import Any, Iterable, Dict
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from app.utils.cleaning import normalize_remote_scope as _normalize_remote_scope
 
+
+class TimeoutSession(requests.Session):
+    """
+    Custom requests.Session that enforces a default timeout on all HTTP requests
+    and provides automatic retries for transient network/server errors.
+    """
+    def __init__(self, timeout: int = 30, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.timeout = timeout
+        
+        # Configure automatic retries for 429 (Rate Limit) and 5xx (Server Errors)
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1.0,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["HEAD", "GET", "OPTIONS"]
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.mount("https://", adapter)
+        self.mount("http://", adapter)
+
+    def request(self, method, url, **kwargs):
+        kwargs.setdefault("timeout", self.timeout)
+        return super().request(method, url, **kwargs)
 
 class ATSAdapter(ABC):
     """
@@ -25,10 +51,11 @@ class ATSAdapter(ABC):
        
     """
     def __init__(self):
-        self.session = requests.Session()
+        self.session = TimeoutSession(timeout=30)
         self.session.headers.update({
             "User-Agent": "OpenJobsEU/1.0 (https://openjobseu.org)",
             "Accept": "application/json",
+            "Accept-Encoding": "gzip, deflate, br",
         })
     source_name: str
     

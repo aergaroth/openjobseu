@@ -98,6 +98,8 @@ app.add_middleware(
     # WARNING: This default key is for development/testing purposes only.
     # In a production environment, you must set the SESSION_SECRET_KEY environment variable.
     secret_key=os.environ.get("SESSION_SECRET_KEY", "a-very-secret-key-for-dev"),
+    https_only=os.environ.get("APP_RUNTIME") != "local",
+    same_site="lax",
 )
 
 
