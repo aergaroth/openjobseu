@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict
 
@@ -10,6 +11,8 @@ from app.adapters.ats.utils import (
     to_utc_datetime,
 )
 from app.utils.cleaning import clean_description
+
+logger = logging.getLogger(__name__)
 
 class WorkableAdapter(ATSAdapter):
     source_name = "workable"
@@ -75,14 +78,17 @@ class WorkableAdapter(ATSAdapter):
                 # Fetch details for description (v3 returns details per shortcode)
                 detail_url = f"{api_url}/{shortcode}"
                 detail_resp = self.session.get(detail_url, timeout=10)
-                if detail_resp.ok:
-                    detail_job = detail_resp.json()
-                    detail_job["_ats_slug"] = slug
-                    full_jobs.append(detail_job)
-                else:
-                    job["_ats_slug"] = slug
-                    full_jobs.append(job)
-            except Exception:
+                detail_resp.raise_for_status()
+                detail_job = detail_resp.json()
+                detail_job["_ats_slug"] = slug
+                full_jobs.append(detail_job)
+            except Exception as e:
+                # If fetching details fails, log it and fall back to the summary job.
+                # This is better than failing the entire company fetch.
+                logger.warning(
+                    "Workable: failed to fetch job details for slug=%s, shortcode=%s. Falling back to summary.",
+                    slug, shortcode, exc_info=True
+                )
                 job["_ats_slug"] = slug
                 full_jobs.append(job)
 
