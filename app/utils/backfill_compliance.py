@@ -4,9 +4,9 @@ from sqlalchemy import text
 from app.domain.taxonomy.enums import RemoteClass, GeoClass
 from app.domain.compliance.engine import apply_policy, ENGINE_POLICY_VERSION
 from storage.db_engine import get_engine
-from storage.db_logic import insert_compliance_report
+from storage.db_logic import insert_compliance_reports
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("openjobseu.backfill")
 
 BATCH_SIZE = 100
 
@@ -19,6 +19,7 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
     query = text("""
         SELECT
             job_id, job_uid, title, description, remote_scope, source,
+            company_id, company_name, remote_source_flag,
             remote_class, geo_class, compliance_status, compliance_score, policy_version
         FROM jobs
         WHERE compliance_status IS NULL
@@ -52,26 +53,30 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
             job_id = job_data["job_id"]
             job_uid = job_data["job_uid"]
 
-            job_input = {
-                "title": job_data["title"] or "",
-                "description": job_data["description"] or "",
-                "remote_scope": job_data["remote_scope"] or "",
-            }
+            job_input = dict(job_data)
 
             try:
                 job_with_compliance, reason = apply_policy(job_input, source=job_data["source"] or "unknown")
 
-                compliance_payload = job_with_compliance.get("_compliance", {})
+                # Zabezpieczenie przed rzucaniem AttributeError dla odrzuconych ofert (None)
+                compliance_payload = (job_with_compliance or job_input).get("_compliance", {})
+                
+                compliance_status = compliance_payload.get("compliance_status")
+                compliance_score = compliance_payload.get("compliance_score")
+                
+                # Fallback zapobiegający zostaniu oferty ze statusem NULL (usunięcie "martwych dusz" z kolejki)
+                if not compliance_status:
+                    compliance_status = "review"
+                    compliance_score = 0
 
                 remote_class = compliance_payload.get("remote_model")
                 geo_class = compliance_payload.get("geo_class")
                 policy_version = compliance_payload.get("policy_version") or ENGINE_POLICY_VERSION.value
 
-                remote_class_val = str(getattr(remote_class, "value", remote_class))
-                geo_class_val = str(getattr(geo_class, "value", geo_class))
-                policy_version_val = str(getattr(policy_version, "value", policy_version))
-                compliance_status = compliance_payload.get("compliance_status")
-                compliance_score = compliance_payload.get("compliance_score")
+                # Prawidłowe unikanie tekstowych wartości "None" w bazie danych
+                remote_class_val = remote_class.value if hasattr(remote_class, "value") else remote_class
+                geo_class_val = geo_class.value if hasattr(geo_class, "value") else geo_class
+                policy_version_val = policy_version.value if hasattr(policy_version, "value") else policy_version
                 decision_trace = compliance_payload.get("decision_trace")
 
                 job_updates.append({
@@ -92,6 +97,8 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
                     "geo_class": geo_class_val,
                     "hard_geo_flag": bool(compliance_payload.get("policy_reason") == "geo_restriction_hard"),
                     "base_score": compliance_score,
+                    "penalties": None,
+                    "bonuses": None,
                     "final_score": compliance_score,
                     "final_status": compliance_status,
                     "decision_vector": decision_trace
@@ -119,22 +126,10 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
                         job_updates
                     )
 
-                    for entry in report_entries:
-                        insert_compliance_report(
-                            conn,
-                            job_id=entry["job_id"],
-                            job_uid=entry["job_uid"],
-                            policy_version=entry["policy_version"],
-                            remote_class=entry["remote_class"],
-                            geo_class=entry["geo_class"],
-                            hard_geo_flag=entry["hard_geo_flag"],
-                            base_score=entry["base_score"],
-                            final_score=entry["final_score"],
-                            final_status=entry["final_status"],
-                            decision_vector=entry["decision_vector"]
-                        )
+                    if report_entries:
+                        insert_compliance_reports(conn, report_entries)
 
-                updated += len(job_updates)
+                    updated += len(job_updates)
             except Exception as e:
                 logger.error(f"Failed to update batch: {e}")
 
