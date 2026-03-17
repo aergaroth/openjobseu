@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Iterable, Dict
+import os
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -16,9 +17,12 @@ class TimeoutSession(requests.Session):
         super().__init__(*args, **kwargs)
         self.timeout = timeout
         
+        # W środowisku testowym wyłączamy retries, żeby uniknąć sztucznego usypiania testów na mockowanych błędach (7s/test)
+        is_testing = "PYTEST_CURRENT_TEST" in os.environ
+        
         # Configure automatic retries for 429 (Rate Limit) and 5xx (Server Errors)
         retry_strategy = Retry(
-            total=3,
+            total=0 if is_testing else 3,
             backoff_factor=1.0,
             status_forcelist=[429, 500, 502, 503, 504],
             allowed_methods=["HEAD", "GET", "OPTIONS"]

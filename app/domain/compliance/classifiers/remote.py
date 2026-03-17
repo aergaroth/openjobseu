@@ -1,50 +1,13 @@
 from app.domain.taxonomy.enums import RemoteClass
 
-REMOTE_WORD = "remote"
-
-SCOPE_REMOTE_STRONG_KEYWORDS = [
-    "remote",
-    "home based",
-    "work from home",
-    "fully remote",
-    "remote job",
-    "remote only",
-    "remote-only",
-    "remote-first",
-
-]
-
-REMOTE_OPTIONAL_SIGNALS = [
-    "remote work options",
-    "flexible remote",
-    "home office",
-    "workation",
-    "possibility to work remotely",
-    "flexible working hours and remote",
-]
-
-HYBRID_SIGNALS = [
-    "hybrid",
-    "days in office",
-    "partially remote",
-]
-
-NEGATIVE_STRONG = [
-    "relocation required",
-    "full-time position in",
-    "this role is based in",
-    "on-site",
-    "onsite",
-    "in-office",
-    "in office work",
-]
-
 V2_NEGATIVE_STRONG = [
     "relocation required",
     "on-site",
     "onsite",
     "in-office",
     "in office",
+    "office based",
+    "office-based",
     "this role is based in",
     "full-time position in",
 ]
@@ -52,7 +15,9 @@ V2_NEGATIVE_STRONG = [
 V2_HYBRID_SIGNALS = [
     "hybrid",
     "days in office",
+    "days a week in the office",
     "partially remote",
+    "partly remote",
 ]
 
 V2_REMOTE_STRONG = [
@@ -61,11 +26,12 @@ V2_REMOTE_STRONG = [
     "remote only",
     "remote-only",
     "remote-first",
+    "remote first",
     "work from anywhere",
+    "work where you work best",
     "home based",
     "remote job",
     "work from home",
-    
 ]
 
 V2_REMOTE_OPTIONAL_SIGNALS = [
@@ -73,6 +39,8 @@ V2_REMOTE_OPTIONAL_SIGNALS = [
     "flexible remote",
     "possibility to work remotely",
     "flexible working hours and remote",
+    "remote friendly",
+    "remote-friendly",
 ]
 
 
@@ -103,15 +71,18 @@ def classify_remote(
     desc_l = (description or "").lower()
     scope_l = (remote_scope or "").lower()
 
-    # 1 Scope has explicit office signals
-    if any(k in scope_l for k in NEGATIVE_STRONG):
-        return {"remote_model": RemoteClass.NON_REMOTE, "reason": "scope_negative"}
+    # 1 Scope has explicit office/hybrid signals
+    if any(k in scope_l for k in V2_NEGATIVE_STRONG) or any(k in scope_l for k in V2_HYBRID_SIGNALS):
+        return {"remote_model": RemoteClass.NON_REMOTE, "reason": "scope_negative_or_hybrid"}
 
     # 2 Scope contains strong remote signal
-    found_keyword = next((k for k in SCOPE_REMOTE_STRONG_KEYWORDS if k in scope_l), None)
+    found_keyword = next((k for k in V2_REMOTE_STRONG if k in scope_l), None)
+    if not found_keyword and "remote" in scope_l:
+        found_keyword = "remote"
+        
     if found_keyword:
-        cleaned = scope_l.replace(found_keyword, "").replace("-", "").strip()
-        if cleaned:
+        cleaned = scope_l.replace(found_keyword, "").replace("-", "").replace(",", "").strip()
+        if cleaned and cleaned not in ("yes", "true", "1", "anywhere", "worldwide"):
             return {
                 "remote_model": RemoteClass.REMOTE_REGION_LOCKED,
                 "reason": "scope_region",
@@ -119,15 +90,23 @@ def classify_remote(
         return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": f"scope_{found_keyword.replace(' ', '_')}"}
 
     # 3 Title contains remote
-    if REMOTE_WORD in title_l:
+    if "remote" in title_l:
         return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": "title_remote"}
 
     # 4 Hybrid detection (strong negative)
-    if any(k in desc_l for k in HYBRID_SIGNALS):
+    if any(k in desc_l for k in V2_HYBRID_SIGNALS):
         return {"remote_model": RemoteClass.NON_REMOTE, "reason": "hybrid_signal"}
 
-    # 5 Optional remote (benefit)
-    if any(k in desc_l for k in REMOTE_OPTIONAL_SIGNALS):
+    # 5 Strong Remote in description (This was previously missing!)
+    if any(k in desc_l for k in V2_REMOTE_STRONG):
+        return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": "desc_remote_strong"}
+
+    # 6 Explicit negative in description
+    if any(k in desc_l for k in V2_NEGATIVE_STRONG):
+        return {"remote_model": RemoteClass.NON_REMOTE, "reason": "desc_negative"}
+
+    # 7 Optional remote (benefit)
+    if any(k in desc_l for k in V2_REMOTE_OPTIONAL_SIGNALS):
         return {"remote_model": RemoteClass.REMOTE_OPTIONAL, "reason": "benefit_remote"}
 
     return {"remote_model": RemoteClass.UNKNOWN, "reason": "no_signal"}

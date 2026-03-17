@@ -2,6 +2,7 @@ import os
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import InterfaceError, OperationalError, ProgrammingError
+import requests
 
 # tests should run against PostgreSQL rather than SQLite.  the CI workflow
 # already exports a suitable `DATABASE_URL`; when running locally you can
@@ -46,6 +47,24 @@ from alembic.config import Config
 
 _engine = None
 
+
+@pytest.fixture(autouse=True)
+def block_external_requests(monkeypatch):
+    """
+    Blokuje wszelkie prawdziwe zapytania HTTP do sieci podczas testów.
+    Dzięki temu, jeśli brakuje mocka, test od razu wybuchnie błędem,
+    zamiast wchodzić w minuty czekania lub zakleszczać bazę w tle!
+    """
+    original_request = requests.Session.request
+
+    def mock_request(self, method, url, *args, **kwargs):
+        # Pozwalamy tylko na żądania wewnętrzne z TestClient (FastAPI)
+        if str(url).startswith(("http://testserver", "http://localhost", "http://127.0.0.1")):
+            return original_request(self, method, url, *args, **kwargs)
+        
+        raise RuntimeError(f"NIEZAMOCKOWANE ZAPYTANIE SIECIOWE W TEŚCIE: {method} {url}")
+
+    monkeypatch.setattr(requests.Session, "request", mock_request)
 
 @pytest.fixture(autouse=True)
 def clean_db():

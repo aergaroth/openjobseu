@@ -97,8 +97,15 @@ def _classify_from_remote_scope(scope_l: str) -> dict | None:
 
     if any(_contains_phrase(scope_l, kw) for kw in NON_EU_SCOPE_TITLE_PHRASES):
         found_non_eu = True
+        
+    if any(_contains_phrase(scope_l, kw) for kw in US_STRONG_SIGNALS):
+        found_non_eu = True
 
     for token in tokens:
+        if token.upper() in US_STATE_CODES:
+            found_non_eu = True
+            continue
+            
         if token in COUNTRY_ALIASES:
             mapped_full_name = COUNTRY_ALIASES[token].lower()
             if mapped_full_name in EU_MEMBER_STATES:
@@ -118,6 +125,9 @@ def _classify_from_remote_scope(scope_l: str) -> dict | None:
         # Handle mixed free-form scopes, e.g. "Remote - US: Select locations".
         token_parts = [_normalize_token(part) for part in re.split(r"[\s:\-]+", token) if part.strip()]
         for token_part in token_parts:
+            if token_part.upper() in US_STATE_CODES:
+                found_non_eu = True
+                continue
             if token_part in NON_EU_SCOPE_TOKENS:
                 found_non_eu = True
                 continue

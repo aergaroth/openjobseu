@@ -100,9 +100,26 @@ class LeverAdapter(ATSAdapter):
 
         company_name = slug.replace("-", " ").replace("_", " ").strip().title()
 
-        description = raw_job.get("descriptionPlain") or raw_job.get("description") or ""
-        if not isinstance(description, str):
-            description = str(description)
+        # Assemble full description from Lever's fragmented payload
+        desc_parts = []
+        if raw_job.get("description"):
+            desc_parts.append(str(raw_job["description"]))
+        elif raw_job.get("descriptionPlain"):
+            desc_parts.append(str(raw_job["descriptionPlain"]))
+            
+        for lst in raw_job.get("lists") or []:
+            if isinstance(lst, dict):
+                if lst.get("text"):
+                    desc_parts.append(f"<h3>{lst['text']}</h3>")
+                if lst.get("content"):
+                    desc_parts.append(str(lst["content"]))
+                    
+        if raw_job.get("additional"):
+            desc_parts.append(str(raw_job["additional"]))
+        elif raw_job.get("additionalPlain"):
+            desc_parts.append(str(raw_job["additionalPlain"]))
+            
+        description = "\n\n".join(desc_parts)
 
         if not raw_id or not title or not source_url:
             return None
