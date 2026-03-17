@@ -21,10 +21,42 @@ from app.workers.ingestion.process_loop import process_company_jobs
 logger = logging.getLogger("openjobseu.ingestion.employer")
 SOURCE = "employer_ing"
 
+GLOBAL_INCREMENTAL_FETCH = True
+
 
 def ingest_company(company: dict):
+    started = perf_counter()
     provider = str(company.get("ats_provider") or "").strip().lower()
-    updated_since = company.get("last_sync_at")
+    updated_since = company.get("last_sync_at") if GLOBAL_INCREMENTAL_FETCH else None
+    company_id = str(company.get("company_id") or "")
+    ats_slug = company.get("ats_slug")
+
+    logger.info(
+        "company_ingestion_start",
+        extra={
+            "company_id": company_id,
+            "ats_provider": provider,
+            "ats_slug": ats_slug,
+        },
+    )
+
+    def _finalize(res: dict) -> dict:
+        duration_ms = int((perf_counter() - started) * 1000)
+        logger.info(
+            "company_ingestion_summary",
+            extra={
+                "company_id": company_id,
+                "ats_provider": provider,
+                "ats_slug": ats_slug,
+                "duration_ms": duration_ms,
+                "fetched": res.get("fetched", 0),
+                "accepted": res.get("accepted", 0),
+                "skipped": res.get("skipped", 0),
+                "error": res.get("error"),
+                "salary_detected": res.get("salary_detected", 0),
+            },
+        )
+        return res
 
     try:
         adapter = get_adapter(provider)
@@ -37,13 +69,13 @@ def ingest_company(company: dict):
                 "ats_slug": company.get("ats_slug"),
             },
         )
-        return {
+        return _finalize({
             "fetched": 0,
             "normalized_count": 0,
             "accepted": 0,
             "skipped": 0,
             "error": "unsupported_ats_provider",
-        }
+        })
 
     if not getattr(adapter, "active", True):
         logger.warning(
@@ -54,30 +86,29 @@ def ingest_company(company: dict):
                 "ats_slug": company.get("ats_slug"),
             },
         )
-        return {
+        return _finalize({
             "fetched": 0,
             "normalized_count": 0,
             "accepted": 0,
             "skipped": 0,
             "error": "inactive_ats_adapter",
-        }
+        })
 
     raw_jobs, error = fetch_company_jobs(company, adapter, updated_since=updated_since)
     if error:
         engine = get_engine()
         with engine.begin() as conn:
             mark_ats_synced(conn, company.get("company_ats_id"), success=False)
-        return {
+        return _finalize({
             "fetched": 0,
             "normalized_count": 0,
             "accepted": 0,
             "skipped": 0,
             "error": error,
-        }
+        })
 
     engine = get_engine()
     metrics = IngestionMetrics(fetched_count=len(raw_jobs))
-    company_id = str(company.get("company_id") or "")
     try:
         with engine.begin() as conn:
             process_company_jobs(
@@ -91,15 +122,15 @@ def ingest_company(company: dict):
             mark_ats_synced(conn, company.get("company_ats_id"), success=True)
 
     except Exception:
-        return {
+        return _finalize({
             "fetched": len(raw_jobs),
             "normalized_count": metrics.normalized,
             "accepted": 0,
             "skipped": 0,
             "error": "transaction_failed",
-        }
+        })
 
-    return metrics.to_result_dict()
+    return _finalize(metrics.to_result_dict())
 
 
 def run_employer_ingestion() -> dict:

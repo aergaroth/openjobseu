@@ -3,6 +3,7 @@ from typing import Any, Dict, List
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
+from app.adapters.ats.utils import to_utc_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,25 @@ class RecruiteeAdapter(ATSAdapter):
         for offer in offers:
             if isinstance(offer, dict):
                 offer["_ats_slug"] = slug
-        return offers
+        return self._filter_incremental_jobs(offers, updated_since)
+
+    def _filter_incremental_jobs(self, jobs: list[dict], updated_since: Any) -> list[dict]:
+        if updated_since in (None, ""):
+            return jobs
+
+        cutoff = to_utc_datetime(updated_since)
+        if cutoff is None:
+            return jobs
+
+        filtered_jobs: list[dict] = []
+        for job in jobs:
+            if not isinstance(job, dict):
+                filtered_jobs.append(job)
+                continue
+            source_updated_at = to_utc_datetime(job.get("created_at"))
+            if source_updated_at is None or source_updated_at >= cutoff:
+                filtered_jobs.append(job)
+        return filtered_jobs
 
     def normalize(self, raw_job: Dict) -> Dict | None:
         slug = raw_job.get("_ats_slug")

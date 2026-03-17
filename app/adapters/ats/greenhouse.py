@@ -13,9 +13,6 @@ from app.utils.cleaning import clean_description
 class GreenhouseAdapter(ATSAdapter):
     source_name = "greenhouse"
     active = True
-    # INCREMENTAL_FETCH determines whether the adapter should only process
-    # records updated since the last sync. When False, all jobs are processed.
-    INCREMENTAL_FETCH = True
     API_URL_TEMPLATE = (
         "https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs?content=true"
     )
@@ -54,8 +51,7 @@ class GreenhouseAdapter(ATSAdapter):
 
         jobs = self._extract_jobs_from_payload(payload, "fetch")
 
-        if self.INCREMENTAL_FETCH:
-            jobs = self._filter_incremental_jobs(jobs, updated_since)
+        jobs = self._filter_incremental_jobs(jobs, updated_since)
 
         # Inject board_token into each job for stateless normalize()
         for job in jobs:

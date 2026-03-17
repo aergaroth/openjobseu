@@ -14,7 +14,6 @@ from app.utils.cleaning import clean_description
 class AshbyAdapter(ATSAdapter):
     source_name = "ashby"
     active = True
-    INCREMENTAL_FETCH = True
     
     API_URL_TEMPLATE = "https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true"
     
@@ -51,8 +50,7 @@ class AshbyAdapter(ATSAdapter):
         if not isinstance(jobs, list):
             raise ValueError("Ashby API did not return a jobs list")
 
-        if self.INCREMENTAL_FETCH:
-            jobs = self._filter_incremental_jobs(jobs, updated_since)
+        jobs = self._filter_incremental_jobs(jobs, updated_since)
 
         for job in jobs:
             if isinstance(job, dict):

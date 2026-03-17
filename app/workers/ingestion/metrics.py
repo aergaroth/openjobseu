@@ -30,6 +30,8 @@ class IngestionMetrics:
             RemoteClass.NON_REMOTE.value: 0,
             RemoteClass.UNKNOWN.value: 0,
         }
+        self.salary_detected = 0
+        self.salary_missing = 0
 
     def observe_normalized(self):
         self.normalized += 1
@@ -53,6 +55,12 @@ class IngestionMetrics:
         metric_remote_model = _normalize_remote_model_for_metrics(remote_model)
         self.remote_model_counts[metric_remote_model] += 1
 
+    def observe_salary(self, has_salary: bool):
+        if has_salary:
+            self.salary_detected += 1
+        else:
+            self.salary_missing += 1
+
     def to_result_dict(self) -> dict:
         return {
             "fetched": self.fetched,
@@ -63,4 +71,6 @@ class IngestionMetrics:
             "rejected_by_reason": self.rejected_by_reason.copy(),
             "remote_model_counts": self.remote_model_counts.copy(),
             "hard_geo_rejected_count": self.hard_geo_rejected_count,
+            "salary_detected": self.salary_detected,
+            "salary_missing": self.salary_missing,
         }
