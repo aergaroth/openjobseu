@@ -43,6 +43,10 @@ V2_REMOTE_STRONG = [
     "remote-only",
     "remote-first",
     "work from anywhere",
+    "home based",
+    "remote job",
+    "work from home",
+    
 ]
 
 V2_REMOTE_OPTIONAL_SIGNALS = [
