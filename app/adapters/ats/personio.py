@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
 from app.adapters.ats.utils import to_utc_datetime
+from app.utils.cleaning import clean_description
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +39,15 @@ class PersonioAdapter(ATSAdapter):
                 for event, elem in parser.read_events():
                     if elem.tag == 'position':
                         desc_texts = []
-                        for desc in elem.findall(".//jobDescription/value"):
-                            if desc.text:
-                                desc_texts.append(desc.text.strip())
-                                
+                        for desc_node in elem.findall(".//jobDescription"):
+                            name = desc_node.findtext("name")
+                            value = desc_node.findtext("value")
+                            if value and value.strip():
+                                if name and name.strip():
+                                    desc_texts.append(f"<h3>{name.strip()}</h3>\n{value.strip()}")
+                                else:
+                                    desc_texts.append(value.strip())
+
                         job = {
                             "id": elem.findtext("id"),
                             "name": elem.findtext("name"),
@@ -92,6 +98,9 @@ class PersonioAdapter(ATSAdapter):
         description = raw_job.get("description", "")
         location = raw_job.get("office", "")
         
+        cleaned_description = clean_description(description, source=self.source_name)
+        normalized_remote_scope = self.normalize_remote_scope(location)
+        
         remote_source_flag = "remote" in str(location).lower() or "remote" in str(title).lower()
         
         company_name = slug.replace("-", " ").replace("_", " ").strip().title()
@@ -102,8 +111,8 @@ class PersonioAdapter(ATSAdapter):
             "source_job_id": job_id,
             "title": title,
             "company_name": company_name,
-            "description": description,
-            "remote_scope": location,
+            "description": cleaned_description.strip(),
+            "remote_scope": normalized_remote_scope,
             "remote_source_flag": remote_source_flag,
             "source_url": "",  # No URL in Personio XML feed
             "status": "new",

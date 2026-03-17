@@ -147,9 +147,15 @@ class WorkableAdapter(ATSAdapter):
 
         company_name = slug.replace("-", " ").replace("_", " ").strip().title()
 
-        description = raw_job.get("description") or ""
-        if not isinstance(description, str):
-            description = str(description)
+        desc_parts = []
+        if raw_job.get("description"):
+            desc_parts.append(str(raw_job["description"]))
+        if raw_job.get("requirements"):
+            desc_parts.append("<h3>Requirements</h3>\n" + str(raw_job["requirements"]))
+        if raw_job.get("benefits"):
+            desc_parts.append("<h3>Benefits</h3>\n" + str(raw_job["benefits"]))
+
+        description = "\n\n".join(desc_parts)
 
         if not raw_id or not title or not source_url:
             return None

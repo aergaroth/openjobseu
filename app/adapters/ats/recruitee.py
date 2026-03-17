@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
 from app.adapters.ats.utils import to_utc_datetime
+from app.utils.cleaning import clean_description
 
 logger = logging.getLogger(__name__)
 
@@ -57,12 +58,23 @@ class RecruiteeAdapter(ATSAdapter):
             return None
 
         title = raw_job.get("title", "")
-        description = raw_job.get("description", "")
         location = raw_job.get("location", "")
         url = raw_job.get("careers_url", "")
         department = raw_job.get("department", "")
         remote = raw_job.get("remote", False)
         
+        desc_parts = []
+        if raw_job.get("description"):
+            desc_parts.append(str(raw_job["description"]))
+        if raw_job.get("requirements"):
+            desc_parts.append("<h3>Requirements</h3>")
+            desc_parts.append(str(raw_job["requirements"]))
+            
+        full_desc = "\n\n".join(desc_parts)
+        cleaned_description = clean_description(full_desc, source=self.source_name)
+        
+        normalized_remote_scope = self.normalize_remote_scope(location if location else ("Remote" if remote else ""))
+
         company_name = raw_job.get("company_name", "")
         if not company_name:
             company_name = slug.replace("-", " ").replace("_", " ").strip().title()
@@ -73,8 +85,8 @@ class RecruiteeAdapter(ATSAdapter):
             "source_job_id": job_id,
             "title": title,
             "company_name": company_name,
-            "description": description,
-            "remote_scope": location if location else ("Remote" if remote else ""),
+            "description": cleaned_description.strip(),
+            "remote_scope": normalized_remote_scope,
             "remote_source_flag": remote,
             "source_url": url,
             "status": "new",
