@@ -21,8 +21,22 @@ def upgrade() -> None:
     bind.commit()
     conn = bind.execution_options(isolation_level="AUTOCOMMIT")
 
-    # Włączenie modułu trigramów (wymagane tylko raz)
-    conn.execute(sa.text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+    # Bezpieczne włączenie modułu trigramów (zabezpieczenie przed brakiem uprawnień w Cloud SQL)
+    has_trgm = conn.execute(sa.text("SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm'")).scalar()
+    if not has_trgm:
+        try:
+            conn.execute(sa.text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+        except Exception as e:
+            raise RuntimeError(
+                "\n"
+                "========================================================================\n"
+                "BRAK UPRAWNIEŃ DO INSTALACJI ROZSZERZENIA 'pg_trgm' W BAZIE DANYCH!\n"
+                "Zaloguj się do konsoli swojego dostawcy (np. Neon SQL Editor) jako\n"
+                "właściciel bazy danych (admin) i wykonaj ręcznie komendę:\n\n"
+                "CREATE EXTENSION IF NOT EXISTS pg_trgm;\n\n"
+                "Po wykonaniu tej komendy ponów deployment (Cloud Run sam ruszy dalej).\n"
+                "========================================================================"
+            ) from e
     
     # Tworzenie wydajnych indeksów typu GIN dla wyszukiwarki API
     conn.execute(sa.text("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_jobs_title_trgm ON jobs USING GIN (title gin_trgm_ops);"))

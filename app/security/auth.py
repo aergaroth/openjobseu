@@ -19,7 +19,7 @@ def configure_oauth(app):
         server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
         client_id=os.environ.get("GOOGLE_CLIENT_ID", "dummy-client-id"),
         client_secret=os.environ.get("GOOGLE_CLIENT_SECRET", "dummy-client-secret"),
-        client_kwargs={"scope": "openid email profile"},
+        client_kwargs={"scope": "openid email"},
     )
 
 
