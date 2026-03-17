@@ -4,7 +4,7 @@ from sqlalchemy import text
 from app.domain.money.salary_parser import extract_salary
 from storage.db_engine import get_engine
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("openjobseu.backfill")
 
 BATCH_SIZE = 100
 
