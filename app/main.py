@@ -103,17 +103,36 @@ app.add_middleware(
 )
 
 
+origins = [
+    "https://openjobseu.org",
+    "https://www.openjobseu.org",
+]
+if os.environ.get("APP_RUNTIME") == "local":
+    origins.extend(["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8000"])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://openjobseu.org"],
+    allow_origins=origins,
     allow_methods=["GET", "OPTIONS"],
-    allow_headers=["*"],
+    allow_headers=["Accept", "Accept-Language", "Content-Language", "Content-Type", "Authorization"],
 )
 
 app.include_router(auth_router)
 app.include_router(internal_router)
 app.include_router(jobs_router)
 
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    
+    if os.environ.get("APP_RUNTIME") != "local":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        
+    return response
 
 @app.middleware("http")
 async def readiness_gate(request: Request, call_next):

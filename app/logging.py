@@ -53,7 +53,7 @@ class JsonLogFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         payload = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "level": record.levelname,
+            "severity": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
         }
@@ -65,7 +65,15 @@ class JsonLogFormatter(logging.Formatter):
         if record.stack_info:
             payload["stack_info"] = record.stack_info
 
-        return json.dumps(payload, ensure_ascii=False, default=str)
+        try:
+            return json.dumps(payload, ensure_ascii=False, default=str)
+        except Exception as exc:
+            return json.dumps({
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "severity": "ERROR",
+                "logger": "openjobseu.logging_fallback",
+                "message": f"Log serialization failed: {exc} | Original message: {record.getMessage()}",
+            })
 
 
 def extract_record_extras(record: logging.LogRecord) -> dict:
