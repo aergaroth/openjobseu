@@ -2,22 +2,41 @@ from app.domain.taxonomy.enums import RemoteClass
 
 REMOTE_WORD = "remote"
 
+SCOPE_REMOTE_STRONG_KEYWORDS = [
+    "remote",
+    "home based",
+    "work from home",
+    "fully remote",
+    "remote job",
+    "remote only",
+    "remote-only",
+    "remote-first",
+
+]
+
 REMOTE_OPTIONAL_SIGNALS = [
     "remote work options",
     "flexible remote",
     "home office",
     "workation",
+    "possibility to work remotely",
+    "flexible working hours and remote",
 ]
 
 HYBRID_SIGNALS = [
     "hybrid",
     "days in office",
+    "partially remote",
 ]
 
 NEGATIVE_STRONG = [
     "relocation required",
     "full-time position in",
     "this role is based in",
+    "on-site",
+    "onsite",
+    "in-office",
+    "in office work",
 ]
 
 V2_NEGATIVE_STRONG = [
@@ -88,15 +107,16 @@ def classify_remote(
     if any(k in scope_l for k in NEGATIVE_STRONG):
         return {"remote_model": RemoteClass.NON_REMOTE, "reason": "scope_negative"}
 
-    # 2 Scope contains "remote"
-    if REMOTE_WORD in scope_l:
-        cleaned = scope_l.replace("remote", "").replace("-", "").strip()
+    # 2 Scope contains strong remote signal
+    found_keyword = next((k for k in SCOPE_REMOTE_STRONG_KEYWORDS if k in scope_l), None)
+    if found_keyword:
+        cleaned = scope_l.replace(found_keyword, "").replace("-", "").strip()
         if cleaned:
             return {
                 "remote_model": RemoteClass.REMOTE_REGION_LOCKED,
                 "reason": "scope_region",
             }
-        return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": "scope_remote"}
+        return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": f"scope_{found_keyword.replace(' ', '_')}"}
 
     # 3 Title contains remote
     if REMOTE_WORD in title_l:

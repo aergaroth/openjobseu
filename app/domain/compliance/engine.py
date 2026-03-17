@@ -1,3 +1,5 @@
+import hashlib
+from pathlib import Path
 from enum import Enum
 
 from app.domain.taxonomy.enums import GeoClass, RemoteClass
@@ -7,11 +9,31 @@ from app.domain.compliance.classifiers.remote import classify_remote
 from app.domain.compliance.resolver import resolve_compliance
 
 
+def _compute_compliance_version() -> str:
+    base_version = "v4"
+    compliance_dir = Path(__file__).parent
+
+    hasher = hashlib.md5()
+    
+    # Sort files to ensure deterministic hashing across different operating systems
+    for file_path in sorted(compliance_dir.rglob("*.py")):
+        try:
+            content = file_path.read_text(encoding="utf-8")
+            # Normalize line endings to avoid hash mismatch between Windows (CRLF) and Linux/Mac (LF)
+            content = content.replace("\r\n", "\n")
+            hasher.update(content.encode("utf-8"))
+        except OSError:
+            pass
+
+    short_hash = hasher.hexdigest()[:7]
+    return f"{base_version}.{short_hash}"
+
+
 class PolicyVersion(str, Enum):
-    V3 = "v3"
+    V4 = _compute_compliance_version()
 
 
-ENGINE_POLICY_VERSION = PolicyVersion.V3
+ENGINE_POLICY_VERSION = PolicyVersion.V4
 # Backward-compatible alias.
 ENGINE_VERSION = ENGINE_POLICY_VERSION.value
 

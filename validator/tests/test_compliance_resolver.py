@@ -56,3 +56,25 @@ def test_apply_policy_marks_region_locked_scope():
     assert reason is None
     assert job is not None
     assert job["_compliance"]["remote_model"] == RemoteClass.REMOTE_REGION_LOCKED
+
+
+def test_apply_policy_marks_home_based_scope_as_remote_only():
+    job, reason = apply_policy(
+        _job(remote_scope="home based"),
+        source="employer_ing",
+    )
+
+    assert reason is None
+    assert job is not None
+    assert job["_compliance"]["remote_model"] == RemoteClass.REMOTE_ONLY
+
+
+def test_apply_policy_marks_home_based_scope_as_region_locked():
+    job, reason = apply_policy(
+        _job(remote_scope="home based - emea"),
+        source="employer_ing",
+    )
+
+    assert reason is None
+    assert job is not None
+    assert job["_compliance"]["remote_model"] == RemoteClass.REMOTE_REGION_LOCKED
