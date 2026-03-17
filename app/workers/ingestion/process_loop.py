@@ -4,10 +4,14 @@ from typing import Dict, List
 from sqlalchemy.engine import Connection
 
 from app.adapters.ats.base import ATSAdapter
-from app.domain.jobs.identity import compute_schema_hash
+from app.domain.jobs.identity import compute_job_identity
 from app.domain.jobs.job_processing import process_ingested_job
 from app.workers.ingestion.metrics import IngestionMetrics
-from storage.db_logic import insert_compliance_report, upsert_job
+from storage.db_logic import (
+    insert_compliance_reports,
+    upsert_job,
+    insert_salary_parsing_cases,
+)
 
 logger = logging.getLogger("openjobseu.ingestion.employer")
 
@@ -27,6 +31,9 @@ def process_company_jobs(
     """
     Process a list of raw jobs for a company: normalize, process, persist, and collect metrics.
     """
+    compliance_reports_bulk = []
+    salary_cases_bulk = []
+
     for raw in raw_jobs:
         try:
             normalized = normalize_job(adapter, raw)
@@ -35,8 +42,8 @@ def process_company_jobs(
                 continue
 
             metrics.observe_normalized()
-            normalized["source_schema_hash"] = compute_schema_hash(raw)
             normalized["company_id"] = company_id
+            normalized = compute_job_identity(company_id, raw, normalized)
 
             job, report = process_ingested_job(normalized, source=provider)
 
@@ -61,25 +68,26 @@ def process_company_jobs(
             salary_source = job.get("salary_source")
             metrics.observe_salary(bool(salary_source))
 
-            canonical_job_id = upsert_job(job, conn=conn, company_id=company_id)
-            report["job_id"] = canonical_job_id
+            # Zabezpieczamy główną transakcję przed błędami z pojedynczego zepsutego joba
+            with conn.begin_nested():
+                canonical_job_id = upsert_job(job, conn=conn, company_id=company_id)
+                report["job_id"] = canonical_job_id
+
+            # Logowanie edge-case'ów z ekstrakcji wynagrodzeń
+            parsing_case = job.get("_salary_parsing_case")
+            if parsing_case and canonical_job_id:
+                salary_cases_bulk.append({
+                    "job_id": canonical_job_id,
+                    "salary_raw": parsing_case.get("salary_raw"),
+                    "description_fragment": None,
+                    "parser_confidence": parsing_case.get("salary_confidence"),
+                    "extracted_min": parsing_case.get("salary_min"),
+                    "extracted_max": parsing_case.get("salary_max"),
+                    "extracted_currency": parsing_case.get("salary_currency"),
+                })
 
             if report.get("job_id"):
-                insert_compliance_report(
-                    conn,
-                    job_id=report["job_id"],
-                    job_uid=report["job_uid"],
-                    policy_version=report["policy_version"],
-                    remote_class=report["remote_class"],
-                    geo_class=report["geo_class"],
-                    hard_geo_flag=report["hard_geo_flag"],
-                    base_score=report["base_score"],
-                    penalties=None,
-                    bonuses=None,
-                    final_score=report["final_score"],
-                    final_status=report["final_status"],
-                    decision_vector=report["decision_vector"],
-                )
+                compliance_reports_bulk.append(report)
 
         except Exception as exc:
             logger.warning(
@@ -94,3 +102,23 @@ def process_company_jobs(
             )
             metrics.observe_skip()
             continue
+            
+    if compliance_reports_bulk:
+        try:
+            with conn.begin_nested():
+                insert_compliance_reports(conn, compliance_reports_bulk)
+        except Exception as exc:
+            logger.error("bulk_insert_compliance_reports_failed", extra={
+                "company_id": company_id,
+                "error": str(exc)
+            })
+        
+    if salary_cases_bulk:
+        try:
+            with conn.begin_nested():
+                insert_salary_parsing_cases(conn, salary_cases_bulk)
+        except Exception as exc:
+            logger.error("bulk_insert_salary_cases_failed", extra={
+                "company_id": company_id,
+                "error": str(exc)
+            })

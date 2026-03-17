@@ -2,6 +2,12 @@ import logging
 import os
 from logging.config import fileConfig
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from alembic import context
 
 # Import your existing engine factory to automatically support DB_MODE switch

@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict
+import concurrent.futures
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
@@ -63,33 +64,36 @@ class WorkableAdapter(ATSAdapter):
 
         jobs = self._filter_incremental_jobs(jobs, updated_since)
 
-        full_jobs = []
-        for job in jobs:
+        def _fetch_detail(job: dict) -> dict:
             if not isinstance(job, dict):
-                continue
-                
+                return job
             shortcode = job.get("shortcode")
             if not shortcode:
-                continue
+                return job
                 
             try:
-                # Fetch details for description (v3 returns details per shortcode)
                 detail_url = f"{api_url}/{shortcode}"
                 detail_resp = self.session.get(detail_url, timeout=10)
                 detail_resp.raise_for_status()
                 detail_job = detail_resp.json()
                 detail_job["_ats_slug"] = slug
-                full_jobs.append(detail_job)
+                return detail_job
             except Exception as e:
-                # If fetching details fails, log it and fall back to the summary job.
-                # This is better than failing the entire company fetch.
                 logger.warning(
                     "Workable: failed to fetch job details for slug=%s, shortcode=%s. Falling back to summary.",
                     slug, shortcode, exc_info=True
                 )
                 job["_ats_slug"] = slug
-                full_jobs.append(job)
+                return job
 
+        if not jobs:
+            return []
+            
+        # Współbieżnie odpytujemy API dla paczki ofert używając maksymalnie 5 wątków 
+        # na jedną firmę, aby nie obudzić w systemie Workable limitu Rate Limit (HTTP 429)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            full_jobs = list(executor.map(_fetch_detail, jobs))
+            
         return full_jobs
 
     @staticmethod

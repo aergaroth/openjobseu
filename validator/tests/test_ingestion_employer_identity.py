@@ -12,10 +12,13 @@ from app.workers.ingestion import employer, process_loop
 
 class _NoopTx:
     def __enter__(self):
-        return object()
+        return self
 
     def __exit__(self, exc_type, exc, tb):
         return False
+
+    def begin_nested(self):
+        return self
 
 
 class _NoopEngine:
@@ -132,8 +135,13 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
     monkeypatch.setattr(process_loop, "upsert_job", _fake_upsert)
     monkeypatch.setattr(
         process_loop,
-        "insert_compliance_report",
-        lambda *args, **kwargs: call_order.append("insert_report"),
+        "insert_compliance_reports",
+        lambda conn, reports: call_order.append("insert_reports"),
+    )
+    monkeypatch.setattr(
+        process_loop,
+        "insert_salary_parsing_cases",
+        lambda conn, cases: None,
     )
     monkeypatch.setattr(
         employer,
@@ -147,7 +155,7 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
     assert result["normalized_count"] == 1
     assert result["accepted"] == 1
     assert result["skipped"] == 0
-    assert call_order == ["normalize", "apply_policy", "upsert", "insert_report"]
+    assert call_order == ["normalize", "apply_policy", "upsert", "insert_reports"]
     assert len(persisted_jobs) == 1
     assert persisted_jobs[0]["job_uid"]
     assert persisted_jobs[0]["job_fingerprint"]
@@ -249,8 +257,13 @@ def test_ingest_company_accepts_uuid_company_identifiers(monkeypatch):
     monkeypatch.setattr(process_loop, "process_ingested_job", _fake_process_ingested_job)
     monkeypatch.setattr(
         process_loop,
-        "insert_compliance_report",
-        lambda *args, **kwargs: None,
+        "insert_compliance_reports",
+        lambda conn, reports: None,
+    )
+    monkeypatch.setattr(
+        process_loop,
+        "insert_salary_parsing_cases",
+        lambda conn, cases: None,
     )
     monkeypatch.setattr(
         process_loop,
@@ -343,8 +356,13 @@ def test_ingest_company_rejected_job_does_not_insert_compliance_report_without_j
     )
     monkeypatch.setattr(
         process_loop,
-        "insert_compliance_report",
-        lambda *args, **kwargs: report_calls.append(kwargs),
+        "insert_compliance_reports",
+        lambda conn, reports: report_calls.extend(reports),
+    )
+    monkeypatch.setattr(
+        process_loop,
+        "insert_salary_parsing_cases",
+        lambda conn, cases: None,
     )
     monkeypatch.setattr(employer, "mark_ats_synced", lambda _conn, _company_ats_id, success=True: None)
 

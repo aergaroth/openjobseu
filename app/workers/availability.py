@@ -1,9 +1,10 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
 from datetime import datetime, timezone
 import logging
 import requests
 from storage.db_engine import get_engine
 from storage.db_logic import get_jobs_for_verification, update_jobs_availability
+from app.adapters.ats.base import TimeoutSession
 
 logger = logging.getLogger("openjobseu.worker.availability")
 
@@ -11,8 +12,10 @@ logger = logging.getLogger("openjobseu.worker.availability")
 DEFAULT_TIMEOUT = 5
 MAX_AVAILABILITY_WORKERS = 8
 
+# Inicjalizujemy globalną sesję (współdzieloną w ramach thread poola) z mechanizmem retry i timeout
+_session = TimeoutSession(timeout=DEFAULT_TIMEOUT)
 
-def check_job_availability(job: dict, timeout: int = DEFAULT_TIMEOUT) -> str:
+def check_job_availability(job: dict, timeout: int = DEFAULT_TIMEOUT, session: requests.Session = _session) -> str:
     """
     Check availability of a single job offer.
 
@@ -24,7 +27,7 @@ def check_job_availability(job: dict, timeout: int = DEFAULT_TIMEOUT) -> str:
         return "unreachable"
 
     try:
-        resp = requests.head(
+        resp = session.head(
             url,
             timeout=timeout,
             allow_redirects=True,
@@ -55,13 +58,21 @@ def _check_availability_for_jobs(
 
     statuses: list[str] = ["unreachable"] * len(jobs)
     workers = min(MAX_AVAILABILITY_WORKERS, len(jobs))
-    with ThreadPoolExecutor(max_workers=workers) as pool:
+    pool = ThreadPoolExecutor(max_workers=workers)
+    try:
         future_to_index = {
             pool.submit(check_job_availability, job): index
             for index, job in enumerate(jobs)
         }
-        for future in as_completed(future_to_index):
-            statuses[future_to_index[future]] = future.result()
+        for future in as_completed(future_to_index, timeout=60):
+            try:
+                statuses[future_to_index[future]] = future.result()
+            except Exception:
+                pass
+    except TimeoutError:
+        logger.error("availability_pool_timeout", extra={"msg": "Thread pool exhausted on hanging requests", "timeout_sec": 60})
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
     return statuses
 

@@ -1,10 +1,13 @@
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 
 def compute_market_segments(conn: Connection, date: date) -> list[dict]:
+    start_time = datetime(date.year, date.month, date.day, tzinfo=timezone.utc)
+    end_time = start_time + timedelta(days=1)
+
     segment_specs = [
         ("country", "remote_scope"),
         ("job_family", "job_family"),
@@ -20,16 +23,17 @@ def compute_market_segments(conn: Connection, date: date) -> list[dict]:
                 SELECT
                     {column_name} AS segment_value,
                     COUNT(*) FILTER (WHERE availability_status='active') AS jobs_active,
-                    COUNT(*) FILTER (WHERE DATE(first_seen_at)=:date) AS jobs_created,
+                    COUNT(*) FILTER (WHERE first_seen_at >= :start_time AND first_seen_at < :end_time) AS jobs_created,
                     AVG(salary_min_eur) AS avg_salary_eur,
                     percentile_cont(0.5)
                         WITHIN GROUP (ORDER BY salary_min_eur) AS median_salary_eur
                 FROM jobs
                 WHERE {column_name} IS NOT NULL
+                  AND (availability_status = 'active' OR (first_seen_at >= :start_time AND first_seen_at < :end_time))
                 GROUP BY {column_name}
                 """
             ),
-            {"date": date},
+            {"start_time": start_time, "end_time": end_time},
         )
 
         for item in result.mappings():

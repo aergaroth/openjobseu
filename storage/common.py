@@ -1,4 +1,38 @@
+import logging
+import random
+import time
+from functools import wraps
+
 from sqlalchemy.engine import Connection
+from sqlalchemy.exc import DBAPIError, OperationalError
+
+logger = logging.getLogger(__name__)
+
+def retry_on_db_timeout(max_retries: int = 3, initial_delay: float = 0.5, backoff_factor: float = 2.0, jitter: float = 0.5):
+    """
+    Dekorator ponawiający wykonanie funkcji w przypadku przejściowych błędów bazy danych
+    (timeouty, utrata połączenia, deadlocki) z użyciem Exponential Backoff i Jitter.
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            delay = initial_delay
+            for attempt in range(1, max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except (OperationalError, DBAPIError) as exc:
+                    if attempt == max_retries:
+                        logger.error("db_retry_exhausted", extra={"func": func.__name__, "attempts": attempt, "error": str(exc)})
+                        raise
+                    
+                    sleep_time = delay + random.uniform(0, jitter)
+                    logger.warning("db_transient_error_retrying", extra={"func": func.__name__, "attempt": attempt, "sleep_time": round(sleep_time, 2), "error": str(exc)})
+                    
+                    time.sleep(sleep_time)
+                    delay *= backoff_factor
+                    
+        return wrapper
+    return decorator
 
 def _string_like(value: object | None) -> str | None:
     if value is None:

@@ -28,7 +28,6 @@ def compute_job_taxonomy(job: dict) -> dict[str, str]:
 from .repositories.jobs_repository import (
     _find_job_id_by_source_mapping,
     _find_job_id_by_fingerprint,
-    _job_exists,
     _resolve_canonical_job_id,
     _upsert_job_source_mapping_in_conn,
     _upsert_job_in_conn,
@@ -37,6 +36,7 @@ from .repositories.jobs_repository import (
 )
 from .repositories.compliance_repository import (
     insert_compliance_report,
+    insert_compliance_reports,
     count_jobs_missing_compliance,
     get_jobs_for_compliance_resolution,
     update_job_compliance_resolution,
@@ -72,4 +72,11 @@ from .repositories.audit_repository import (
     get_job_lifetime_stats,
     get_repost_candidates,
     get_failing_ats_integrations,
+)
+from .repositories.snapshots_repository import (
+    insert_job_snapshot,
+)
+from .repositories.salary_repository import (
+    insert_salary_parsing_case,
+    insert_salary_parsing_cases,
 )

@@ -103,8 +103,17 @@ def _fetch_careers_page(url: str) -> requests.Response | None:
         return None
 
     try:
-        response = requests.get(url, timeout=15, allow_redirects=True, verify=False)
+        response = requests.get(url, timeout=15, allow_redirects=True, verify=False, stream=True)
         response.raise_for_status()
+        
+        content = b""
+        for chunk in response.iter_content(chunk_size=8192):
+            content += chunk
+            if len(content) > 5 * 1024 * 1024:  # Sztywny limit wielkości do 5MB dla stron HTML
+                logger.warning("careers page too large, truncating to 5MB", extra={"url": url})
+                break
+                
+        response._content = content  # Bezpieczny "hack", aby response.text i kodowanie zadziałały dla reszty skryptu
         return response
     except Exception as exc:
         logger.warning(

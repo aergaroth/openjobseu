@@ -3,10 +3,12 @@ import re
 from typing import Any
 
 
+_WHITESPACE_RE = re.compile(r"\s+")
+
 def normalize(text: Any) -> str:
     text = str(text or "")
     text = text.lower()
-    text = re.sub(r"\s+", " ", text)
+    text = _WHITESPACE_RE.sub(" ", text)
     text = text.strip()
     return text
 
@@ -31,8 +33,11 @@ def compute_job_fingerprint(
     location = normalize(location or "")
     company_id = normalize(company_id or "")
     company_name = normalize(company_name or "")
-    description = normalize(description or "")
-    fragment = description[:500]
+
+    # Optymalizacja: Ograniczamy opis ZANIM przemieli go potężny regex
+    # Bufor 1500 znaków z zapasem wystarczy, by po usunięciu spacji zostało 500 znaków.
+    raw_fragment = str(description or "")[:1500]
+    fragment = normalize(raw_fragment)[:500]
 
     base = f"{company_id}|{company_name}|{title}|{location}|{fragment}"
     return hashlib.md5(base.encode("utf-8")).hexdigest()
@@ -41,9 +46,8 @@ def compute_job_fingerprint(
 def _schema_signature(value: Any) -> str:
     if isinstance(value, dict):
         parts = []
-        for key in sorted(value.keys(), key=lambda item: str(item)):
-            key_text = str(key)
-            parts.append(f"{key_text}:{_schema_signature(value[key])}")
+        for key in sorted(value.keys(), key=str):
+            parts.append(f"{key}:{_schema_signature(value[key])}")
         return "{" + ",".join(parts) + "}"
 
     if isinstance(value, list):

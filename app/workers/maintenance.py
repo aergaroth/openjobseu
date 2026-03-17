@@ -1,7 +1,6 @@
 import logging
 from time import perf_counter
 
-from storage.db_engine import get_engine
 from storage.repositories.maintenance_repository import (
     update_company_job_stats_bulk,
     update_company_signal_scores_bulk,
@@ -18,9 +17,7 @@ def _update_company_job_stats() -> int:
     - total_jobs_count
     - last_active_job_at
     """
-    engine = get_engine()
-    with engine.begin() as conn:
-        return update_company_job_stats_bulk(conn)
+    return update_company_job_stats_bulk()
 
 
 def _update_company_signal_scores() -> int:
@@ -31,10 +28,7 @@ def _update_company_signal_scores() -> int:
     - HQ in EU: 20
     - Historical approval ratio (>= 80%: 15, >= 50%: 8)
     """
-    engine = get_engine()
-
-    with engine.begin() as conn:
-        return update_company_signal_scores_bulk(conn)
+    return update_company_signal_scores_bulk()
 
 
 def run_maintenance_pipeline() -> dict:
