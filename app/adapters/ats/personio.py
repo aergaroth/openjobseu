@@ -10,6 +10,7 @@ from app.utils.cleaning import clean_description
 logger = logging.getLogger(__name__)
 
 class PersonioAdapter(ATSAdapter):
+    dorking_target = "jobs.personio.com"
     source_name = "personio"
 
     def fetch(self, company: Dict, updated_since: Any = None) -> List[Dict]:

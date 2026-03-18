@@ -5,19 +5,10 @@ from storage.db_engine import get_engine
 from storage.repositories.ats_repository import load_active_ats_companies
 from app.domain.jobs.job_processing import process_ingested_job
 
-from app.adapters.ats.greenhouse import GreenhouseAdapter
-from app.adapters.ats.lever import LeverAdapter
-from app.adapters.ats.workable import WorkableAdapter
-from app.adapters.ats.ashby import AshbyAdapter
+import app.adapters.ats as ats  # noqa: F401
+from app.adapters.ats.registry import get_adapter
 
 logger = logging.getLogger("openjobseu.backfill")
-
-ADAPTER_MAP = {
-    "greenhouse": GreenhouseAdapter,
-    "lever": LeverAdapter,
-    "workable": WorkableAdapter,
-    "ashby": AshbyAdapter,
-}
 
 
 def backfill_missing_departments() -> int:
@@ -35,12 +26,11 @@ def backfill_missing_departments() -> int:
     for idx, row in enumerate(companies, 1):
         company = dict(row)
         provider = company.get("provider")
-        adapter_cls = ADAPTER_MAP.get(provider)
         
-        if not adapter_cls:
+        try:
+            adapter = get_adapter(provider)
+        except ValueError:
             continue
-
-        adapter = adapter_cls()
 
         try:
             # Force full fetch without time filter (updated_since=None)

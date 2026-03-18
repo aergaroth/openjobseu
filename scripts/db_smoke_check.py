@@ -7,7 +7,6 @@ import requests
 from collections import Counter
 
 BASE_URL = "http://127.0.0.1:8000"
-DB_PATH = "data/openjobseu.db"
 
 
 def http_check():

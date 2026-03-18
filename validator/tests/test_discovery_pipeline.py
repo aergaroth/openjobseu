@@ -3,6 +3,15 @@ from app.workers.discovery import pipeline
 from app.workers.discovery import ats_reverse
 
 
+def test_discovery_pipeline_steps_configured():
+    step_names = [name for name, _ in pipeline.PIPELINE_STEPS]
+    assert step_names == [
+        "sources",
+        "careers",
+        "ats_reverse",
+        "ats_guessing",
+    ]
+
 def test_run_discovery_pipeline_handles_step_error(monkeypatch):
     calls = []
 

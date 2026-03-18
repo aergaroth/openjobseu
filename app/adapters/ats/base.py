@@ -36,6 +36,8 @@ class TimeoutSession(requests.Session):
         return super().request(method, url, **kwargs)
 
 class ATSAdapter(ABC):
+    dorking_target: str | None = None
+
     """
     Abstract base class for ATS adapters.
     

@@ -15,6 +15,7 @@ from app.utils.cleaning import clean_description
 logger = logging.getLogger(__name__)
 
 class GreenhouseAdapter(ATSAdapter):
+    dorking_target = "boards.greenhouse.io"
     source_name = "greenhouse"
     active = True
     API_URL_TEMPLATE = (

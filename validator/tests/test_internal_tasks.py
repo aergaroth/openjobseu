@@ -142,3 +142,23 @@ def test_tasks_endpoints_are_protected_by_auth():
         assert get_response.json()["detail"] == "Not authenticated"
     finally:
         app.dependency_overrides.clear()
+
+
+def test_trigger_dorking_task(monkeypatch):
+    def mock_dorking():
+        logger = logging.getLogger("openjobseu.dorking")
+        logger.info("dorking discovery executed in background")
+        return {"status": "ok", "discovered_slugs": 5}
+
+    monkeypatch.setattr(internal, "run_dorking_discovery", mock_dorking)
+
+    response = client.post("/internal/tasks/dorking")
+    assert response.status_code == 200
+    task_id = response.json()["task_id"]
+
+    get_response = client.get(f"/internal/tasks/{task_id}")
+    assert get_response.status_code == 200
+    data = get_response.json()
+    assert data["status"] == "completed"
+    assert data["result"] == {"status": "ok", "discovered_slugs": 5}
+    assert "dorking discovery executed in background" in data["logs"]

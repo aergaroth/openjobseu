@@ -194,3 +194,16 @@ def get_existing_brand_names(conn: Connection) -> set[str]:
         text("SELECT brand_name FROM companies WHERE brand_name IS NOT NULL")
     ).fetchall()
     return {row[0].lower() for row in rows}
+
+
+def insert_discovered_slugs(conn: Connection, slugs: list[dict]):
+    """Bulk inserts newly discovered slugs into the discovered_slugs table."""
+    if not slugs:
+        return
+
+    stmt = text("""
+        INSERT INTO discovered_slugs (provider, slug, discovery_source)
+        VALUES (:provider, :slug, :discovery_source)
+        ON CONFLICT (provider, slug) DO NOTHING
+    """)
+    conn.execute(stmt, slugs)

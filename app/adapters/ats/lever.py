@@ -17,6 +17,7 @@ from app.utils.cleaning import clean_description
 logger = logging.getLogger(__name__)
 
 class LeverAdapter(ATSAdapter):
+    dorking_target = "jobs.lever.co"
     source_name = "lever"
     active = True
     API_URL_TEMPLATE = "https://api.lever.co/v0/postings/{slug}?mode=json"

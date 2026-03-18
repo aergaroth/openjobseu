@@ -94,21 +94,23 @@ def _check_availability_for_jobs(
 
     statuses: list[str] = ["unreachable"] * len(jobs)
     workers = min(MAX_AVAILABILITY_WORKERS, len(jobs))
-    pool = ThreadPoolExecutor(max_workers=workers)
-    try:
+    
+    with ThreadPoolExecutor(max_workers=workers) as executor:
         future_to_index = {
-            pool.submit(check_job_availability, job): index
+            executor.submit(check_job_availability, job): index
             for index, job in enumerate(jobs)
         }
-        for future in as_completed(future_to_index, timeout=60):
-            try:
-                statuses[future_to_index[future]] = future.result()
-            except Exception:
-                pass
-    except TimeoutError:
-        logger.error("availability_pool_timeout", extra={"msg": "Thread pool exhausted on hanging requests", "timeout_sec": 60})
-    finally:
-        pool.shutdown(wait=False, cancel_futures=True)
+        
+        try:
+            for future in as_completed(future_to_index, timeout=60):
+                try:
+                    statuses[future_to_index[future]] = future.result()
+                except Exception:
+                    pass
+        except TimeoutError:
+            logger.error("availability_pool_timeout", extra={"msg": "Thread pool exhausted on hanging requests", "timeout_sec": 60})
+            for f in future_to_index:
+                f.cancel()
 
     return statuses
 

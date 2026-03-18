@@ -15,6 +15,23 @@ resource "google_cloud_scheduler_job" "tick_ingestion" {
   }
 }
 
+resource "google_cloud_scheduler_job" "dorking_discovery" {
+  name      = "openjobseu-dorking"
+  region    = var.scheduler_region
+  schedule  = "0 3 * * *" # at 03:00 AM every day (off-peak)
+  time_zone = "UTC"
+
+  http_target {
+    http_method = "POST"
+    uri         = "${google_cloud_run_v2_service.this.uri}/internal/tasks/dorking"
+
+    headers = {
+      Content-Type      = "application/json"
+      X-Internal-Secret = random_password.internal_secret.result
+    }
+  }
+}
+
 resource "google_cloud_scheduler_job" "tick_maintenance" {
   name      = "openjobseu-tick-maintenance"
   region    = var.scheduler_region

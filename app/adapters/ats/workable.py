@@ -17,6 +17,7 @@ from app.utils.cleaning import clean_description
 logger = logging.getLogger(__name__)
 
 class WorkableAdapter(ATSAdapter):
+    dorking_target = "apply.workable.com"
     source_name = "workable"
     active = True
     
