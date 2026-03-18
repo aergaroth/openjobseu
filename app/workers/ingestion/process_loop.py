@@ -68,10 +68,8 @@ def process_company_jobs(
             salary_source = job.get("salary_source")
             metrics.observe_salary(bool(salary_source))
 
-            # Zabezpieczamy główną transakcję przed błędami z pojedynczego zepsutego joba
-            with conn.begin_nested():
-                canonical_job_id = upsert_job(job, conn=conn, company_id=company_id)
-                report["job_id"] = canonical_job_id
+            canonical_job_id = upsert_job(job, conn=conn, company_id=company_id)
+            report["job_id"] = canonical_job_id
 
             # Logowanie edge-case'ów z ekstrakcji wynagrodzeń
             parsing_case = job.get("_salary_parsing_case")
@@ -104,21 +102,7 @@ def process_company_jobs(
             continue
             
     if compliance_reports_bulk:
-        try:
-            with conn.begin_nested():
-                insert_compliance_reports(conn, compliance_reports_bulk)
-        except Exception as exc:
-            logger.error("bulk_insert_compliance_reports_failed", extra={
-                "company_id": company_id,
-                "error": str(exc)
-            })
+        insert_compliance_reports(conn, compliance_reports_bulk)
         
     if salary_cases_bulk:
-        try:
-            with conn.begin_nested():
-                insert_salary_parsing_cases(conn, salary_cases_bulk)
-        except Exception as exc:
-            logger.error("bulk_insert_salary_cases_failed", extra={
-                "company_id": company_id,
-                "error": str(exc)
-            })
+        insert_salary_parsing_cases(conn, salary_cases_bulk)

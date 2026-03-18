@@ -201,6 +201,16 @@
 
         <button onclick="runBackfillSalary(this)">Backfill Salary</button>
 
+        <div style="display:inline-flex; align-items:center; gap:6px; margin-top:4px; margin-left:8px;">
+          <label for="backfill-limit-input" style="margin:0;">Limit (backfill):</label>
+          <input id="backfill-limit-input" type="number" min="1" max="100000" value="10000" style="width:80px; margin:0; padding:6px;" />
+        </div>
+
+        <div style="display:inline-flex; align-items:center; gap:6px; margin-top:4px; margin-left:8px;">
+          <label for="tick-limit-input" style="margin:0;">Limit (tick):</label>
+          <input id="tick-limit-input" type="number" min="1" max="1000" value="100" style="width:70px; margin:0; padding:6px;" />
+        </div>
+
       </div>
 
     </div>
@@ -212,7 +222,13 @@
       </div>
       <div id="tick-meta"></div>
       <div id="task-status-container" style="display: none; margin-top: 14px;">
-        <div id="task-status-header" style="margin-bottom: 12px;"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div id="task-status-header"></div>
+          <button id="cancel-task-btn" type="button" class="btn-danger" style="display:none; margin:0; min-width:auto; padding:4px 12px; font-size:0.8rem;" onclick="cancelCurrentTask()">Cancel Task</button>
+        </div>
+        <div class="progress-bar-wrap">
+          <div id="task-progress-bar" class="progress-bar-fill"></div>
+        </div>
         <div id="task-status-grid" class="task-status-grid"></div>
       </div>
       <pre class="tick-output" id="tick-output">No run yet.</pre>

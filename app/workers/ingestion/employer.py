@@ -186,8 +186,8 @@ def run_employer_ingestion() -> dict:
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
         try:
             futures = {executor.submit(ingest_company, company): company for company in companies}
-            # Ustawiamy absolutny maksymalny czas na cały przebieg (np. 15 minut)
-            for future in concurrent.futures.as_completed(futures, timeout=900):
+            # Podnosimy maksymalny czas by dopasować do środowisk w tle (np. 55 minut)
+            for future in concurrent.futures.as_completed(futures, timeout=3300):
                 try:
                     result = future.result()
 
@@ -216,7 +216,7 @@ def run_employer_ingestion() -> dict:
                 except Exception:
                     companies_failed += 1
         except concurrent.futures.TimeoutError:
-            logger.error("employer_ingestion_pool_timeout", extra={"msg": "Thread pool exhausted on hanging adapters", "timeout_sec": 900})
+            logger.error("employer_ingestion_pool_timeout", extra={"msg": "Thread pool exhausted on hanging adapters", "timeout_sec": 3300})
         finally:
             # Niezwykle ważne: wait=False sprawi, że główny wątek (API/Worker) ucieknie 
             # i dokończy tick, a cancel_futures przerwie oczekujące zadania w kolejce!
