@@ -108,13 +108,13 @@ def _classify_from_remote_scope(scope_l: str) -> dict | None:
             
         if token in COUNTRY_ALIASES:
             mapped_full_name = COUNTRY_ALIASES[token].lower()
-            if mapped_full_name in EU_MEMBER_STATES:
+            if mapped_full_name in EU_MEMBER_STATES or mapped_full_name in EOG_COUNTRIES:
                 found_eu = True
             else:
                 found_non_eu = True
             continue
 
-        if token in EU_MEMBER_STATES:
+        if token in EU_MEMBER_STATES or token in EOG_COUNTRIES:
             found_eu = True
             continue
 
@@ -133,12 +133,12 @@ def _classify_from_remote_scope(scope_l: str) -> dict | None:
                 continue
             if token_part in COUNTRY_ALIASES:
                 mapped = COUNTRY_ALIASES[token_part].lower()
-                if mapped in EU_MEMBER_STATES:
+                if mapped in EU_MEMBER_STATES or mapped in EOG_COUNTRIES:
                     found_eu = True
                 else:
                     found_non_eu = True
                 continue
-            if token_part in EU_MEMBER_STATES:
+            if token_part in EU_MEMBER_STATES or token_part in EOG_COUNTRIES:
                 found_eu = True
                 continue
 
@@ -160,6 +160,10 @@ def _classify_from_localization_section(description: str) -> dict | None:
     for country in EU_MEMBER_STATES:
         if _contains_phrase(localization_text, country):
             return {"geo_class": GeoClass.EU_MEMBER_STATE, "reason": country}
+            
+    for country in EOG_COUNTRIES:
+        if _contains_phrase(localization_text, country):
+            return {"geo_class": GeoClass.EU_REGION, "reason": country}
 
     # Ignore 2-letter aliases in free text to reduce false positives.
     for alias, mapped in COUNTRY_ALIASES.items():
@@ -169,6 +173,8 @@ def _classify_from_localization_section(description: str) -> dict | None:
             mapped_full_name = mapped.lower()
             if mapped_full_name in EU_MEMBER_STATES:
                 return {"geo_class": GeoClass.EU_MEMBER_STATE, "reason": mapped_full_name}
+            if mapped_full_name in EOG_COUNTRIES:
+                return {"geo_class": GeoClass.EU_REGION, "reason": mapped_full_name}
 
     for kw in UK_KEYWORDS:
         if _contains_phrase(localization_text, kw):
@@ -207,14 +213,21 @@ def classify_geo(
     if scope_result:
         return scope_result
 
+    # 3.5 Fallback to structured parsing of title (for cities appended by ATS like "Engineer - Berlin")
+    title_result = _classify_from_remote_scope(title_l)
+    if title_result:
+        return title_result
+
     # 4 Fallback to the "Localization" section from description only
     localization_result = _classify_from_localization_section(description or "")
     if localization_result:
         return localization_result
 
-    # 5 UK fallback in generic text
+    # 5 UK fallback - apply ONLY to scope and title, NOT full description
+    # (prevents false positives from generic text like "Our HQ is in London")
+    scope_and_title = f"{title_l} {scope_l}"
     for kw in UK_KEYWORDS:
-        if _contains_phrase(full_text, kw):
+        if _contains_phrase(scope_and_title, kw):
             return {"geo_class": GeoClass.UK, "reason": kw}
 
     # 6 Unknown

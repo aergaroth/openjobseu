@@ -90,9 +90,10 @@ class PersonioAdapter(ATSAdapter):
             logger.warning("Personio normalize missing _ats_slug", extra={"raw_job_id": raw_job.get("id")})
             return None
 
-        job_id = str(raw_job.get("id"))
+        job_id = raw_job.get("id")
         if not job_id:
             return None
+        job_id = str(job_id)
 
         title = raw_job.get("name", "")
         description = raw_job.get("description", "")

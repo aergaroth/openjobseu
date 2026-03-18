@@ -7,12 +7,14 @@ from app.adapters.ats.greenhouse import GreenhouseAdapter
 from app.adapters.ats.lever import LeverAdapter
 from app.adapters.ats.workable import WorkableAdapter
 from app.adapters.ats.ashby import AshbyAdapter
+from app.adapters.ats.personio import PersonioAdapter
 
 ADAPTERS = [
     GreenhouseAdapter(),
     LeverAdapter(),
     WorkableAdapter(),
     AshbyAdapter(),
+    PersonioAdapter(),
 ]
 
 
@@ -170,6 +172,18 @@ VALID_JOBS = [
             }
         }
     ),
+    (
+        PersonioAdapter(),
+        {
+            "id": "personio-123",
+            "name": "Senior Python Developer",
+            "description": "<p>We are looking for a senior Python developer...</p>",
+            "office": "Remote - Europe",
+            "department": "Engineering",
+            "createdAt": "2024-01-15T10:00:00Z",
+            "_ats_slug": "test-company"
+        }
+    ),
 ]
 
 @pytest.mark.parametrize("adapter, raw_job", VALID_JOBS)
@@ -232,6 +246,9 @@ INVALID_JOBS = [
     # Ashby missing attributes
     (AshbyAdapter(), {"id": "123", "descriptionHtml": "Desc", "jobUrl": "http://example.com", "_ats_slug": "test"}),
     (AshbyAdapter(), {"title": "Developer", "descriptionHtml": "Desc", "jobUrl": "http://example.com", "_ats_slug": "test"}),
+    # Personio missing attributes
+    (PersonioAdapter(), {"name": "Developer", "description": "Desc", "office": "Remote", "_ats_slug": "test"}),
+    (PersonioAdapter(), {"id": "123", "name": "Developer", "description": "Desc", "office": "Remote"}),
 ]
 
 @pytest.mark.parametrize("adapter, raw_job", INVALID_JOBS)

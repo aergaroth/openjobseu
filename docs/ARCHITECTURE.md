@@ -102,7 +102,7 @@ Feed behavior:
 - cache header: `Cache-Control: public, max-age=300`
 
 Internal endpoints:
-- `POST /internal/tick` (`format=auto|text|json`)
+- `POST /internal/tick` (`format=auto|text|json`, `incremental=true|false`, `limit=100`)
 - `GET /internal/audit`
 - `GET /internal/audit/jobs`
 - `GET /internal/audit/filters`
@@ -215,7 +215,7 @@ Primary runtime flow in code:
 
 #### Tick trigger and orchestration
 - Trigger path: `POST /internal/tick` in `app/internal.py`.
-- Endpoint calls `run_pipeline()` from `app/workers/pipeline.py`.
+- Endpoint configures global variables for incremental fetch/limits and calls `run_pipeline()` from `app/workers/pipeline.py`.
 
 #### Execution order (`PIPELINE_STEPS`)
 Defined in `app/workers/pipeline.py`:
@@ -248,7 +248,7 @@ The orchestrator aggregates `actions` and step-level `metrics`; failures are cap
 #### Ingestion runtime flow
 Main worker: `app/workers/ingestion/employer.py`
 1. Load active ATS-company mappings via `load_active_ats_companies` (`storage/repositories/ats_repository.py`) batched by 100 oldest synced records.
-2. For each company:
+2. For each company (up to `GLOBAL_COMPANIES_LIMIT`):
    - resolve adapter from registry,
    - fetch raw jobs incrementally via `fetch_company_jobs` using `last_sync_at` as a cursor,
    - open DB transaction and process jobs via `process_company_jobs` (`app/workers/ingestion/process_loop.py`),
@@ -406,7 +406,7 @@ Schema source: `storage/migrations/*.sql` + repository usage in `storage/reposit
 - `GET /jobs/stats/compliance-7d` – compliance aggregate from `jobs`.
 
 #### Internal endpoints
-- `POST /internal/tick` – execute full runtime pipeline.
+- `POST /internal/tick` – execute full runtime pipeline (supports batched processing via `limit` and `incremental` flags).
 - `GET /internal/audit` – HTML audit panel (`audit_tool/offer_audit_panel.html`).
 - `GET /internal/audit/jobs` – audit listing and counts (reads `jobs` + `job_sources`).
 - `GET /internal/audit/filters` – filter registry + dynamic source list.
