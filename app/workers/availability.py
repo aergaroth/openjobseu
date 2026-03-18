@@ -2,8 +2,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
 from datetime import datetime, timezone
 import logging
 import requests
+import time
 from storage.db_engine import get_engine
-from storage.db_logic import get_jobs_for_verification, update_jobs_availability
+from storage.repositories.availability_repository import (
+    get_jobs_for_verification,
+    update_jobs_availability,
+)
 from app.adapters.ats.base import TimeoutSession
 
 logger = logging.getLogger("openjobseu.worker.availability")
@@ -26,6 +30,8 @@ def check_job_availability(job: dict, timeout: int = DEFAULT_TIMEOUT, session: r
     if not url:
         return "unreachable"
 
+    start_time = time.perf_counter()
+
     try:
         resp = session.head(
             url,
@@ -36,14 +42,44 @@ def check_job_availability(job: dict, timeout: int = DEFAULT_TIMEOUT, session: r
         status = resp.status_code
 
         if status in (404, 410):
+            duration_ms = int((time.perf_counter() - start_time) * 1000)
+            logger.info(
+                "job availability expired",
+                extra={
+                    "job_id": job.get("job_id"),
+                    "url": url,
+                    "status_code": status,
+                    "duration_ms": duration_ms,
+                }
+            )
             return "expired"
 
         if status >= 500:
+            duration_ms = int((time.perf_counter() - start_time) * 1000)
+            logger.warning(
+                "job availability returned server error",
+                extra={
+                    "job_id": job.get("job_id"),
+                    "url": url,
+                    "status_code": status,
+                    "duration_ms": duration_ms,
+                }
+            )
             return "unreachable"
 
         return "active"
 
-    except requests.RequestException:
+    except requests.RequestException as exc:
+        duration_ms = int((time.perf_counter() - start_time) * 1000)
+        logger.warning(
+            "job availability check failed",
+            extra={
+                "job_id": job.get("job_id"),
+                "url": url,
+                "error_type": type(exc).__name__,
+                "duration_ms": duration_ms,
+            }
+        )
         return "unreachable"
 
 
@@ -82,6 +118,7 @@ def run_availability_checks(jobs: list[dict]) -> dict:
     Run availability checks for a batch of jobs.
     Returns summary statistics.
     """
+    start_time = time.perf_counter()
     summary = {
         "checked": 0,
         "active": 0,
@@ -98,6 +135,7 @@ def run_availability_checks(jobs: list[dict]) -> dict:
 
         job["availability_status"] = status  # transient, DB update elsewhere
 
+    summary["duration_ms"] = int((time.perf_counter() - start_time) * 1000)
     logger.info("availability checks completed", extra=summary)
     return summary
 
@@ -108,6 +146,7 @@ def run_availability_pipeline() -> dict:
     """
     # init_db()  # initialized at app startup in app/main.py
 
+    start_time = time.perf_counter()
     jobs = get_jobs_for_verification(limit=20)
     now = datetime.now(timezone.utc)
 
@@ -139,4 +178,5 @@ def run_availability_pipeline() -> dict:
             update_jobs_availability(updates=updates, conn=conn)
 
     summary["status"] = "ok"
+    summary["duration_ms"] = int((time.perf_counter() - start_time) * 1000)
     return {"metrics": summary}

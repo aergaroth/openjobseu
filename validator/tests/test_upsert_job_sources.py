@@ -1,7 +1,7 @@
 from sqlalchemy import text
 
 from storage.db_engine import get_engine
-from storage.db_logic import upsert_job
+from storage.repositories.jobs_repository import upsert_job
 
 engine = get_engine()
 

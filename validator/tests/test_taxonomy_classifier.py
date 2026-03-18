@@ -289,36 +289,3 @@ class TestClassifyTaxonomyCombined:
         assert result["job_family"] == "data_science"
         assert result["job_role"] == "data_scientist"
         assert result["seniority"] == "senior"
-
-
-class TestDeriveTaxonomy:
-    """Test the compute_job_taxonomy wrapper in db_logic."""
-
-    def test_derive_taxonomy_from_job_dict(self):
-        from storage.db_logic import compute_job_taxonomy
-
-        job = {"title": "Senior Software Engineer"}
-        result = compute_job_taxonomy(job)
-        assert result["job_family"] == "software_development"
-        assert result["job_role"] == "engineer"
-        assert result["seniority"] == "senior"
-
-    def test_derive_taxonomy_missing_title(self):
-        from storage.db_logic import compute_job_taxonomy
-
-        job = {}
-        result = compute_job_taxonomy(job)
-        assert result["job_family"] == "unknown"
-        assert result["job_role"] == "unknown"
-        assert result["seniority"] == "unknown"
-        assert result["specialization"] == "unknown"
-
-    def test_derive_taxonomy_none_title(self):
-        from storage.db_logic import compute_job_taxonomy
-
-        job = {"title": None}
-        result = compute_job_taxonomy(job)
-        assert result["job_family"] == "unknown"
-        assert result["job_role"] == "unknown"
-        assert result["seniority"] == "unknown"
-        assert result["specialization"] == "unknown"

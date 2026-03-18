@@ -1,4 +1,4 @@
-from storage.db_logic import (
+from storage.repositories.lifecycle_repository import (
     activate_new_jobs_due_to_lifecycle,
     expire_jobs_due_to_lifecycle,
     mark_reposts_due_to_lifecycle,

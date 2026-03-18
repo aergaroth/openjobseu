@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, Dict
+import logging
+from requests.exceptions import JSONDecodeError
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
@@ -10,6 +12,8 @@ from app.adapters.ats.utils import (
     to_utc_datetime,
 )
 from app.utils.cleaning import clean_description
+
+logger = logging.getLogger(__name__)
 
 class AshbyAdapter(ATSAdapter):
     source_name = "ashby"
@@ -44,7 +48,20 @@ class AshbyAdapter(ATSAdapter):
         resp = self.session.get(api_url, timeout=15)
         resp.raise_for_status()
 
-        data = resp.json()
+        try:
+            data = resp.json()
+        except JSONDecodeError as e:
+            raw_text = resp.text[:500]
+            logger.error(
+                "Failed to decode JSON from Ashby ATS", 
+                extra={
+                    "ats_slug": slug,
+                    "http_status": resp.status_code,
+                    "response_text": raw_text
+                }
+            )
+            raise ValueError(f"Ashby API returned non-JSON response for {slug}") from e
+
         jobs = data.get("jobs", [])
         
         if not isinstance(jobs, list):
@@ -183,7 +200,20 @@ class AshbyAdapter(ATSAdapter):
         resp = self.session.get(api_url, timeout=15)
         resp.raise_for_status()
 
-        data = resp.json()
+        try:
+            data = resp.json()
+        except JSONDecodeError as e:
+            raw_text = resp.text[:500]
+            logger.error(
+                "Failed to decode JSON from Ashby ATS probe", 
+                extra={
+                    "ats_slug": ats_slug,
+                    "http_status": resp.status_code,
+                    "response_text": raw_text
+                }
+            )
+            raise ValueError(f"Ashby probe API returned non-JSON response for {ats_slug}") from e
+
         jobs = data.get("jobs", [])
 
         jobs_total = 0

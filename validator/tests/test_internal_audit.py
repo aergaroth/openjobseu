@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 import app.internal as internal_api
 from app.domain.taxonomy.enums import ComplianceStatus, GeoClass, RemoteClass
 from app.main import app
-from storage.db_logic import upsert_job
+from storage.repositories.jobs_repository import upsert_job
 from storage.db_engine import get_engine
 from sqlalchemy import text
 

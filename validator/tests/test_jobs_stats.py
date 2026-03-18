@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 from app.main import app
 from storage.db_engine import get_engine
-from storage.db_logic import upsert_job
+from storage.repositories.jobs_repository import upsert_job
 
 client = TestClient(app)
 engine = get_engine()

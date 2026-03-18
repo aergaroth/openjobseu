@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any
+import logging
+from requests.exceptions import JSONDecodeError
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
 from app.adapters.ats.utils import (
@@ -9,6 +11,8 @@ from app.adapters.ats.utils import (
     to_utc_datetime,
 )
 from app.utils.cleaning import clean_description
+
+logger = logging.getLogger(__name__)
 
 class GreenhouseAdapter(ATSAdapter):
     source_name = "greenhouse"
@@ -47,7 +51,19 @@ class GreenhouseAdapter(ATSAdapter):
         resp = self.session.get(api_url, timeout=15)
         resp.raise_for_status()
 
-        payload = resp.json()
+        try:
+            payload = resp.json()
+        except JSONDecodeError as e:
+            raw_text = resp.text[:500]
+            logger.error(
+                "Failed to decode JSON from Greenhouse ATS", 
+                extra={
+                    "ats_slug": board_token,
+                    "http_status": resp.status_code,
+                    "response_text": raw_text
+                }
+            )
+            raise ValueError(f"Greenhouse API returned non-JSON response for {board_token}") from e
 
         jobs = self._extract_jobs_from_payload(payload, "fetch")
 
@@ -199,7 +215,20 @@ class GreenhouseAdapter(ATSAdapter):
         resp = self.session.get(api_url, timeout=15)
         resp.raise_for_status()
 
-        payload = resp.json()
+        try:
+            payload = resp.json()
+        except JSONDecodeError as e:
+            raw_text = resp.text[:500]
+            logger.error(
+                "Failed to decode JSON from Greenhouse ATS probe", 
+                extra={
+                    "ats_slug": board_token,
+                    "http_status": resp.status_code,
+                    "response_text": raw_text
+                }
+            )
+            raise ValueError(f"Greenhouse probe API returned non-JSON response for {board_token}") from e
+
         jobs = self._extract_jobs_from_payload(payload, "probe")
 
         jobs_total = 0
