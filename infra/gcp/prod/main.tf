@@ -8,6 +8,42 @@ resource "random_password" "internal_secret" {
   special = false
 }
 
+resource "google_secret_manager_secret" "google_api_key" {
+  secret_id = "google-api-key"
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "google_api_key" {
+  secret      = google_secret_manager_secret.google_api_key.id
+  secret_data = var.google_api_key
+}
+
+resource "google_secret_manager_secret_iam_member" "cloud_run_google_api_key" {
+  secret_id = google_secret_manager_secret.google_api_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:cloudrun-prod-runtime@openjobseu.iam.gserviceaccount.com"
+}
+
+resource "google_secret_manager_secret" "google_cse_id" {
+  secret_id = "google-cse-id"
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "google_cse_id" {
+  secret      = google_secret_manager_secret.google_cse_id.id
+  secret_data = var.google_cse_id
+}
+
+resource "google_secret_manager_secret_iam_member" "cloud_run_google_cse_id" {
+  secret_id = google_secret_manager_secret.google_cse_id.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:cloudrun-prod-runtime@openjobseu.iam.gserviceaccount.com"
+}
+
 resource "google_cloud_run_v2_service" "this" {
   name     = var.service_name
   location = var.region
@@ -69,6 +105,25 @@ resource "google_cloud_run_v2_service" "this" {
       env {
         name  = "INTERNAL_SECRET"
         value = random_password.internal_secret.result
+      }
+
+      env {
+        name = "GOOGLE_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.google_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name = "GOOGLE_CSE_ID"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.google_cse_id.secret_id
+            version = "latest"
+          }
+        }
       }
 
       ports {

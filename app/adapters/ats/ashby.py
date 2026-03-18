@@ -16,6 +16,7 @@ from app.utils.cleaning import clean_description
 logger = logging.getLogger(__name__)
 
 class AshbyAdapter(ATSAdapter):
+    dorking_target = "jobs.ashbyhq.com"
     source_name = "ashby"
     active = True
     

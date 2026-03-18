@@ -1,4 +1,5 @@
 import pytest
+import time
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from datetime import datetime, timezone
@@ -104,3 +105,76 @@ def test_list_jobs_pagination_structure():
     assert data["limit"] == 2
     assert data["offset"] == 1
     assert len(data["items"]) == 2
+
+
+def test_list_jobs_handles_large_volume_and_fuzzy_search():
+    # Generujemy 1000 zanonimizowanych ofert + 1 specyficzną do odnalezienia
+    jobs_data = []
+    for i in range(1000):
+        jobs_data.append({
+            "job_id": f"vol_{i}",
+            "job_uid": f"uid_{i}",
+            "job_fingerprint": f"fp_{i}",
+            "source": "bulk",
+            "source_job_id": str(i),
+            "source_url": f"https://example.com/bulk/{i}",
+            "title": f"Generic Engineer {i}",
+            "company_name": f"Company {i % 50}",
+            "description": "Standard boilerplate description for volume testing.",
+            "remote_source_flag": True,
+            "remote_scope": "Europe",
+            "status": "active",
+            "first_seen_at": "2026-01-01T00:00:00+00:00",
+        })
+        
+    jobs_data.append({
+        "job_id": "vol_target",
+        "job_uid": "uid_target",
+        "job_fingerprint": "fp_target",
+        "source": "bulk",
+        "source_job_id": "target",
+        "source_url": "https://example.com/target",
+        "title": "Unicorn Whisperer",
+        "company_name": "Magical Corp",
+        "description": "Looking for someone to talk to unicorns.",
+        "remote_source_flag": True,
+        "remote_scope": "Europe",
+        "status": "active",
+        "first_seen_at": "2026-01-01T00:00:00+00:00",
+    })
+    
+    with engine.begin() as conn:
+        conn.execute(
+            text("""
+                INSERT INTO jobs (
+                    job_id, job_uid, job_fingerprint, source, source_job_id, source_url, title, company_name, 
+                    description, remote_source_flag, remote_scope, status, first_seen_at
+                ) VALUES (
+                    :job_id, :job_uid, :job_fingerprint, :source, :source_job_id, :source_url, :title, :company_name,
+                    :description, :remote_source_flag, :remote_scope, :status, :first_seen_at
+                )
+            """),
+            jobs_data
+        )
+        
+    # Test 1: Sprawdzenie samej paginacji na dużej paczce
+    start_time = time.perf_counter()
+    res_all = client.get("/jobs?limit=50")
+    dur_all = time.perf_counter() - start_time
+    
+    assert res_all.status_code == 200
+    data_all = res_all.json()
+    assert data_all["total"] == 1001
+    assert len(data_all["items"]) == 50
+    
+    # Test 2: Sprawdzenie fuzzy searchu dla zakopanego wyniku (z pomiarem czasu jako wskaźnikiem wydajności)
+    start_search = time.perf_counter()
+    res_search = client.get("/jobs?q=unicorn")
+    dur_search = time.perf_counter() - start_search
+    
+    assert res_search.status_code == 200
+    data_search = res_search.json()
+    assert data_search["total"] >= 1
+    
+    # Unicorn Whisperer powinien znaleźć się na samym szczycie (dystans trigramowy)
+    assert data_search["items"][0]["job_id"] == "vol_target"

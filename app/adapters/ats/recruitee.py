@@ -10,6 +10,7 @@ from app.utils.cleaning import clean_description
 logger = logging.getLogger(__name__)
 
 class RecruiteeAdapter(ATSAdapter):
+    dorking_target = "recruitee.com"
     source_name = "recruitee"
 
     def fetch(self, company: Dict, updated_since: Any = None) -> List[Dict]:

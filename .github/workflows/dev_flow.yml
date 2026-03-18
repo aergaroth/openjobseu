@@ -114,7 +114,9 @@ jobs:
             -var="google_client_id=${{ secrets.DEV_GOOGLE_CLIENT_ID }}" \
             -var="google_client_secret=${{ secrets.DEV_GOOGLE_CLIENT_SECRET }}" \
             -var="session_secret_key=${{ secrets.DEV_SESSION_SECRET_KEY }}" \
-            -var="allowed_auth_email=${{ secrets.DEV_ALLOWED_AUTH_EMAIL }}"
+            -var="allowed_auth_email=${{ secrets.DEV_ALLOWED_AUTH_EMAIL }}" \
+            -var="google_api_key=${{ secrets.DEV_GOOGLE_API_KEY }}" \
+            -var="google_cse_id=${{ secrets.DEV_GOOGLE_CSE_ID }}"
 
       - name: Show deployed revision
         run: |

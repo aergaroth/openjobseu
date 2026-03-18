@@ -93,7 +93,7 @@ def process_ingested_job(job: dict, source: str) -> Tuple[Optional[dict], dict]:
     # 4. Salary
     salary_info = extract_structured_salary(processed_job)
     if not salary_info:
-        salary_info = extract_salary(processed_job.get("description") or "")
+        salary_info = extract_salary(processed_job.get("description") or "", title=processed_job.get("title") or "")
         if salary_info:
             # Oznacz trudne przypadki do manualnej weryfikacji
             confidence = salary_info.get("salary_confidence")

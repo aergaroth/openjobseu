@@ -23,10 +23,9 @@ from app.workers.discovery.careers_crawler import run_careers_discovery
 from app.workers.discovery.pipeline import run_discovery_pipeline
 from app.workers.discovery.company_sources import run_company_source_discovery
 from app.workers.discovery.ats_reverse import run_ats_reverse_discovery
-from app.adapters.ats.greenhouse import GreenhouseAdapter
-from app.adapters.ats.lever import LeverAdapter
-from app.adapters.ats.workable import WorkableAdapter
-from app.adapters.ats.ashby import AshbyAdapter
+from app.workers.discovery.dorking import run_dorking_discovery
+import app.adapters.ats as ats  # noqa: F401
+from app.adapters.ats.registry import get_adapter
 from app.workers.pipeline import run_pipeline
 from storage.repositories.audit_repository import (
     get_audit_company_compliance_stats,
@@ -53,13 +52,6 @@ from app.security.internal_access import require_internal_access
 import app.workers.ingestion.employer as employer_worker
 
 logger = logging.getLogger("openjobseu.runtime")
-
-ADAPTER_MAP = {
-    "greenhouse": GreenhouseAdapter,
-    "lever": LeverAdapter,
-    "workable": WorkableAdapter,
-    "ashby": AshbyAdapter,
-}
 
 router = APIRouter(
     prefix="/internal",
@@ -325,6 +317,16 @@ def run_ats_reverse():
     }
 
 
+@router.post("/discovery/dorking", dependencies=[Depends(require_internal_or_user_api_access)])
+def run_dorking():
+    metrics = run_dorking_discovery()
+    return {
+        "pipeline": "discovery",
+        "phase": "dorking",
+        "metrics": metrics,
+    }
+
+
 @router.post("/discovery/run", dependencies=[Depends(require_internal_or_user_api_access)])
 def run_discovery():
     return run_discovery_pipeline()
@@ -376,7 +378,7 @@ class DequeHandler(logging.Handler):
         except Exception:
             self.handleError(record)
 
-def background_runner(task_id: str, func, *args, **kwargs):
+def background_runner(_task_id: str, func, *args, **kwargs):
     log_deque = deque(maxlen=200)
     handler = DequeHandler(log_deque)
     formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s')
@@ -385,27 +387,27 @@ def background_runner(task_id: str, func, *args, **kwargs):
     target_logger = logging.getLogger("openjobseu")
     target_logger.addHandler(handler)
     
-    ASYNC_TASKS[task_id]["log_deque"] = log_deque
-    ASYNC_TASKS[task_id]["status"] = "running"
+    ASYNC_TASKS[_task_id]["log_deque"] = log_deque
+    ASYNC_TASKS[_task_id]["status"] = "running"
     try:
         result = func(*args, **kwargs)
         if isinstance(result, dict) and result.get("status") == "cancelled":
-            ASYNC_TASKS[task_id]["status"] = "cancelled"
+            ASYNC_TASKS[_task_id]["status"] = "cancelled"
         else:
-            ASYNC_TASKS[task_id]["status"] = "completed"
-        ASYNC_TASKS[task_id]["result"] = result
+            ASYNC_TASKS[_task_id]["status"] = "completed"
+        ASYNC_TASKS[_task_id]["result"] = result
     except Exception as e:
-        logger.exception("Async task failed", extra={"task_id": task_id, "error": str(e)})
-        ASYNC_TASKS[task_id]["status"] = "failed"
-        ASYNC_TASKS[task_id]["error"] = str(e)
+        logger.exception("Async task failed", extra={"task_id": _task_id, "error": str(e)})
+        ASYNC_TASKS[_task_id]["status"] = "failed"
+        ASYNC_TASKS[_task_id]["error"] = str(e)
     finally:
         target_logger.removeHandler(handler)
         logs = "\n".join(log_deque)
         if len(log_deque) == log_deque.maxlen:
             logs = "... [TRUNCATED] ...\n" + logs
-        ASYNC_TASKS[task_id]["logs"] = logs
-        ASYNC_TASKS[task_id].pop("log_deque", None)
-        ASYNC_TASKS[task_id]["finished_at"] = time.time()
+        ASYNC_TASKS[_task_id]["logs"] = logs
+        ASYNC_TASKS[_task_id].pop("log_deque", None)
+        ASYNC_TASKS[_task_id]["finished_at"] = time.time()
 
 
 def _cleanup_old_tasks(retention_seconds: float = 600.0):
@@ -474,6 +476,7 @@ def trigger_async_task(
         "guess": run_ats_guessing,
         "ats-reverse": run_ats_reverse_discovery,
         "company-sources": run_company_source_discovery,
+        "dorking": run_dorking_discovery,
         "backfill-department": backfill_missing_departments,
         "backfill-compliance": run_backfill_compliance_task,
         "backfill-salary": run_backfill_salary_task,
@@ -491,7 +494,7 @@ def trigger_async_task(
     if task_name == "tick":
         background_tasks.add_task(background_runner, task_id, task_map[task_name], incremental=incremental, limit=limit)
     elif task_name in ("backfill-compliance", "backfill-salary"):
-        background_tasks.add_task(background_runner, task_id, task_map[task_name], limit=limit)
+        background_tasks.add_task(background_runner, task_id, task_map[task_name], limit=limit, task_id=task_id)
     else:
         background_tasks.add_task(background_runner, task_id, task_map[task_name])
         
@@ -546,11 +549,10 @@ def api_force_sync_ats(company_ats_id: str):
             raise HTTPException(status_code=404, detail="ATS integration not found")
 
     provider = ats_integration["ats_provider"]
-    adapter_cls = ADAPTER_MAP.get(provider)
-    if not adapter_cls:
+    try:
+        adapter = get_adapter(provider)
+    except ValueError:
         raise HTTPException(status_code=400, detail=f"No adapter found for provider: {provider}")
-
-    adapter = adapter_cls()
     company_dict = {
         "ats_slug": ats_integration["ats_slug"],
         "company_id": ats_integration["company_id"],

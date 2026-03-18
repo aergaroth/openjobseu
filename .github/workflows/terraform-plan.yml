@@ -21,6 +21,8 @@ jobs:
     env:
       TF_VAR_project_id: dev-openjobseu
       TF_VAR_image: europe-north1-docker.pkg.dev/dev-openjobseu/dev-openjobseu/dev-openjobseu:pr-placeholder
+      TF_VAR_google_api_key: "dummy-api-key"
+      TF_VAR_google_cse_id: "dummy-cse-id"
 
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +54,8 @@ jobs:
       TF_VAR_google_client_secret: "dummy-client-secret"
       TF_VAR_session_secret_key: "dummy-session-key"
       TF_VAR_allowed_auth_email: "dummy@example.com"
+      TF_VAR_google_api_key: "dummy-api-key"
+      TF_VAR_google_cse_id: "dummy-cse-id"
 
     steps:
       - uses: actions/checkout@v4

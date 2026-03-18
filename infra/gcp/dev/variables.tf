@@ -44,3 +44,15 @@ variable "allowed_auth_email" {
   type        = string
   description = "Email allowed to access the audit panel"
 }
+
+variable "google_api_key" {
+  type        = string
+  description = "Google Custom Search API Key"
+  sensitive   = true
+}
+
+variable "google_cse_id" {
+  type        = string
+  description = "Google Custom Search Engine ID"
+  sensitive   = true
+}

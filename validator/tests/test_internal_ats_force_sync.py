@@ -22,8 +22,13 @@ def test_api_force_sync_ats_success(monkeypatch):
         def fetch(self, company, updated_since=None):
             # Simulate finding 3 jobs
             return [{"id": "1"}, {"id": "2"}, {"id": "3"}]
-
-    monkeypatch.setattr("app.internal.ADAPTER_MAP", {"ashby": DummyAdapter})
+            
+    def mock_get_adapter(provider):
+        if provider == "ashby":
+            return DummyAdapter()
+        raise ValueError(f"Unknown provider: {provider}")
+        
+    monkeypatch.setattr("app.internal.get_adapter", mock_get_adapter)
 
     # Request (Auth is bypassed automatically because testclient is whitelisted)
     response = client.post("/internal/audit/ats-force-sync/fake_id")
