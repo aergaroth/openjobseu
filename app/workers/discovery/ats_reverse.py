@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import requests
+import time
 import uuid
 from datetime import datetime, timezone, timedelta
 
@@ -103,6 +104,7 @@ def _is_recent(recent_job_at: object) -> bool:
 
 
 def run_ats_reverse_discovery() -> dict[str, int]:
+    start_time = time.perf_counter()
     engine = get_engine()
     metrics = {
         "slugs_tested": 0,
@@ -183,6 +185,7 @@ def run_ats_reverse_discovery() -> dict[str, int]:
                 bar = "█" * filled + "-" * (20 - filled)
                 logger.info(f"ats_reverse progress: [{bar}] {pct}% ({idx}/{total})")
 
+    metrics["duration_ms"] = int((time.perf_counter() - start_time) * 1000)
     logger.info(
         "ats_reverse_discovery_summary",
         extra={

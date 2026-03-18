@@ -146,6 +146,48 @@ class TestRunEmployerIngestion(unittest.TestCase):
         self.assertEqual(metrics["companies_processed"], 0)
         self.assertEqual(metrics["fetched_count"], 0)
 
+    @patch("app.workers.ingestion.employer.get_engine")
+    @patch("app.workers.ingestion.employer.load_active_ats_companies")
+    @patch("app.workers.ingestion.employer.ingest_company")
+    @patch("app.workers.ingestion.employer.log_ingestion")
+    @patch("app.workers.ingestion.employer.perf_counter", side_effect=list(range(1, 1000)))
+    def test_run_employer_ingestion_stress_with_thread_pool_failures(
+        self, mock_perf_counter, mock_log_ingestion, mock_ingest_company, mock_load_companies, mock_get_engine
+    ):
+        # Arrange: Przygotowujemy 50 firm
+        num_companies = 50
+        mock_companies = [{"id": i, "ats_slug": f"slug-{i}", "ats_provider": "lever"} for i in range(num_companies)]
+        mock_load_companies.return_value = mock_companies
+
+        # Symulujemy awarie z poziomu wątków
+        def fake_ingest(company):
+            cid = company["id"]
+            if cid < 20:
+                # Pierwsze 20 firm rzuca brutalnym, nieobsłużonym wyjątkiem w środku ThreadPoolExecutora
+                raise RuntimeError(f"Thread pool explosion for company {cid}")
+            elif cid < 30:
+                # Kolejne 10 firm kończy się standardowym błędem w formacie dict (np. brak odpowiedzi API)
+                return {"error": "fetch_failed"}
+            else:
+                # Ostatnie 20 firm przetwarza się pomyślnie
+                return {
+                    "fetched": 5,
+                    "normalized_count": 5,
+                    "accepted": 5,
+                    "skipped": 0,
+                }
+
+        mock_ingest_company.side_effect = fake_ingest
+
+        # Act
+        result = run_employer_ingestion()
+
+        # Assert
+        metrics = result["metrics"]
+        self.assertEqual(metrics["status"], "ok")
+        self.assertEqual(metrics["companies_processed"], 50)
+        self.assertEqual(metrics["companies_failed"], 30) # 20 twardych wybuchów + 10 błędów dict
+        self.assertEqual(metrics["accepted_jobs"], 100) # 20 firm * 5 ofert = 100
 
 class TestIngestCompany(unittest.TestCase):
     @patch("app.workers.ingestion.employer.get_adapter")

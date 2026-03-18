@@ -2,7 +2,7 @@ from fastapi import APIRouter, Query, Response
 from datetime import datetime, timezone
 
 from storage.repositories.audit_repository import get_compliance_stats_last_7d
-from storage.repositories.jobs_repository import get_jobs
+from storage.repositories.jobs_repository import get_jobs, get_jobs_paginated
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -26,17 +26,21 @@ def list_jobs(
     limit: int = Query(40, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):
+    items, total = get_jobs_paginated(
+        status=status,
+        q=q,
+        company=company,
+        title=title,
+        source=source,
+        remote_scope=remote_scope,
+        limit=limit,
+        offset=offset,
+    )
     return {
-        "items": get_jobs(
-            status=status,
-            q=q,
-            company=company,
-            title=title,
-            source=source,
-            remote_scope=remote_scope,
-            limit=limit,
-            offset=offset,
-        )
+        "items": items,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
     }
 
 

@@ -400,6 +400,7 @@ Schema source: `storage/migrations/*.sql` + repository usage in `storage/reposit
 #### Public endpoints
 - `GET /health` (`app/main.py`) – liveness.
 - `GET /ready` (`app/main.py`) – readiness state.
+- `GET /companies` (`app/api/companies.py`) – public directory of remote-friendly companies.
 - `GET /jobs` (`app/api/jobs.py`) – filtered list supporting GIN trigram fuzzy search (`?q=`) from `storage.repositories.jobs_repository.get_jobs`.
 - `GET /jobs/feed` – visible jobs feed with `min_compliance_score=80`, cache headers.
 - `GET /jobs/stats/compliance-7d` – compliance aggregate from `jobs`.

@@ -127,7 +127,16 @@ def ingest_company(company: dict):
         with engine.begin() as conn:
             mark_ats_synced(conn, company.get("company_ats_id"), success=True)
 
-    except Exception:
+    except Exception as exc:
+        logger.error(
+            "employer ingestion transaction failed",
+            exc_info=True,
+            extra={
+                "company_id": company_id,
+                "ats_provider": provider,
+                "ats_slug": ats_slug,
+            },
+        )
         return _finalize({
             "fetched": len(raw_jobs),
             "normalized_count": metrics.normalized,
@@ -213,7 +222,17 @@ def run_employer_ingestion() -> dict:
                         remote_model_counts[key] += int(source_remote_model.get(key, 0) or 0)
                     total_hard_geo_rejected += int(result.get("hard_geo_rejected_count", 0) or 0)
 
-                except Exception:
+                except Exception as exc:
+                    company_context = futures[future]
+                    logger.error(
+                        "employer ingestion thread pool future failed",
+                        exc_info=True,
+                        extra={
+                            "company_id": str(company_context.get("company_id") or ""),
+                            "ats_provider": company_context.get("ats_provider"),
+                            "ats_slug": company_context.get("ats_slug"),
+                        }
+                    )
                     companies_failed += 1
         except concurrent.futures.TimeoutError:
             logger.error("employer_ingestion_pool_timeout", extra={"msg": "Thread pool exhausted on hanging adapters", "timeout_sec": 3300})

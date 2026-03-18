@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from datetime import datetime, timezone, timedelta
+import time
 from typing import Iterable
 
 from app.workers.discovery.ats_probe import probe_ats
@@ -96,6 +97,7 @@ def _is_recent(recent_job_at: object) -> bool:
 
 
 def run_ats_guessing() -> dict[str, int]:
+    start_time = time.perf_counter()
     engine = get_engine()
     metrics = {
         "companies_scanned": 0,
@@ -198,6 +200,7 @@ def run_ats_guessing() -> dict[str, int]:
             bar = "█" * filled + "-" * (20 - filled)
             logger.info(f"ats_guessing progress: [{bar}] {pct}% ({idx}/{total})")
 
+    metrics["duration_ms"] = int((time.perf_counter() - start_time) * 1000)
     logger.info(
         "ats_guessing_summary",
         extra={

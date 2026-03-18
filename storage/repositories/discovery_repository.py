@@ -124,10 +124,20 @@ def insert_discovered_company_ats(
     return bool(result.fetchone())
 
 
-def get_discovered_company_ats(limit: int = 100) -> list[dict]:
+def get_discovered_company_ats(q: str | None = None, limit: int = 100) -> list[dict]:
+    where_clause = ""
+    params = {"limit": int(limit)}
+    order_by_sql = "ca.created_at DESC"
+
+    if q:
+        where_clause = "WHERE c.legal_name ILIKE :q_like OR c.brand_name ILIKE :q_like"
+        params["q_like"] = f"%{q}%"
+        params["q_exact"] = q
+        order_by_sql = "LEAST(c.legal_name <-> :q_exact, c.brand_name <-> :q_exact) ASC, ca.created_at DESC"
+
     with engine.connect() as conn:
         rows = conn.execute(
-            text("""
+            text(f"""
                 SELECT
                     c.legal_name AS company_name,
                     ca.provider,
@@ -137,19 +147,30 @@ def get_discovered_company_ats(limit: int = 100) -> list[dict]:
                 FROM company_ats ca
                 JOIN companies c
                     ON ca.company_id = c.company_id
-                ORDER BY ca.created_at DESC
+                {where_clause}
+                ORDER BY {order_by_sql}
                 LIMIT :limit
             """),
-            {"limit": int(limit)},
+            params,
         ).mappings().all()
 
     return [dict(row) for row in rows]
 
 
-def get_discovery_candidates(limit: int = 50) -> list[dict]:
+def get_discovery_candidates(q: str | None = None, limit: int = 50) -> list[dict]:
+    where_sql = "WHERE ats_provider IS NULL AND careers_url IS NOT NULL"
+    order_by_sql = "careers_last_checked_at NULLS FIRST, ats_guess_last_checked_at NULLS FIRST"
+    params = {"limit": int(limit)}
+
+    if q:
+        where_sql += " AND (legal_name ILIKE :q_like OR brand_name ILIKE :q_like)"
+        params["q_like"] = f"%{q}%"
+        params["q_exact"] = q
+        order_by_sql = f"LEAST(legal_name <-> :q_exact, brand_name <-> :q_exact) ASC, {order_by_sql}"
+
     with engine.connect() as conn:
         rows = conn.execute(
-            text("""
+            text(f"""
                 SELECT
                     company_id,
                     legal_name,
@@ -157,12 +178,11 @@ def get_discovery_candidates(limit: int = 50) -> list[dict]:
                     careers_last_checked_at,
                     ats_guess_last_checked_at
                 FROM companies
-                WHERE ats_provider IS NULL
-                  AND careers_url IS NOT NULL
-                ORDER BY careers_last_checked_at NULLS FIRST, ats_guess_last_checked_at NULLS FIRST
+                {where_sql}
+                ORDER BY {order_by_sql}
                 LIMIT :limit
             """),
-            {"limit": int(limit)},
+            params,
         ).mappings().all()
 
     return [dict(row) for row in rows]

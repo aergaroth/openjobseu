@@ -4,12 +4,13 @@ from storage.db_engine import get_engine
 from app.workers.maintenance import run_maintenance_pipeline
 
 
-def test_maintenance_pipeline_updates_company_stats(clean_db):
+def test_maintenance_pipeline_updates_company_stats():
     engine = get_engine()
     
     comp1_id = str(uuid.uuid4())
     comp2_id = str(uuid.uuid4())
     comp3_id = str(uuid.uuid4())
+    comp4_id = str(uuid.uuid4())
 
     with engine.begin() as conn:
         # Insert dummy companies
@@ -18,29 +19,34 @@ def test_maintenance_pipeline_updates_company_stats(clean_db):
             VALUES 
             (:comp1_id, 'Acme EU', true, true, 'PL', 'REMOTE_ONLY', true, NOW(), NOW()),
             (:comp2_id, 'Acme US', true, true, 'US', 'UNKNOWN', false, NOW(), NOW()),
-            (:comp3_id, 'Acme New', true, true, 'PL', 'UNKNOWN', false, NOW(), NOW())
-        """), {"comp1_id": comp1_id, "comp2_id": comp2_id, "comp3_id": comp3_id})
+            (:comp3_id, 'Acme New', true, true, 'PL', 'UNKNOWN', false, NOW(), NOW()),
+            (:comp4_id, 'Acme Upgrade', true, true, 'US', 'UNKNOWN', false, NOW(), NOW())
+        """), {"comp1_id": comp1_id, "comp2_id": comp2_id, "comp3_id": comp3_id, "comp4_id": comp4_id})
         
         # Insert mixed jobs
         conn.execute(text("""
-            INSERT INTO jobs (job_id, job_uid, job_fingerprint, source, source_job_id, company_id, title, status, compliance_status, salary_transparency_status, first_seen_at)
+            INSERT INTO jobs (job_id, job_uid, job_fingerprint, source, source_job_id, company_id, title, status, compliance_status, salary_transparency_status, first_seen_at, remote_source_flag)
             VALUES 
-            ('job-1', 'uid-1', 'fp-1', 'test', 'sj-1', :comp1_id, 'Engineer 1', 'active', 'approved', 'disclosed', '2023-01-01T10:00:00Z'),
-            ('job-2', 'uid-2', 'fp-2', 'test', 'sj-2', :comp1_id, 'Engineer 2', 'active', 'approved', 'disclosed', '2023-01-02T10:00:00Z'),
-            ('job-3', 'uid-3', 'fp-3', 'test', 'sj-3', :comp1_id, 'Engineer 3', 'active', 'rejected', 'disclosed', '2023-01-03T10:00:00Z'),
-            ('job-4', 'uid-4', 'fp-4', 'test', 'sj-4', :comp1_id, 'Engineer 4', 'stale', NULL, 'unknown', '2023-01-04T10:00:00Z'),
-            ('job-5', 'uid-5', 'fp-5', 'test', 'sj-5', :comp2_id, 'US Eng', 'active', 'approved', 'unknown', '2023-01-05T10:00:00Z'),
-            ('job-6', 'uid-6', 'fp-6', 'test', 'sj-6', :comp3_id, 'New Eng', 'active', 'approved', 'unknown', NOW())
-        """), {"comp1_id": comp1_id, "comp2_id": comp2_id, "comp3_id": comp3_id})
+            ('job-1', 'uid-1', 'fp-1', 'test', 'sj-1', :comp1_id, 'Engineer 1', 'active', 'approved', 'disclosed', '2023-01-01T10:00:00Z', true),
+            ('job-2', 'uid-2', 'fp-2', 'test', 'sj-2', :comp1_id, 'Engineer 2', 'active', 'approved', 'disclosed', '2023-01-02T10:00:00Z', true),
+            ('job-3', 'uid-3', 'fp-3', 'test', 'sj-3', :comp1_id, 'Engineer 3', 'active', 'rejected', 'disclosed', '2023-01-03T10:00:00Z', false),
+            ('job-4', 'uid-4', 'fp-4', 'test', 'sj-4', :comp1_id, 'Engineer 4', 'stale', NULL, 'unknown', '2023-01-04T10:00:00Z', false),
+            ('job-5', 'uid-5', 'fp-5', 'test', 'sj-5', :comp2_id, 'US Eng', 'active', 'approved', 'unknown', '2023-01-05T10:00:00Z', true),
+            ('job-6', 'uid-6', 'fp-6', 'test', 'sj-6', :comp3_id, 'New Eng', 'active', 'approved', 'unknown', NOW(), false),
+            ('job-7', 'uid-7', 'fp-7', 'test', 'sj-7', :comp4_id, 'Rem 1', 'active', 'approved', 'unknown', NOW(), true),
+            ('job-8', 'uid-8', 'fp-8', 'test', 'sj-8', :comp4_id, 'Rem 2', 'active', 'approved', 'unknown', NOW(), true),
+            ('job-9', 'uid-9', 'fp-9', 'test', 'sj-9', :comp4_id, 'Rem 3', 'active', 'approved', 'unknown', NOW(), true)
+        """), {"comp1_id": comp1_id, "comp2_id": comp2_id, "comp3_id": comp3_id, "comp4_id": comp4_id})
         
     result = run_maintenance_pipeline()
     
     assert result["metrics"]["status"] == "ok", f"Pipeline failed: {result['metrics'].get('error')}"
     assert result["metrics"]["job_stats_updated"] >= 3
     assert result["metrics"]["scores_updated"] >= 3
+    assert result["metrics"]["posture_updated"] >= 1
     
     with engine.connect() as conn:
-        rows = conn.execute(text("SELECT company_id, is_active, approved_jobs_count, rejected_jobs_count, total_jobs_count, last_active_job_at, signal_score FROM companies ORDER BY legal_name")).mappings().all()
+        rows = conn.execute(text("SELECT company_id, is_active, remote_posture, approved_jobs_count, rejected_jobs_count, total_jobs_count, last_active_job_at, signal_score FROM companies ORDER BY legal_name")).mappings().all()
         
         # comp-1: 2 approved jobs. 
         # Score = (PL (+20) + REMOTE_ONLY (+40) + EU entity (+25) + ratio 2/4=0.5 (+8)) = 93
@@ -56,12 +62,19 @@ def test_maintenance_pipeline_updates_company_stats(clean_db):
         assert str(rows[1]["company_id"]) == comp3_id
         assert rows[1]["is_active"] is True
 
+        # comp-4 (Acme Upgrade) has 3 remote jobs -> Should upgrade to REMOTE_FRIENDLY
+        # Score = US (+0) + REMOTE_FRIENDLY (+20) + No EU entity (+0) + ratio 3/3=1.0 (+15) = 35
+        assert str(rows[2]["company_id"]) == comp4_id
+        assert rows[2]["is_active"] is True
+        assert rows[2]["remote_posture"] == "REMOTE_FRIENDLY"
+        assert rows[2]["signal_score"] == 35
+
         # comp-2: 1 approved job.
         # Score = US (+0) + UNKNOWN (+0) + No EU entity (+0) + ratio 1/1=1.0 (+15) = 15
-        assert str(rows[2]["company_id"]) == comp2_id
-        assert rows[2]["is_active"] is True
-        assert rows[2]["total_jobs_count"] == 1
-        assert rows[2]["approved_jobs_count"] == 1
-        assert rows[2]["rejected_jobs_count"] == 0
-        assert str(rows[2]["last_active_job_at"]).startswith("2023-01-05")
-        assert rows[2]["signal_score"] == 15
+        assert str(rows[3]["company_id"]) == comp2_id
+        assert rows[3]["is_active"] is True
+        assert rows[3]["total_jobs_count"] == 1
+        assert rows[3]["approved_jobs_count"] == 1
+        assert rows[3]["rejected_jobs_count"] == 0
+        assert str(rows[3]["last_active_job_at"]).startswith("2023-01-05")
+        assert rows[3]["signal_score"] == 15
