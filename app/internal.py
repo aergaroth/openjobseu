@@ -378,7 +378,10 @@ def background_runner(task_id: str, func, *args, **kwargs):
     ASYNC_TASKS[task_id]["status"] = "running"
     try:
         result = func(*args, **kwargs)
-        ASYNC_TASKS[task_id]["status"] = "completed"
+        if isinstance(result, dict) and result.get("status") == "cancelled":
+            ASYNC_TASKS[task_id]["status"] = "cancelled"
+        else:
+            ASYNC_TASKS[task_id]["status"] = "completed"
         ASYNC_TASKS[task_id]["result"] = result
     except Exception as e:
         logger.exception("Async task failed", extra={"task_id": task_id, "error": str(e)})
@@ -395,21 +398,27 @@ def background_runner(task_id: str, func, *args, **kwargs):
 
 
 def _cleanup_old_tasks(retention_seconds: float = 600.0):
-    """Removes completed or failed tasks older than retention_seconds."""
+    """Removes completed, failed, or cancelled tasks older than retention_seconds."""
     now = time.time()
     to_delete = []
     for tid, tdata in ASYNC_TASKS.items():
-        if tdata.get("status") in ("completed", "failed"):
+        if tdata.get("status") in ("completed", "failed", "cancelled"):
             if now - tdata.get("finished_at", now) > retention_seconds:
                 to_delete.append(tid)
     for tid in to_delete:
         del ASYNC_TASKS[tid]
 
 
-def run_backfill_compliance_task():
+def run_backfill_compliance_task(limit: int = 10000, task_id: str = None):
     total = 0
-    while True:
-        count = backfill_missing_compliance_classes(limit=1000)
+    while total < limit:
+        if task_id and ASYNC_TASKS.get(task_id, {}).get("cancel_requested"):
+            logger.warning("backfill_compliance cancelled by user", extra={"task_id": task_id, "updated_jobs_count": total})
+            return {"status": "cancelled", "updated_jobs_count": total}
+
+        # Dbamy o to by zlecenia do bazy były podzielone na transakcyjne paczki maks. po 1000 sztuk
+        chunk = min(1000, limit - total)
+        count = backfill_missing_compliance_classes(limit=chunk)
         if not count:
             break
         total += count
@@ -417,10 +426,15 @@ def run_backfill_compliance_task():
     return {"status": "completed", "updated_jobs_count": total}
 
 
-def run_backfill_salary_task():
+def run_backfill_salary_task(limit: int = 10000, task_id: str = None):
     total = 0
-    while True:
-        count = backfill_missing_salary_fields(limit=1000)
+    while total < limit:
+        if task_id and ASYNC_TASKS.get(task_id, {}).get("cancel_requested"):
+            logger.warning("backfill_salary cancelled by user", extra={"task_id": task_id, "updated_jobs_count": total})
+            return {"status": "cancelled", "updated_jobs_count": total}
+
+        chunk = min(1000, limit - total)
+        count = backfill_missing_salary_fields(limit=chunk)
         if not count:
             break
         total += count
@@ -428,10 +442,22 @@ def run_backfill_salary_task():
     return {"status": "completed", "updated_jobs_count": total}
 
 
+def run_tick_task(incremental: bool = True, limit: int = 100):
+    employer_worker.GLOBAL_INCREMENTAL_FETCH = incremental
+    employer_worker.GLOBAL_COMPANIES_LIMIT = limit
+    return run_pipeline(group="all")
+
+
 @router.post("/tasks/{task_name}", dependencies=[Depends(require_internal_or_user_api_access)])
-def trigger_async_task(task_name: str, background_tasks: BackgroundTasks):
+def trigger_async_task(
+    task_name: str, 
+    background_tasks: BackgroundTasks,
+    incremental: bool = Query(True, description="Only for 'tick' task"),
+    limit: int = Query(100, description="Limit parameter for tick and backfill tasks"),
+):
     _cleanup_old_tasks()
     task_map = {
+        "tick": run_tick_task,
         "discovery": run_discovery_pipeline,
         "careers": run_careers_discovery,
         "guess": run_ats_guessing,
@@ -450,8 +476,26 @@ def trigger_async_task(task_name: str, background_tasks: BackgroundTasks):
 
     task_id = str(uuid.uuid4())
     ASYNC_TASKS[task_id] = {"status": "pending", "task": task_name}
-    background_tasks.add_task(background_runner, task_id, task_map[task_name])
+    
+    if task_name == "tick":
+        background_tasks.add_task(background_runner, task_id, task_map[task_name], incremental=incremental, limit=limit)
+    elif task_name in ("backfill-compliance", "backfill-salary"):
+        background_tasks.add_task(background_runner, task_id, task_map[task_name], limit=limit)
+    else:
+        background_tasks.add_task(background_runner, task_id, task_map[task_name])
+        
     return {"task_id": task_id, "status": "pending", "task": task_name}
+
+@router.post("/tasks/{task_id}/cancel", dependencies=[Depends(require_internal_or_user_api_access)])
+def cancel_async_task(task_id: str):
+    if task_id not in ASYNC_TASKS:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    if ASYNC_TASKS[task_id].get("status") in ("pending", "running"):
+        ASYNC_TASKS[task_id]["cancel_requested"] = True
+        return {"status": "cancel_requested"}
+    
+    return {"status": ASYNC_TASKS[task_id].get("status")}
 
 @router.get("/tasks/{task_id}", dependencies=[Depends(require_internal_or_user_api_access)])
 def get_task_status(task_id: str):

@@ -521,7 +521,8 @@ async function runTickDev() {
 }
 
 async function runTick(btn, incremental = true) {
-  await runInternal(`/internal/tick?format=text&incremental=${incremental}`, btn);
+  const limit = document.getElementById("tick-limit-input")?.value || "100";
+  await runInternalAsync("tick", btn, { incremental, limit });
 }
 
 async function runDiscovery(btn) {
@@ -545,11 +546,13 @@ async function runBackfillDepartment(btn) {
 }
 
 async function runBackfillCompliance(btn) {
-  await runInternalAsync("backfill-compliance", btn);
+  const limit = document.getElementById("backfill-limit-input")?.value || "10000";
+  await runInternalAsync("backfill-compliance", btn, { limit });
 }
 
 async function runBackfillSalary(btn) {
-  await runInternalAsync("backfill-salary", btn);
+  const limit = document.getElementById("backfill-limit-input")?.value || "10000";
+  await runInternalAsync("backfill-salary", btn, { limit });
 }
 
 async function runForceSync(btn, companyAtsId) {
@@ -643,7 +646,25 @@ document.addEventListener("keydown", (e) => {
       }
 });
 
-async function runInternalAsync(taskName, btn) {
+let currentTaskId = null;
+
+async function cancelCurrentTask() {
+  if (!currentTaskId) return;
+  const btn = document.getElementById("cancel-task-btn");
+  if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Cancelling...";
+  }
+  try {
+    const res = await fetch(`/internal/tasks/${currentTaskId}/cancel`, { method: "POST" });
+    if (!res.ok) throw new Error(await res.text());
+  } catch (err) {
+    alert("Failed to cancel: " + err.message);
+    if (btn) { btn.disabled = false; btn.textContent = "Cancel Task"; }
+  }
+}
+
+async function runInternalAsync(taskName, btn, extraParams = {}) {
   const out = document.getElementById("tick-output");
   const meta = document.getElementById("tick-meta");
   const statusContainer = document.getElementById("task-status-container");
@@ -660,7 +681,10 @@ async function runInternalAsync(taskName, btn) {
   if (statusContainer) statusContainer.style.display = "none";
 
   try {
-    const response = await fetch(`/internal/tasks/${taskName}`, {
+    const urlParams = new URLSearchParams(extraParams);
+    const queryStr = urlParams.toString() ? `?${urlParams.toString()}` : "";
+
+    const response = await fetch(`/internal/tasks/${taskName}${queryStr}`, {
       method: "POST",
       credentials: "same-origin"
     });
@@ -673,6 +697,14 @@ async function runInternalAsync(taskName, btn) {
     const data = await response.json();
     const taskId = data.task_id;
     meta.textContent = `Task ${taskName} [${taskId}]`;
+    currentTaskId = taskId;
+    
+    const cancelBtn = document.getElementById("cancel-task-btn");
+    if (cancelBtn) {
+      cancelBtn.style.display = "inline-block";
+      cancelBtn.disabled = false;
+      cancelBtn.textContent = "Cancel Task";
+    }
 
     let attempt = 0;
     while (true) {
@@ -687,6 +719,11 @@ async function runInternalAsync(taskName, btn) {
       if (statusContainer) {
         statusContainer.style.display = "block";
         statusHeader.innerHTML = `<span class="task-status-badge ${esc(status)}">${esc(status)}</span> <span style="font-size: 0.85rem; color: var(--muted);">Attempt: ${attempt} &bull; ID: ${taskId}</span>`;
+        
+        const pBar = document.getElementById("task-progress-bar");
+        if (pBar) {
+          pBar.className = `progress-bar-fill ${esc(status)}`;
+        }
         
         let gridHtml = '';
         if (error) {
@@ -712,8 +749,10 @@ async function runInternalAsync(taskName, btn) {
       out.textContent = logs ? logs : "No logs emitted.";
       out.scrollTop = out.scrollHeight; // Auto-scroll to new logs
 
-      if (statusData.status === "completed" || statusData.status === "failed") {
+      if (["completed", "failed", "cancelled"].includes(statusData.status)) {
         meta.textContent = `Task ${taskName} [${taskId}] finished in ${attempt} attempts.`;
+        if (cancelBtn) cancelBtn.style.display = "none";
+        currentTaskId = null;
         break;
       }
     }

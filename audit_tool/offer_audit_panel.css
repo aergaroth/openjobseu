@@ -185,6 +185,37 @@ button.loading::after {
 .task-status-badge.completed { background: #059669; color: #fff; }
 .task-status-badge.failed { background: #dc2626; color: #fff; }
 .task-status-badge.pending { background: #4b5563; color: #fff; }
+.task-status-badge.cancelled { background: #f59e0b; color: #fff; }
+
+.progress-bar-wrap {
+  width: 100%;
+  height: 8px;
+  background: #e6eaed;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  transition: width 0.4s ease, background-color 0.4s ease;
+}
+.progress-bar-fill.pending { width: 5%; background: #9ca3af; }
+.progress-bar-fill.running {
+  width: 60%; /* Pasek symulujący zajętość */
+  background-color: #0d6b56;
+  background-image: linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent);
+  background-size: 1rem 1rem;
+  animation: progress-stripes 1s linear infinite;
+}
+.progress-bar-fill.completed { width: 100%; background: #059669; }
+.progress-bar-fill.failed { width: 100%; background: #dc2626; }
+.progress-bar-fill.cancelled { width: 100%; background: #f59e0b; }
+@keyframes progress-stripes {
+  from { background-position: 1rem 0; }
+  to { background-position: 0 0; }
+}
+
 .stats {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
