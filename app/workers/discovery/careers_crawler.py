@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, Iterable
 
@@ -102,6 +103,8 @@ def _fetch_careers_page(url: str) -> requests.Response | None:
     if not url or not url.startswith(("http://", "https://")):
         return None
 
+    start_time = time.perf_counter()
+
     try:
         response = requests.get(url, timeout=15, allow_redirects=True, verify=False, stream=True)
         response.raise_for_status()
@@ -116,12 +119,14 @@ def _fetch_careers_page(url: str) -> requests.Response | None:
         response._content = content  # Bezpieczny "hack", aby response.text i kodowanie zadziałały dla reszty skryptu
         return response
     except Exception as exc:
+        duration_ms = int((time.perf_counter() - start_time) * 1000)
         logger.warning(
             f"discovery fetch careers failed [{url}]: {exc}",
             extra={
                 "component": "discovery",
                 "phase": "careers_discovery",
                 "careers_url": url,
+                "duration_ms": duration_ms,
                 "error": str(exc),
             },
         )
@@ -199,6 +204,7 @@ def run_careers_discovery() -> Dict[str, int]:
         rows = load_discovery_companies(conn, phase="careers", limit=MAX_COMPANIES_PER_RUN)
 
     if not rows:
+        metrics["duration_ms"] = int((time.perf_counter() - start_time) * 1000)
         logger.info(
             "discovery_summary",
             extra={
@@ -301,6 +307,7 @@ def run_careers_discovery() -> Dict[str, int]:
             bar = "█" * filled + "-" * (20 - filled)
             logger.info(f"careers_crawler progress: [{bar}] {pct}% ({idx}/{total})")
 
+    metrics["duration_ms"] = int((time.perf_counter() - start_time) * 1000)
     logger.info(
         "discovery_summary",
         extra={

@@ -1,4 +1,5 @@
 const ids = [
+  "q",
   "status",
   "source",
   "company",
@@ -297,7 +298,7 @@ async function loadJobs() {
 
 async function loadCompanies() {
   const params = new URLSearchParams();
-  for (const id of ["comp_name", "comp_ats", "comp_active", "comp_min_score", "comp_limit", "comp_offset"]) {
+  for (const id of ["comp_q", "comp_ats", "comp_active", "comp_min_score", "comp_limit", "comp_offset"]) {
     const el = document.getElementById(id);
     if (!el) continue;
     const val = (el.value || "").trim();
@@ -469,7 +470,7 @@ function scheduleCompLoad() {
   if (compDebounceTimer) clearTimeout(compDebounceTimer);
   compDebounceTimer = setTimeout(safeLoadCompanies, 250);
 }
-for (const id of ["comp_name", "comp_ats", "comp_active", "comp_min_score", "comp_limit", "comp_offset"]) {
+for (const id of ["comp_q", "comp_ats", "comp_active", "comp_min_score", "comp_limit", "comp_offset"]) {
   const el = document.getElementById(id);
   if (el) {
     el.addEventListener("input", scheduleCompLoad);

@@ -1,4 +1,8 @@
 # scripts/db_smoke_check.py
+from pathlib import Path
+current_path = Path(__file__).resolve().parent
+print(current_path)
+
 import requests
 from collections import Counter
 
@@ -15,7 +19,7 @@ def http_check():
 
 def run_tick():
     print("→ running tick")
-    r = requests.post(f"{BASE_URL}/internal/tick", timeout=30)
+    r = requests.post(f"{BASE_URL}/internal/tick?format=json", timeout=30)
     r.raise_for_status()
     payload = r.json()
     print("  actions:", payload.get("actions"))
@@ -57,10 +61,21 @@ def feed_check():
     return len(data)
 
 
+def search_check():
+    print("→ search check (q=engineer)")
+    r = requests.get(f"{BASE_URL}/jobs", params={"q": "engineer"}, timeout=10)
+    r.raise_for_status()
+    data = r.json()
+    items = data.get("items", [])
+    print(f"  found {len(items)} jobs matching 'engineer'")
+    return len(items)
+
+
 if __name__ == "__main__":
     http_check()
     tick_result = run_tick()
     db_check()
     feed_count = feed_check()
+    search_count = search_check()
 
     print("\n✓ DB smoke check finished OK")

@@ -5,6 +5,7 @@ import io
 import zipfile
 import requests
 import urllib3
+import time
 
 from storage.db_engine import get_engine
 from storage.repositories.discovery_repository import insert_source_company, get_existing_brand_names
@@ -70,6 +71,7 @@ def _fetch_github_remote_companies():
 
 
 def run_company_source_discovery():
+    start_time = time.perf_counter()
 
     engine = get_engine()
 
@@ -133,6 +135,7 @@ def run_company_source_discovery():
             bar = "█" * filled + "-" * (20 - filled)
             logger.info(f"company_sources progress: [{bar}] {pct}% ({idx}/{total})")
 
+    metrics["duration_ms"] = int((time.perf_counter() - start_time) * 1000)
     logger.info(
         "company_source_discovery",
         extra=metrics

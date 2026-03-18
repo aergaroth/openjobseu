@@ -61,6 +61,51 @@ def update_company_job_stats_bulk() -> int:
     return total_updated
 
 
+def update_company_remote_posture_bulk() -> int:
+    engine = get_engine()
+    batch_size = 1000
+    total_updated = 0
+    last_id = "00000000-0000-0000-0000-000000000000"
+    
+    while True:
+        with engine.begin() as conn:
+            batch_rows = conn.execute(text("""
+                SELECT company_id 
+                FROM companies 
+                WHERE company_id > :last_id 
+                ORDER BY company_id 
+                LIMIT :batch_size
+            """), {"last_id": last_id, "batch_size": batch_size}).fetchall()
+            
+            if not batch_rows:
+                break
+                
+            company_ids = [str(r[0]) for r in batch_rows]
+            company_ids_str = ", ".join(f"'{cid}'" for cid in company_ids)
+            
+            result = conn.execute(text(f"""
+                WITH remote_counts AS (
+                    SELECT company_id, COUNT(job_id) as remote_jobs_count
+                    FROM jobs
+                    WHERE company_id IN ({company_ids_str})
+                      AND remote_source_flag = TRUE
+                    GROUP BY company_id
+                    HAVING COUNT(job_id) >= 3
+                )
+                UPDATE companies c
+                SET remote_posture = 'REMOTE_FRIENDLY',
+                    updated_at = NOW()
+                FROM remote_counts rc
+                WHERE c.company_id = rc.company_id
+                  AND c.remote_posture = 'UNKNOWN';
+            """))
+            
+            total_updated += result.rowcount
+            last_id = company_ids[-1]
+            
+    return total_updated
+
+
 def update_company_signal_scores_bulk() -> int:
     engine = get_engine()
     eu_countries_formatted = ", ".join(f"'{c}'" for c in EU_COUNTRIES)

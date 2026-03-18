@@ -161,7 +161,7 @@ def audit_jobs(
 
 @router.get("/audit/companies", dependencies=[Depends(require_user_api_access)])
 def audit_companies(
-    name: str | None = Query(None),
+    q: str | None = Query(None, description="Fuzzy search across legal and brand names"),
     ats_provider: str | None = Query(None),
     is_active: bool | None = Query(None),
     min_score: int | None = Query(None, ge=0),
@@ -173,13 +173,13 @@ def audit_companies(
     params = {"limit": limit, "offset": offset}
     order_by_sql = "signal_score DESC, created_at DESC"
 
-    if name:
+    if q:
         # ILIKE do błyskawicznego odfiltrowania (wykorzystuje indeks GIN),
         # a dystans trigramowy <-> do posortowania wg najwyższej trafności słowa.
-        where_clauses.append("(legal_name ILIKE :name_like OR brand_name ILIKE :name_like)")
-        params["name_like"] = f"%{name}%"
-        params["name_exact"] = name
-        order_by_sql = "LEAST(legal_name <-> :name_exact, brand_name <-> :name_exact) ASC, signal_score DESC"
+        where_clauses.append("(legal_name ILIKE :q_like OR brand_name ILIKE :q_like)")
+        params["q_like"] = f"%{q}%"
+        params["q_exact"] = q
+        order_by_sql = "LEAST(legal_name <-> :q_exact, brand_name <-> :q_exact) ASC, signal_score DESC"
     if ats_provider:
         where_clauses.append("ats_provider = :ats_provider")
         params["ats_provider"] = ats_provider
@@ -274,8 +274,10 @@ def internal_metrics():
 
 
 @router.get("/discovery/audit", dependencies=[Depends(require_user_api_access)])
-def discovery_audit():
-    results = get_discovered_company_ats(limit=100)
+def discovery_audit(
+    q: str | None = Query(None, description="Fuzzy search across company names")
+):
+    results = get_discovered_company_ats(q=q, limit=100)
     return {
         "count": len(results),
         "results": results,
@@ -283,8 +285,10 @@ def discovery_audit():
 
 
 @router.get("/discovery/candidates", dependencies=[Depends(require_user_api_access)])
-def discovery_candidates():
-    results = get_discovery_candidates(limit=50)
+def discovery_candidates(
+    q: str | None = Query(None, description="Fuzzy search across company names")
+):
+    results = get_discovery_candidates(q=q, limit=50)
     return {
         "count": len(results),
         "results": results,

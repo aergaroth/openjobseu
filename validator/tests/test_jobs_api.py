@@ -83,3 +83,24 @@ def test_list_jobs_with_q_parameter_searches_description_text():
     
     assert len(items) == 1
     assert items[0]["job_id"] == "job8"
+
+
+def test_list_jobs_pagination_structure():
+    with engine.begin() as conn:
+        upsert_job(_make_job("job_page_1", "Backend", "Acme"), conn=conn)
+        upsert_job(_make_job("job_page_2", "Frontend", "Acme"), conn=conn)
+        upsert_job(_make_job("job_page_3", "DevOps", "Acme"), conn=conn)
+
+    response = client.get("/jobs?limit=2&offset=1")
+    assert response.status_code == 200
+    data = response.json()
+
+    # Sprawdzamy strukturę kontraktu paginacji
+    assert "items" in data
+    assert "total" in data
+    assert "limit" in data
+    assert "offset" in data
+    assert data["total"] == 3
+    assert data["limit"] == 2
+    assert data["offset"] == 1
+    assert len(data["items"]) == 2

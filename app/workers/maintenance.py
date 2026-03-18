@@ -4,6 +4,7 @@ from time import perf_counter
 from storage.repositories.maintenance_repository import (
     update_company_job_stats_bulk,
     update_company_signal_scores_bulk,
+    update_company_remote_posture_bulk,
 )
 
 logger = logging.getLogger("openjobseu.maintenance")
@@ -20,6 +21,14 @@ def _update_company_job_stats() -> int:
     return update_company_job_stats_bulk()
 
 
+def _update_company_remote_posture() -> int:
+    """
+    Upgrades remote_posture from 'UNKNOWN' to 'REMOTE_FRIENDLY'
+    for companies that have accumulated at least 3 remote jobs.
+    """
+    return update_company_remote_posture_bulk()
+
+
 def _update_company_signal_scores() -> int:
     """
     Updates the signal_score for all companies based on rules:
@@ -34,11 +43,13 @@ def _update_company_signal_scores() -> int:
 def run_maintenance_pipeline() -> dict:
     started = perf_counter()
     metrics = {
+        "posture_updated": 0,
         "job_stats_updated": 0,
         "scores_updated": 0,
     }
 
     try:
+        metrics["posture_updated"] = _update_company_remote_posture()
         metrics["job_stats_updated"] = _update_company_job_stats()
         metrics["scores_updated"] = _update_company_signal_scores()
         metrics["status"] = "ok"

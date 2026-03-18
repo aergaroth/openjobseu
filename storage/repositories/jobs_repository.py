@@ -11,7 +11,7 @@ from .snapshots_repository import insert_job_snapshot
 
 logger = logging.getLogger(__name__)
 
-def get_jobs(
+def _build_get_jobs_query(
     status: str | None = None,
     q: str | None = None,
     company: str | None = None,
@@ -19,9 +19,7 @@ def get_jobs(
     source: str | None = None,
     remote_scope: str | None = None,
     min_compliance_score: int | None = None,
-    limit: int = 20,
-    offset: int = 0,
-) -> list[dict]:
+) -> tuple[str, dict, str]:
     clauses = []
     params = {}
     param_counter = 0
@@ -75,6 +73,24 @@ def get_jobs(
     if clauses:
         where_clause = "WHERE " + " AND ".join(clauses)
 
+    return where_clause, params, order_by_sql
+
+
+def get_jobs(
+    status: str | None = None,
+    q: str | None = None,
+    company: str | None = None,
+    title: str | None = None,
+    source: str | None = None,
+    remote_scope: str | None = None,
+    min_compliance_score: int | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[dict]:
+    where_clause, params, order_by_sql = _build_get_jobs_query(
+        status, q, company, title, source, remote_scope, min_compliance_score
+    )
+
     query = f"""
         SELECT
             job_id,
@@ -97,12 +113,58 @@ def get_jobs(
 
     engine = get_engine()
     with engine.connect() as conn:
-        rows = conn.execute(
-            text(query),
-            params,
-        ).mappings().all()
+        rows = conn.execute(text(query), params).mappings().all()
 
     return [dict(row) for row in rows]
+
+
+def get_jobs_paginated(
+    status: str | None = None,
+    q: str | None = None,
+    company: str | None = None,
+    title: str | None = None,
+    source: str | None = None,
+    remote_scope: str | None = None,
+    min_compliance_score: int | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[list[dict], int]:
+    where_clause, params, order_by_sql = _build_get_jobs_query(
+        status, q, company, title, source, remote_scope, min_compliance_score
+    )
+
+    query = f"""
+        SELECT
+            job_id,
+            source,
+            source_url,
+            title,
+            company_name,
+            remote_scope,
+            status,
+            first_seen_at,
+            last_seen_at
+        FROM jobs
+        {where_clause}
+        ORDER BY {order_by_sql}
+        LIMIT :limit OFFSET :offset
+    """
+
+    if not where_clause:
+        total_query = "SELECT GREATEST(0, CAST(reltuples AS BIGINT)) AS total FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid WHERE n.nspname = 'public' AND c.relname = 'jobs'"
+    else:
+        total_query = f"SELECT COUNT(*) AS total FROM jobs {where_clause}"
+
+    params["limit"] = limit
+    params["offset"] = offset
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        rows = conn.execute(text(query), params).mappings().all()
+        total_row = conn.execute(text(total_query), params).fetchone()
+
+    total = int(total_row[0]) if total_row else 0
+    return [dict(row) for row in rows], total
 
 def _find_job_id_by_source_mapping(
     conn: Connection, *, source: str, source_job_id: str

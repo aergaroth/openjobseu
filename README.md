@@ -38,6 +38,7 @@ OpenJobsEU runs as a tick-based pipeline:
 Public/read-only:
 - `GET /health`
 - `GET /ready`
+- `GET /companies?q=keyword` (Public company directory with pagination)
 - `GET /jobs?q=keyword` (Supports fast fuzzy search via pg_trgm)
 - `GET /jobs/feed`
 - `GET /jobs/stats/compliance-7d`
