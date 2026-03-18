@@ -95,6 +95,27 @@ def test_geo_v3_uses_country_from_remote_scope_first():
     assert result["reason"] == "explicit_country"
 
 
+def test_geo_v3_detects_city_in_remote_scope():
+    result = classify_geo_v3(
+        title="Data Scientist",
+        description="",
+        remote_scope="Remote - Berlin",
+    )
+
+    assert result["geo_class"] == GeoClass.EU_MEMBER_STATE
+    assert result["reason"] == "explicit_country"
+
+
+def test_geo_v3_detects_city_in_title():
+    result = classify_geo_v3(
+        title="Frontend Engineer - Warsaw",
+        description="",
+        remote_scope="",
+    )
+    assert result["geo_class"] == GeoClass.EU_MEMBER_STATE
+    assert result["reason"] == "explicit_country"
+
+
 def test_geo_v3_falls_back_to_localization_section_in_description():
     description = """
 Overview
@@ -125,7 +146,7 @@ Responsibilities
 Build APIs and integrations.
 """
     result = classify_geo_v3(
-        title="Senior Backend Engineer in Poland",
+        title="Senior Backend Engineer",
         description=description,
         remote_scope="",
     )

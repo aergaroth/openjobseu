@@ -81,6 +81,108 @@ COUNTRY_ALIASES = {
     "slovakia": "slovakia",
     "slovensko": "slovakia",
     "sk": "slovakia",
+
+    # Największe miasta mapujące bezpośrednio na kraje EU
+    "berlin": "germany",
+    "munich": "germany",
+    "münchen": "germany",
+    "hamburg": "germany",
+    "frankfurt": "germany",
+
+    "paris": "france",
+    "lyon": "france",
+    "marseille": "france",
+    "toulouse": "france",
+
+    "madrid": "spain",
+    "barcelona": "spain",
+    "valencia": "spain",
+    "seville": "spain",
+
+    "rome": "italy",
+    "milan": "italy",
+    "naples": "italy",
+    "turin": "italy",
+
+    "warsaw": "poland",
+    "warszawa": "poland",
+    "krakow": "poland",
+    "kraków": "poland",
+    "wroclaw": "poland",
+    "wrocław": "poland",
+
+    "amsterdam": "netherlands",
+    "rotterdam": "netherlands",
+    "the hague": "netherlands",
+    "utrecht": "netherlands",
+
+    "stockholm": "sweden",
+    "gothenburg": "sweden",
+    "malmo": "sweden",
+    "malmö": "sweden",
+
+    "dublin": "ireland",
+    "cork": "ireland",
+    "galway": "ireland",
+
+    "lisbon": "portugal",
+    "porto": "portugal",
+    "braga": "portugal",
+
+    "vienna": "austria",
+    "wien": "austria",
+    "salzburg": "austria",
+    "linz": "austria",
+
+    "brussels": "belgium",
+    "antwerp": "belgium",
+    "ghent": "belgium",
+
+    "prague": "czech republic",
+    "praha": "czech republic",
+    "brno": "czech republic",
+    "ostrava": "czech republic",
+
+    "bucharest": "romania",
+    "cluj-napoca": "romania",
+    "timisoara": "romania",
+
+    "athens": "greece",
+    "thessaloniki": "greece",
+    "patras": "greece",
+
+    "budapest": "hungary",
+    "debrecen": "hungary",
+    "szeged": "hungary",
+
+    "copenhagen": "denmark",
+    "aarhus": "denmark",
+    "odense": "denmark",
+
+    "helsinki": "finland",
+    "espoo": "finland",
+    "tampere": "finland",
+
+    "bratislava": "slovakia",
+    "kosice": "slovakia",
+
+    "sofia": "bulgaria",
+    "plovdiv": "bulgaria",
+    "varna": "bulgaria",
+
+    "riga": "latvia",
+    "tallinn": "estonia",
+    "vilnius": "lithuania",
+    "zagreb": "croatia",
+    "dubrovnik": "croatia",
+    "ljubljana": "slovenia",
+    "nicosia": "cyprus",
+    "valletta": "malta",
+
+    # Największe miasta mapujące bezpośrednio na kraje EOG (EEA)
+    "oslo": "norway",
+    "bergen": "norway",
+    "reykjavik": "iceland",
 }
 
 NON_EU_REGION_CUSTOM = (

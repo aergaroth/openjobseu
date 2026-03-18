@@ -8,21 +8,7 @@ from app.domain.compliance.engine import ENGINE_POLICY_VERSION
 
 client = TestClient(app)
 
-@pytest.fixture
-def clean_db():
-    engine = get_engine()
-    # Mark app as ready for middleware
-    app.state.ready = True
-    app.state.bootstrap_enforced = False
-    with engine.begin() as conn:
-        conn.execute(text("DELETE FROM compliance_reports"))
-        conn.execute(text("DELETE FROM jobs"))
-    yield
-    with engine.begin() as conn:
-        conn.execute(text("DELETE FROM compliance_reports"))
-        conn.execute(text("DELETE FROM jobs"))
-
-def test_backfill_missing_compliance_classes(clean_db):
+def test_backfill_missing_compliance_classes():
     engine = get_engine()
     
     # 1. Insert jobs with missing/outdated compliance
@@ -59,7 +45,7 @@ def test_backfill_missing_compliance_classes(clean_db):
         report_count = conn.execute(text("SELECT count(*) FROM compliance_reports")).scalar()
         assert report_count == 3
 
-def test_backfill_endpoint(clean_db):
+def test_backfill_endpoint():
     engine = get_engine()
     
     # 1. Insert jobs

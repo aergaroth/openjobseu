@@ -22,6 +22,7 @@ logger = logging.getLogger("openjobseu.ingestion.employer")
 SOURCE = "employer_ing"
 
 GLOBAL_INCREMENTAL_FETCH = True
+GLOBAL_COMPANIES_LIMIT = 100
 
 
 def ingest_company(company: dict):
@@ -169,7 +170,7 @@ def run_employer_ingestion() -> dict:
     try:
         companies_load_started = perf_counter()
         with engine.connect() as conn:
-            companies = load_active_ats_companies(conn, limit=100)
+            companies = load_active_ats_companies(conn, limit=GLOBAL_COMPANIES_LIMIT)
         companies_load_duration_ms = int((perf_counter() - companies_load_started) * 1000)
 
         total_companies = len(companies)

@@ -66,8 +66,32 @@ def block_external_requests(monkeypatch):
 
     monkeypatch.setattr(requests.Session, "request", mock_request)
 
+@pytest.fixture(scope="session", autouse=True)
+def db_engine_setup():
+    """Inicjalizuje bazę i uruchamia migracje dokładnie raz na sesję testową."""
+    global _engine
+    try:
+        alembic_cfg = Config("alembic.ini")
+        alembic_cfg.attributes["configure_logger"] = False
+        _engine = get_engine()
+
+        with _engine.connect() as conn:
+            jobs_exist = conn.execute(text("SELECT to_regclass('public.jobs')")).scalar_one_or_none()
+            alembic_exists = conn.execute(text("SELECT to_regclass('public.alembic_version')")).scalar_one_or_none()
+            if jobs_exist and not alembic_exists:
+                command.stamp(alembic_cfg, "56f2bf3724cd")
+                conn.commit()
+
+        command.upgrade(alembic_cfg, "head")
+    except (OperationalError, InterfaceError) as exc:  # pragma: no cover
+        pytest.skip(f"database unavailable, skipping tests: {exc}")
+    except ProgrammingError as exc:
+        raise RuntimeError(
+            "test database schema is missing. Ensure Alembic migrations are up to date."
+        ) from exc
+
 @pytest.fixture(autouse=True)
-def clean_db():
+def clean_db(db_engine_setup):
     """Truncate the main tables before each test so state doesn't leak.
 
     We deliberately use ``BEGIN/COMMIT`` semantics rather than ``DROP`` so
@@ -78,28 +102,16 @@ def clean_db():
     backend (e.g. for linting or editing).
     """
     global _engine
-    try:
-        if _engine is None:
-            alembic_cfg = Config("alembic.ini")
-            alembic_cfg.attributes["configure_logger"] = False
-            _engine = get_engine()
-
-            # Auto-adopt legacy test database
-            with _engine.connect() as conn:
-                jobs_exist = conn.execute(text("SELECT to_regclass('public.jobs')")).scalar_one_or_none()
-                alembic_exists = conn.execute(text("SELECT to_regclass('public.alembic_version')")).scalar_one_or_none()
-                if jobs_exist and not alembic_exists:
-                    command.stamp(alembic_cfg, "56f2bf3724cd")
-                    conn.commit()
-
-            command.upgrade(alembic_cfg, "head")
-        with _engine.begin() as conn:
-            conn.execute(text("TRUNCATE jobs, companies CASCADE"))
-    except (OperationalError, InterfaceError) as exc:  # pragma: no cover - network/auth errors etc
-        pytest.skip(f"database unavailable, skipping tests: {exc}")
-    except ProgrammingError as exc:
-        raise RuntimeError(
-            "test database schema is missing (e.g. table 'jobs' or 'companies'). "
-            "Ensure Alembic migrations are up to date."
-        ) from exc
+    if _engine is None:
+        return
+        
+    with _engine.begin() as conn:
+        # DELETE jest o rzędy wielkości szybsze niż TRUNCATE CASCADE w PostgreSQL,
+        # zwłaszcza na pustych lub małych tabelach. Usuwamy od dzieci do rodziców.
+        conn.execute(text("DELETE FROM job_snapshots;"))
+        conn.execute(text("DELETE FROM compliance_reports;"))
+        conn.execute(text("DELETE FROM job_sources;"))
+        conn.execute(text("DELETE FROM jobs;"))
+        conn.execute(text("DELETE FROM company_ats;"))
+        conn.execute(text("DELETE FROM companies;"))
     yield

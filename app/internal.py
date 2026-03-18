@@ -520,14 +520,16 @@ def manual_tick(
     ),
     group: str = Query("all", pattern="^(all|ingestion|maintenance)$"),
     incremental: bool = Query(True, description="Enable incremental fetch based on last sync date"),
+    limit: int = Query(100, ge=1, le=1000, description="Limit the number of companies processed in this tick"),
 ):
-    return tick(response_format=response_format, group=group, incremental=incremental)
+    return tick(response_format=response_format, group=group, incremental=incremental, limit=limit)
 
 
-def tick(*, response_format: str = "auto", force_text: bool = False, group: str = "all", incremental: bool = True):
+def tick(*, response_format: str = "auto", force_text: bool = False, group: str = "all", incremental: bool = True, limit: int = 100):
     ingestion_mode = "prod"
     tick_sources = [TICK_SOURCE] if group in ("all", "ingestion") else []
     employer_worker.GLOBAL_INCREMENTAL_FETCH = incremental
+    employer_worker.GLOBAL_COMPANIES_LIMIT = limit
 
     logger.info(
         "tick_start",
@@ -538,6 +540,7 @@ def tick(*, response_format: str = "auto", force_text: bool = False, group: str 
             "sources": tick_sources,
             "group": group,
             "incremental": incremental,
+            "limit": limit,
         },
     )
 

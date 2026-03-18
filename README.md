@@ -45,7 +45,7 @@ Public/read-only:
 Internal/ops:
 *Auth:* `/login`, `/auth`, `/logout`
 *Pipelines:* 
-- `POST /internal/tick` (Main ingestion)
+- `POST /internal/tick?incremental=true|false&limit=100` (Main ingestion)
 - `POST /internal/discovery/run` (ATS discovery)
 *Audit UI:* 
 - `GET /internal/audit` (Protected by Google OAuth)
@@ -60,6 +60,7 @@ Internal/ops:
 - `POST /internal/backfill-salary`
 - `POST /internal/backfill-department`
 *Discovery granular:* `/internal/discovery/careers`, `/internal/discovery/guess`, `/internal/discovery/ats-reverse`, `/internal/discovery/company-sources`
+*Async Tasks:* `POST /internal/tasks/{task_name}`, `GET /internal/tasks/{task_id}` (For long-running backfills and pipelines bypassing Cloud Run limits)
 
 Feed contract:
 - `/jobs/feed` returns only visible jobs (`new`, `active`)
@@ -116,6 +117,8 @@ curl -X POST "http://127.0.0.1:8000/internal/tick?format=json"
 Most tests expect PostgreSQL. CI starts `postgres:16` and uses:
 - `DB_MODE=standard`
 - `DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/testdb`
+
+*Note: The test suite explicitly blocks external HTTP requests to prevent accidental hangs or timeouts. Fast `DELETE` sweeps are used over `TRUNCATE CASCADE` for near-instant teardowns.*
 
 Local pattern:
 

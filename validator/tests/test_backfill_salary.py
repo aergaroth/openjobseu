@@ -7,19 +7,7 @@ from storage.db_engine import get_engine
 
 client = TestClient(app)
 
-@pytest.fixture
-def clean_db():
-    engine = get_engine()
-    # Mark app as ready for middleware
-    app.state.ready = True
-    app.state.bootstrap_enforced = False
-    with engine.begin() as conn:
-        conn.execute(text("DELETE FROM jobs"))
-    yield
-    with engine.begin() as conn:
-        conn.execute(text("DELETE FROM jobs"))
-
-def test_backfill_missing_salary_fields(clean_db):
+def test_backfill_missing_salary_fields():
     engine = get_engine()
     
     # 1. Insert jobs with and without salary
@@ -58,7 +46,7 @@ def test_backfill_missing_salary_fields(clean_db):
         assert row3["salary_min"] == 50000
         assert row3["salary_max"] == 60000
 
-def test_backfill_salary_endpoint(clean_db):
+def test_backfill_salary_endpoint():
     engine = get_engine()
     
     # 1. Insert job
