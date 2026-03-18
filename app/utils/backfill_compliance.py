@@ -4,7 +4,7 @@ from sqlalchemy import text
 from app.domain.taxonomy.enums import RemoteClass, GeoClass
 from app.domain.compliance.engine import apply_policy, ENGINE_POLICY_VERSION
 from storage.db_engine import get_engine
-from storage.db_logic import insert_compliance_reports
+from storage.repositories.compliance_repository import insert_compliance_reports
 
 logger = logging.getLogger("openjobseu.backfill")
 

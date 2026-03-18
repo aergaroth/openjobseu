@@ -186,7 +186,6 @@ Primary runtime flow in code:
 
 #### `storage/` (data access + schema)
 - `storage/db_engine.py` – SQLAlchemy engine factory/DB mode handling.
-- `storage/db_logic.py` – migration bootstrap + compatibility facade re-exporting repositories.
 - `storage/repositories/` – table-level access and mutation logic.
 - `storage/migrations/` – SQL migrations (`001`–`021`).
 
@@ -401,7 +400,7 @@ Schema source: `storage/migrations/*.sql` + repository usage in `storage/reposit
 #### Public endpoints
 - `GET /health` (`app/main.py`) – liveness.
 - `GET /ready` (`app/main.py`) – readiness state.
-- `GET /jobs` (`app/api/jobs.py`) – filtered list from `storage.db_logic.get_jobs` (`jobs` table + optional `job_sources` source filter).
+- `GET /jobs` (`app/api/jobs.py`) – filtered list supporting GIN trigram fuzzy search (`?q=`) from `storage.repositories.jobs_repository.get_jobs`.
 - `GET /jobs/feed` – visible jobs feed with `min_compliance_score=80`, cache headers.
 - `GET /jobs/stats/compliance-7d` – compliance aggregate from `jobs`.
 
@@ -415,6 +414,7 @@ Schema source: `storage/migrations/*.sql` + repository usage in `storage/reposit
 - `POST /internal/audit/tick-dev` – tick endpoint with forced text output.
 - `POST /internal/backfill-compliance` – backfill worker trigger.
 - `POST /internal/backfill-salary` – salary backfill worker trigger.
+- `POST /internal/tasks/{task_id}/cancel` – safely cancel running async tasks.
 
 ### 9. Infrastructure layer
 

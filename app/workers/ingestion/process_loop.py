@@ -7,11 +7,9 @@ from app.adapters.ats.base import ATSAdapter
 from app.domain.jobs.identity import compute_job_identity
 from app.domain.jobs.job_processing import process_ingested_job
 from app.workers.ingestion.metrics import IngestionMetrics
-from storage.db_logic import (
-    insert_compliance_reports,
-    upsert_job,
-    insert_salary_parsing_cases,
-)
+from storage.repositories.compliance_repository import insert_compliance_reports
+from storage.repositories.jobs_repository import upsert_job
+from storage.repositories.salary_repository import insert_salary_parsing_cases
 
 logger = logging.getLogger("openjobseu.ingestion.employer")
 

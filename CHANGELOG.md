@@ -18,6 +18,7 @@
 - Compliance engine and resolver with scoring and startup backfill utilities
 - Salary parser and structured salary model with currency normalisation
 - HTML to Markdown description normalization engine (lists, bold, italics, links, blockquotes, headers)
+- GIN (pg_trgm) indexing for ultra-fast, relevance-sorted fuzzy search across jobs and companies
 
 #### Job lifecycle
 - Job identity and deduplication layer
@@ -25,14 +26,15 @@
 - Availability worker and lifecycle worker
 
 #### API
-- Public endpoints: `GET /jobs`, `GET /jobs/feed`, `GET /jobs/stats/compliance-7d`
-- Internal/ops endpoints: `POST /internal/tick`, `GET /internal/audit`, audit stats endpoints
+- Public endpoints: `GET /jobs` (with `?q=` fuzzy search), `GET /jobs/feed`, `GET /jobs/stats/compliance-7d`
+- Internal/ops endpoints: `POST /internal/tick`, `GET /internal/audit`, audit stats endpoints, task cancellation
 - Feed threshold: `min_compliance_score=80`, cached at `max-age=300`
 
 #### Storage
 - PostgreSQL schema with 16 incremental SQL migration files
 - SQLAlchemy Core backend; supports `DB_MODE=standard` and `DB_MODE=cloudsql`
 - Repositories for jobs, companies, audit, compliance, availability, and discovery
+- Complete removal of the legacy `storage/db_logic.py` facade, adopting direct repository imports
 
 #### Ops & CI/CD
 - GitHub Actions workflows: `dev_flow.yml`, `prod_flow.yml`, `terraform-plan.yml`

@@ -1,5 +1,6 @@
 import logging
 from typing import Any, Dict, List
+from requests.exceptions import JSONDecodeError
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
@@ -22,7 +23,21 @@ class RecruiteeAdapter(ATSAdapter):
         # The base adapter uses `requests`, so we use `self.session`.
         resp = self.session.get(url, timeout=15.0)
         resp.raise_for_status()
-        data = resp.json()
+
+        try:
+            data = resp.json()
+        except JSONDecodeError as e:
+            raw_text = resp.text[:500]
+            logger.error(
+                "Failed to decode JSON from Recruitee ATS", 
+                extra={
+                    "ats_slug": slug,
+                    "http_status": resp.status_code,
+                    "response_text": raw_text
+                }
+            )
+            raise ValueError(f"Recruitee API returned non-JSON response for {slug}") from e
+
         offers = data.get("offers", [])
         for offer in offers:
             if isinstance(offer, dict):

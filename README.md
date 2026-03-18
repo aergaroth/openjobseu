@@ -38,7 +38,7 @@ OpenJobsEU runs as a tick-based pipeline:
 Public/read-only:
 - `GET /health`
 - `GET /ready`
-- `GET /jobs`
+- `GET /jobs?q=keyword` (Supports fast fuzzy search via pg_trgm)
 - `GET /jobs/feed`
 - `GET /jobs/stats/compliance-7d`
 
@@ -60,7 +60,7 @@ Internal/ops:
 - `POST /internal/backfill-salary`
 - `POST /internal/backfill-department`
 *Discovery granular:* `/internal/discovery/careers`, `/internal/discovery/guess`, `/internal/discovery/ats-reverse`, `/internal/discovery/company-sources`
-*Async Tasks:* `POST /internal/tasks/{task_name}`, `GET /internal/tasks/{task_id}` (For long-running backfills and pipelines bypassing Cloud Run limits)
+*Async Tasks:* `POST /internal/tasks/{task_name}`, `GET /internal/tasks/{task_id}`, `POST /internal/tasks/{task_id}/cancel` (For long-running backfills and pipelines bypassing Cloud Run limits)
 
 Feed contract:
 - `/jobs/feed` returns only visible jobs (`new`, `active`)

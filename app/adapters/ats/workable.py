@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict
 import concurrent.futures
+from requests.exceptions import JSONDecodeError
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
@@ -56,7 +57,20 @@ class WorkableAdapter(ATSAdapter):
         resp = self.session.post(api_url, json=payload, timeout=15)
         resp.raise_for_status()
 
-        data = resp.json()
+        try:
+            data = resp.json()
+        except JSONDecodeError as e:
+            raw_text = resp.text[:500]
+            logger.error(
+                "Failed to decode JSON from Workable ATS", 
+                extra={
+                    "ats_slug": slug,
+                    "http_status": resp.status_code,
+                    "response_text": raw_text
+                }
+            )
+            raise ValueError(f"Workable API returned non-JSON response for {slug}") from e
+
         jobs = data.get("results", [])
         
         if not isinstance(jobs, list):
@@ -75,7 +89,22 @@ class WorkableAdapter(ATSAdapter):
                 detail_url = f"{api_url}/{shortcode}"
                 detail_resp = self.session.get(detail_url, timeout=10)
                 detail_resp.raise_for_status()
-                detail_job = detail_resp.json()
+
+                try:
+                    detail_job = detail_resp.json()
+                except JSONDecodeError as e:
+                    raw_text = detail_resp.text[:500]
+                    logger.error(
+                        "Failed to decode JSON from Workable ATS detail", 
+                        extra={
+                            "ats_slug": slug,
+                            "shortcode": shortcode,
+                            "http_status": detail_resp.status_code,
+                            "response_text": raw_text
+                        }
+                    )
+                    raise ValueError(f"Workable detail API returned non-JSON response for {slug}/{shortcode}") from e
+
                 detail_job["_ats_slug"] = slug
                 return detail_job
             except Exception as e:
@@ -246,7 +275,20 @@ class WorkableAdapter(ATSAdapter):
         resp = self.session.post(api_url, json=payload, timeout=15)
         resp.raise_for_status()
 
-        data = resp.json()
+        try:
+            data = resp.json()
+        except JSONDecodeError as e:
+            raw_text = resp.text[:500]
+            logger.error(
+                "Failed to decode JSON from Workable ATS probe", 
+                extra={
+                    "ats_slug": ats_slug,
+                    "http_status": resp.status_code,
+                    "response_text": raw_text
+                }
+            )
+            raise ValueError(f"Workable probe API returned non-JSON response for {ats_slug}") from e
+
         jobs = data.get("results", [])
 
         jobs_total = 0

@@ -28,12 +28,14 @@ from app.adapters.ats.lever import LeverAdapter
 from app.adapters.ats.workable import WorkableAdapter
 from app.adapters.ats.ashby import AshbyAdapter
 from app.workers.pipeline import run_pipeline
-from storage.db_logic import (
+from storage.repositories.audit_repository import (
     get_audit_company_compliance_stats,
     get_audit_source_compliance_stats_last_7d,
     get_audit_source_filter_values,
     get_jobs_audit,
     get_failing_ats_integrations,
+)
+from storage.repositories.ats_repository import (
     get_ats_integration_by_id,
     deactivate_ats_integration,
 )
@@ -169,10 +171,15 @@ def audit_companies(
     engine = get_engine()
     where_clauses = []
     params = {"limit": limit, "offset": offset}
+    order_by_sql = "signal_score DESC, created_at DESC"
 
     if name:
-        where_clauses.append("(legal_name ILIKE :name OR brand_name ILIKE :name)")
-        params["name"] = f"%{name}%"
+        # ILIKE do błyskawicznego odfiltrowania (wykorzystuje indeks GIN),
+        # a dystans trigramowy <-> do posortowania wg najwyższej trafności słowa.
+        where_clauses.append("(legal_name ILIKE :name_like OR brand_name ILIKE :name_like)")
+        params["name_like"] = f"%{name}%"
+        params["name_exact"] = name
+        order_by_sql = "LEAST(legal_name <-> :name_exact, brand_name <-> :name_exact) ASC, signal_score DESC"
     if ats_provider:
         where_clauses.append("ats_provider = :ats_provider")
         params["ats_provider"] = ats_provider
@@ -202,7 +209,7 @@ def audit_companies(
                 last_active_job_at, is_active, created_at
             FROM companies 
             {where_sql}
-            ORDER BY signal_score DESC, created_at DESC
+            ORDER BY {order_by_sql}
             LIMIT :limit OFFSET :offset
         """
         rows = conn.execute(text(query), params).mappings().all()

@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, Dict
+import logging
+from requests.exceptions import JSONDecodeError
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
@@ -11,6 +13,8 @@ from app.adapters.ats.utils import (
     to_utc_datetime,
 )
 from app.utils.cleaning import clean_description
+
+logger = logging.getLogger(__name__)
 
 class LeverAdapter(ATSAdapter):
     source_name = "lever"
@@ -44,7 +48,20 @@ class LeverAdapter(ATSAdapter):
         resp = self.session.get(api_url, timeout=15)
         resp.raise_for_status()
 
-        jobs = resp.json()
+        try:
+            jobs = resp.json()
+        except JSONDecodeError as e:
+            raw_text = resp.text[:500]
+            logger.error(
+                "Failed to decode JSON from Lever ATS", 
+                extra={
+                    "ats_slug": slug,
+                    "http_status": resp.status_code,
+                    "response_text": raw_text
+                }
+            )
+            raise ValueError(f"Lever API returned non-JSON response for {slug}") from e
+
         if not isinstance(jobs, list):
             raise ValueError("Lever API did not return a list payload")
 
@@ -197,7 +214,20 @@ class LeverAdapter(ATSAdapter):
         resp = self.session.get(api_url, timeout=15)
         resp.raise_for_status()
 
-        jobs = resp.json()
+        try:
+            jobs = resp.json()
+        except JSONDecodeError as e:
+            raw_text = resp.text[:500]
+            logger.error(
+                "Failed to decode JSON from Lever ATS probe", 
+                extra={
+                    "ats_slug": ats_slug,
+                    "http_status": resp.status_code,
+                    "response_text": raw_text
+                }
+            )
+            raise ValueError(f"Lever probe API returned non-JSON response for {ats_slug}") from e
+
         if not isinstance(jobs, list):
             raise ValueError("Lever API did not return a list payload")
 

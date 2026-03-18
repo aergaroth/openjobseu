@@ -25,7 +25,7 @@ def run_tick():
 def db_check():
     print("→ db inspection")
     from sqlalchemy import text
-    from app.db import get_engine
+    from storage.db_engine import get_engine
 
     engine = get_engine()
 

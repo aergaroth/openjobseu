@@ -8,7 +8,7 @@ from app.adapters.ats.registry import get_adapter
 from app.domain.taxonomy.enums import RemoteClass
 
 from storage.db_engine import get_engine
-from storage.db_logic import (
+from storage.repositories.ats_repository import (
     load_active_ats_companies,
     mark_ats_synced,
 )

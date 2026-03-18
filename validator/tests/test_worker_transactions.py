@@ -63,15 +63,13 @@ def test_availability_pipeline_uses_single_transaction_conn(monkeypatch):
 
     summary = availability.run_availability_pipeline()
 
-    assert summary == {
-        "metrics": {
-            "checked": 3,
-            "active": 1,
-            "expired": 1,
-            "unreachable": 1,
-            "status": "ok",
-        }
-    }
+    metrics = summary["metrics"]
+    assert metrics["checked"] == 3
+    assert metrics["active"] == 1
+    assert metrics["expired"] == 1
+    assert metrics["unreachable"] == 1
+    assert metrics["status"] == "ok"
+    assert "duration_ms" in metrics
     assert [item[0] for item in seen] == ["a", "b", "c"]
     assert all(item[3] is not None for item in seen)
     assert len({id(item[3]) for item in seen}) == 1

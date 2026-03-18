@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 def get_jobs(
     status: str | None = None,
+    q: str | None = None,
     company: str | None = None,
     title: str | None = None,
     source: str | None = None,
@@ -24,6 +25,7 @@ def get_jobs(
     clauses = []
     params = {}
     param_counter = 0
+    order_by_sql = "first_seen_at DESC"
 
     if status == "visible":
         clauses.append("status IN ('new', 'active')")
@@ -57,6 +59,13 @@ def get_jobs(
         clauses.append(f"remote_scope = :p{param_counter}")
         params[f"p{param_counter}"] = remote_scope
 
+    if q:
+        clauses.append("(title ILIKE :q_like OR company_name ILIKE :q_like OR description ILIKE :q_like)")
+        params["q_like"] = f"%{q}%"
+        params["q_exact"] = q
+        # Opis celowo omijamy w LEAST(). Dystans trigramowy dla długich tekstów jest bliski 1.0, co psuje ranking.
+        order_by_sql = "LEAST(title <-> :q_exact, company_name <-> :q_exact) ASC, first_seen_at DESC"
+
     if min_compliance_score is not None:
         param_counter += 1
         clauses.append(f"COALESCE(compliance_score, 0) >= :p{param_counter}")
@@ -79,7 +88,7 @@ def get_jobs(
             last_seen_at
         FROM jobs
         {where_clause}
-        ORDER BY first_seen_at DESC
+        ORDER BY {order_by_sql}
         LIMIT :limit OFFSET :offset
     """
 

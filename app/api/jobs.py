@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Query, Response
 from datetime import datetime, timezone
 
-from storage.db_logic import get_compliance_stats_last_7d, get_jobs
+from storage.repositories.audit_repository import get_compliance_stats_last_7d
+from storage.repositories.jobs_repository import get_jobs
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -17,6 +18,7 @@ def _utc_now_iso() -> str:
 @router.get("")
 def list_jobs(
     status: str | None = Query("visible"),
+    q: str | None = Query(None, description="Fast fuzzy text search across title and company"),
     company: str | None = None,
     title: str | None = None,
     source: str | None = None,
@@ -27,6 +29,7 @@ def list_jobs(
     return {
         "items": get_jobs(
             status=status,
+            q=q,
             company=company,
             title=title,
             source=source,
