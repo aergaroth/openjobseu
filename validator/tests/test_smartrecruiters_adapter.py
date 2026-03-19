@@ -39,3 +39,24 @@ def test_smartrecruiters_fetch_detail_fallback(monkeypatch):
     
     assert jobs[1]["name"] == "Summary Title 2"
     assert "jobAd" not in jobs[1]
+
+
+def test_smartrecruiters_probe_jobs_success(monkeypatch):
+    adapter = SmartrecruitersAdapter()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "content": [
+            {"name": "Remote Dev", "location": {"city": "Remote", "country": "PL", "remote": True}, "releasedDate": "2023-01-01T00:00:00Z"},
+            {"name": "Local Dev"}
+        ]
+    }
+    monkeypatch.setattr(adapter.session, "get", lambda *a, **kw: mock_resp)
+    
+    res = adapter.probe_jobs("test")
+    assert res["jobs_total"] == 2
+    assert res["remote_hits"] == 1
+    assert res["recent_job_at"] is not None
+
+def test_smartrecruiters_probe_jobs_empty_slug():
+    with pytest.raises(ValueError):
+        SmartrecruitersAdapter().probe_jobs("")

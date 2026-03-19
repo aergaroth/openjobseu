@@ -39,7 +39,7 @@ def test_check_availability_for_jobs_timeout(monkeypatch):
     # Upewniamy się, że TimeoutError został poprawnie obsłużony i zalogowany (bez wywalania workera)
     assert len(log_calls) == 1
     assert log_calls[0][0] == "availability_pool_timeout"
-    assert log_calls[0][1]["msg"] == "Thread pool exhausted on hanging requests"
+    assert log_calls[0][1]["details"] == "Thread pool exhausted on hanging requests"
 
 
 def test_check_availability_for_jobs_future_exception(monkeypatch):

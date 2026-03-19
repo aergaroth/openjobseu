@@ -108,7 +108,7 @@ def _check_availability_for_jobs(
                 except Exception:
                     pass
         except TimeoutError:
-            logger.error("availability_pool_timeout", extra={"msg": "Thread pool exhausted on hanging requests", "timeout_sec": 60})
+            logger.error("availability_pool_timeout", extra={"details": "Thread pool exhausted on hanging requests", "timeout_sec": 60})
             for f in future_to_index:
                 f.cancel()
 

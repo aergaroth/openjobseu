@@ -147,8 +147,49 @@ class SmartrecruitersAdapter(ATSAdapter):
         }
 
     def probe_jobs(self, slug: str) -> dict[str, Any]:
-        # SmartRecruiters ma solidne API skrócone - do probe wystarczy pierwszy list endpoint bez dociągania
-        jobs = self.fetch({"ats_slug": slug})
-        return {"jobs_total": len(jobs), "remote_hits": 0, "recent_job_at": None} # uproszczony probe
+        ats_slug = str(slug or "").strip()
+        if not ats_slug:
+            raise ValueError("slug cannot be empty for smartrecruiters probe")
+
+        api_url = self.API_URL_TEMPLATE.format(slug=ats_slug)
+        
+        # Odpytujemy wyłącznie szybki list endpoint (bez dociągania szczegółów w wątkach)
+        resp = self.session.get(f"{api_url}?limit=100", timeout=15)
+        resp.raise_for_status()
+
+        data = self._parse_json(resp, ats_slug, context="probe")
+        jobs = data.get("content", [])
+
+        if not isinstance(jobs, list):
+            raise ValueError("SmartRecruiters probe API did not return a content list")
+
+        jobs_total = 0
+        remote_hits = 0
+        recent_job_at: datetime | None = None
+
+        for job in jobs:
+            if not isinstance(job, dict):
+                continue
+
+            jobs_total += 1
+            job_updated_at = to_utc_datetime(job.get("releasedDate"))
+            if job_updated_at and (recent_job_at is None or job_updated_at > recent_job_at):
+                recent_job_at = job_updated_at
+
+            title = (job.get("name") or "").lower()
+            location_dict = job.get("location") or {}
+            location_parts = [str(location_dict.get(k)) for k in ["city", "region", "country"] if location_dict.get(k)]
+            location = sanitize_location(" - ".join(location_parts)) or ""
+            
+            is_remote_location = "remote" in location.lower()
+            is_remote_flag = location_dict.get("remote") is True
+            if self.detect_remote(title, location, explicit_flag=(is_remote_flag or is_remote_location), is_probe=True):
+                remote_hits += 1
+
+        return {
+            "jobs_total": jobs_total,
+            "recent_job_at": recent_job_at,
+            "remote_hits": remote_hits,
+        }
 
 register(SmartrecruitersAdapter.source_name, SmartrecruitersAdapter)
