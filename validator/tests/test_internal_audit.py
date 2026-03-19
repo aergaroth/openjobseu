@@ -324,12 +324,18 @@ def test_internal_audit_company_stats():
     assert payload["min_total_jobs"] == 10
     items = payload["items"]
     assert len(items) == 2
-    assert [item["legal_name"] for item in items] == [f"{marker}-low", f"{marker}-high"]
+    # Teraz wyniki są sortowane po ilości zaakceptowanych (approved) ofert malejąco
+    assert [item["legal_name"] for item in items] == [f"{marker}-high", f"{marker}-low"]
+    
     assert items[0]["total_jobs"] == 12
-    assert items[0]["approved"] == 3
-    assert items[0]["rejected"] == 9
-    assert items[0]["approved_ratio_pct"] == 25.0
-    assert items[1]["approved_ratio_pct"] == 75.0
+    assert items[0]["approved"] == 9
+    assert items[0]["rejected"] == 3
+    assert items[0]["approved_ratio_pct"] == 75.0
+    
+    assert items[1]["total_jobs"] == 12
+    assert items[1]["approved"] == 3
+    assert items[1]["rejected"] == 9
+    assert items[1]["approved_ratio_pct"] == 25.0
 
 
 def test_internal_audit_source_stats_7d():
@@ -423,12 +429,18 @@ def test_internal_audit_source_stats_7d():
 
     assert payload["window"] == "last_7_days"
     items = payload["items"]
-    assert [item["source"] for item in items] == ["ashby:test", "greenhouse:acme"]
-    assert items[0]["total_jobs"] == 4
-    assert items[0]["approved"] == 1
-    assert items[0]["rejected"] == 3
-    assert items[0]["approved_ratio_pct"] == 25.0
-    assert items[1]["approved_ratio_pct"] == 100.0
+    # Teraz wyniki są sortowane po ilości zaakceptowanych ofert malejąco
+    assert [item["source"] for item in items] == ["greenhouse:acme", "ashby:test"]
+    
+    assert items[0]["total_jobs"] == 2
+    assert items[0]["approved"] == 2
+    assert items[0]["rejected"] == 0
+    assert items[0]["approved_ratio_pct"] == 100.0
+    
+    assert items[1]["total_jobs"] == 4
+    assert items[1]["approved"] == 1
+    assert items[1]["rejected"] == 3
+    assert items[1]["approved_ratio_pct"] == 25.0
 
 
 def test_internal_discovery_audit_returns_recent_discovered_ats():

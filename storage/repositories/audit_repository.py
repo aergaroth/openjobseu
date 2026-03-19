@@ -294,7 +294,7 @@ def get_audit_company_compliance_stats(
                 JOIN companies c ON c.company_id = j.company_id
                 GROUP BY c.legal_name
                 HAVING COUNT(*) > :min_total_jobs
-                ORDER BY approved_ratio_pct ASC NULLS FIRST, c.legal_name ASC
+                ORDER BY approved DESC, c.legal_name ASC
             """),
             {"min_total_jobs": int(min_total_jobs)},
         ).mappings().all()
@@ -331,7 +331,7 @@ def get_audit_source_compliance_stats_last_7d() -> list[dict]:
                 JOIN job_sources js ON js.job_id = j.job_id
                 WHERE j.first_seen_at > NOW() - INTERVAL '7 days'
                 GROUP BY js.source
-                ORDER BY approved_ratio_pct ASC NULLS FIRST, js.source ASC
+                ORDER BY approved DESC, js.source ASC
             """)
         ).mappings().all()
 

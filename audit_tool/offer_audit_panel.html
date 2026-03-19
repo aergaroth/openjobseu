@@ -118,7 +118,12 @@
     <div class="panel">
       <div class="audit-stats-grid">
         <div class="chip-box audit-stats-card">
-          <h3>Company compliance ratio (all data, total jobs &gt; 10)</h3>
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <h3 style="margin-bottom: 8px;">Company compliance ratio (all data, total jobs &gt; 10)</h3>
+            <label style="font-size: 0.75rem; cursor: pointer; color: var(--muted); font-weight: normal;">
+              <input type="checkbox" id="show-zero-approved-chk" onchange="renderCompanyStatsRowsFromCache()" style="width: auto; margin: 0 4px 0 0;" /> Show 0 approved
+            </label>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -137,7 +142,12 @@
         </div>
 
         <div class="chip-box audit-stats-card">
-          <h3>Source compliance ratio (first_seen_at in last 7 days)</h3>
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <h3 style="margin-bottom: 8px;">Source compliance ratio (first_seen_at in last 7 days)</h3>
+            <label style="font-size: 0.75rem; cursor: pointer; color: var(--muted); font-weight: normal;">
+              <input type="checkbox" id="show-zero-source-approved-chk" onchange="renderSourceStatsRowsFromCache()" style="width: auto; margin: 0 4px 0 0;" /> Show 0 approved
+            </label>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -183,7 +193,7 @@
     <div class="panel">
       <h3>Pipeline controls</h3>
 
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
 
         <button onclick="runTick(this, true)" title="Incremental jobs ingestion">Tick (inc)</button>
         <button onclick="runTick(this, false)" title="Full jobs ingestion (incremental=false)">Tick (all)</button>
@@ -212,6 +222,16 @@
           <input id="tick-limit-input" type="number" min="1" max="1000" value="100" style="width:70px; margin:0; padding:6px;" />
         </div>
 
+      </div>
+      
+      <hr style="border: 0; border-top: 1px solid var(--line); margin: 16px 0;" />
+      
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <strong style="margin-right: 8px;">Raw Job Preview:</strong>
+        <input id="preview-provider" type="text" placeholder="provider (e.g. lever)" style="width:150px; margin:0; padding:6px;" />
+        <input id="preview-slug" type="text" placeholder="ats_slug (e.g. netflix)" style="width:150px; margin:0; padding:6px;" />
+        <input id="preview-job-id" type="text" placeholder="job_id (optional)" style="width:150px; margin:0; padding:6px;" />
+        <button onclick="runPreviewJob(this)" style="min-width:auto; padding: 6px 16px;">Run Preview</button>
       </div>
 
     </div>

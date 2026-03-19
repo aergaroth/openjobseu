@@ -81,7 +81,7 @@ function paramsFromFilters() {
   return params;
 }
 
-function renderCountMap(nodeId, counts) {
+function renderCountMap(nodeId, counts, maxItems = 12) {
   const node = document.getElementById(nodeId);
   if (!node) return;
   const entries = Object.entries(counts || {});
@@ -89,9 +89,15 @@ function renderCountMap(nodeId, counts) {
     node.innerHTML = '<span class="chip">none</span>';
     return;
   }
-  node.innerHTML = entries
+  
+  let html = entries.slice(0, maxItems)
     .map(([key, value]) => `<span class="chip">${esc(key)}: ${esc(value)}</span>`)
     .join("");
+    
+  if (entries.length > maxItems) {
+    html += `<span class="chip" style="background: transparent; border: 1px dashed var(--muted); color: var(--muted);">+${entries.length - maxItems} more</span>`;
+  }
+  node.innerHTML = html;
 }
 
 function renderJobColsMenu() {
@@ -188,6 +194,21 @@ function renderCompRows(items) {
       </tr>
     `;
   }).join("");
+}
+
+let currentCompanyStats = [];
+let currentSourceStats = [];
+
+function renderCompanyStatsRowsFromCache() {
+  const showZero = document.getElementById("show-zero-approved-chk")?.checked;
+  const items = currentCompanyStats.filter(item => showZero || item.approved > 0);
+  renderCompanyStatsRows(items);
+}
+
+function renderSourceStatsRowsFromCache() {
+  const showZero = document.getElementById("show-zero-source-approved-chk")?.checked;
+  const items = currentSourceStats.filter(item => showZero || item.approved > 0);
+  renderSourceStatsRows(items);
 }
 
 function formatRatio(value) {
@@ -366,8 +387,10 @@ async function loadAuditStats() {
   const companyPayload = await companyResponse.json();
   const sourcePayload = await sourceResponse.json();
 
-  renderCompanyStatsRows(companyPayload.items || []);
-  renderSourceStatsRows(sourcePayload.items || []);
+  currentCompanyStats = companyPayload.items || [];
+  renderCompanyStatsRowsFromCache();
+  currentSourceStats = sourcePayload.items || [];
+  renderSourceStatsRowsFromCache();
 
   const companyMeta = document.getElementById("company-stats-meta");
   const sourceMeta = document.getElementById("source-stats-meta");
@@ -571,6 +594,22 @@ async function deactivateAts(companyAtsId) {
   }
 }
 
+async function runPreviewJob(btn) {
+  const provider = document.getElementById("preview-provider").value.trim();
+  const slug = document.getElementById("preview-slug").value.trim();
+  const jobId = document.getElementById("preview-job-id").value.trim();
+  
+  if (!provider || !slug) {
+    alert("Provider and ATS Slug are required.");
+    return;
+  }
+  
+  const params = new URLSearchParams({ provider, slug });
+  if (jobId) params.set("job_id", jobId);
+  
+  await runInternal(`/internal/preview-job?${params.toString()}`, btn);
+}
+
 async function runInternal(url, btn) {
   const out = document.getElementById("tick-output");
   const meta = document.getElementById("tick-meta");
@@ -706,6 +745,17 @@ async function runInternalAsync(taskName, btn, extraParams = {}) {
       cancelBtn.disabled = false;
       cancelBtn.textContent = "Cancel Task";
     }
+    
+    // Pokaż UI od razu po otrzymaniu ID zadania
+    if (statusContainer) {
+      statusContainer.style.display = "block";
+      statusHeader.innerHTML = `<span class="task-status-badge pending">pending</span> <span style="font-size: 0.85rem; color: var(--muted);">ID: ${taskId}</span>`;
+      const pBar = document.getElementById("task-progress-bar");
+      if (pBar) {
+        pBar.className = "progress-bar-fill pending";
+      }
+      statusGrid.innerHTML = "";
+    }
 
     let attempt = 0;
     while (true) {
@@ -717,13 +767,18 @@ async function runInternalAsync(taskName, btn, extraParams = {}) {
 
       const { logs, result, status, task, error, ...restData } = statusData;
       
+      let displayStatus = status;
+      if (status === 'running' && restData.cancel_requested) {
+        displayStatus = 'cancelling';
+      }
+      
       if (statusContainer) {
         statusContainer.style.display = "block";
-        statusHeader.innerHTML = `<span class="task-status-badge ${esc(status)}">${esc(status)}</span> <span style="font-size: 0.85rem; color: var(--muted);">Attempt: ${attempt} &bull; ID: ${taskId}</span>`;
+        statusHeader.innerHTML = `<span class="task-status-badge ${esc(displayStatus)}">${esc(displayStatus)}</span> <span style="font-size: 0.85rem; color: var(--muted);">Attempt: ${attempt} &bull; ID: ${taskId}</span>`;
         
         const pBar = document.getElementById("task-progress-bar");
         if (pBar) {
-          pBar.className = `progress-bar-fill ${esc(status)}`;
+          pBar.className = `progress-bar-fill ${esc(displayStatus)}`;
         }
         
         let gridHtml = '';
