@@ -821,8 +821,12 @@ async function runInternalAsync(taskName, btn, extraParams = {}) {
         if (result !== undefined && result !== null) {
           if (typeof result === 'object') {
             for (const [k, v] of Object.entries(result)) {
-              const valDisplay = (typeof v === 'object' && v !== null) ? esc(JSON.stringify(v)) : esc(String(v));
-              gridHtml += `<div class="task-stat-card"><strong>${esc(k)}</strong><span>${valDisplay}</span></div>`;
+              if (typeof v === 'object' && v !== null) {
+                const valDisplay = esc(JSON.stringify(v, null, 2));
+                gridHtml += `<div class="task-stat-card" style="grid-column: 1 / -1;"><strong>${esc(k)}</strong><pre class="json-dump" style="margin-top: 8px; max-height: 250px; overflow: auto; font-weight: normal; line-height: 1.4;">${valDisplay}</pre></div>`;
+              } else {
+                gridHtml += `<div class="task-stat-card"><strong>${esc(k)}</strong><span>${esc(String(v))}</span></div>`;
+              }
             }
           } else {
             gridHtml += `<div class="task-stat-card"><strong>Result</strong><span>${esc(String(result))}</span></div>`;
