@@ -2,7 +2,7 @@ import hashlib
 from pathlib import Path
 from enum import Enum
 
-from app.domain.taxonomy.enums import GeoClass, RemoteClass
+from app.domain.taxonomy.enums import ComplianceStatus, GeoClass, RemoteClass
 from app.domain.compliance.classifiers.geo import classify_geo
 from app.domain.compliance.classifiers.hard_geo import detect_hard_geo_restriction
 from app.domain.compliance.classifiers.remote import classify_remote
@@ -66,6 +66,8 @@ def apply_policy(job: dict, source: str) -> tuple[dict | None, str | None]:
             "policy_reason": "geo_restriction_hard",
             "remote_model": RemoteClass.UNKNOWN,
             "geo_class": GeoClass.NON_EU,
+            "compliance_score": 0,
+            "compliance_status": ComplianceStatus.REJECTED.value,
             "decision_trace": trace,
         }
         return job, "geo_restriction_hard"
