@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from app.domain.taxonomy.enums import RemoteClass
 from app.workers.ingestion.employer import ingest_company, run_employer_ingestion
+from app.workers.ingestion.fetch import FetchCompanyJobsError
 
 
 class TestRunEmployerIngestion(unittest.TestCase):
@@ -203,7 +204,7 @@ class TestIngestCompany(unittest.TestCase):
         mock_adapter = MagicMock()
         mock_get_adapter.return_value = mock_adapter
         raw_jobs = [{"id": "job1"}]
-        mock_fetch.return_value = (raw_jobs, None)
+        mock_fetch.return_value = (iter(raw_jobs), None)
         mock_engine = MagicMock()
         mock_conn = MagicMock()
         mock_engine.begin.return_value.__enter__.return_value = mock_conn
@@ -216,8 +217,9 @@ class TestIngestCompany(unittest.TestCase):
         mock_get_adapter.assert_called_once_with("test_provider")
         mock_fetch.assert_called_once_with(company, mock_adapter, updated_since=None)
         mock_process.assert_called_once()
+        self.assertEqual(mock_process.call_args.args[1], raw_jobs)
         metrics_arg = mock_process.call_args.args[5]
-        self.assertEqual(metrics_arg.fetched, 1)
+        self.assertEqual(metrics_arg.fetched, 0)
         mock_mark_synced.assert_called_once_with(mock_conn, "ats1", success=True)
         self.assertNotIn("error", result)
         self.assertEqual(result["fetched"], 1)
@@ -277,7 +279,7 @@ class TestIngestCompany(unittest.TestCase):
         company = {"ats_provider": "test_provider"}
         mock_get_adapter.return_value = MagicMock()
         raw_jobs = [{"id": "job1"}]
-        mock_fetch.return_value = (raw_jobs, None)
+        mock_fetch.return_value = (iter(raw_jobs), None)
 
         mock_engine = MagicMock()
         mock_engine.begin.side_effect = Exception("DB transaction failed")
@@ -291,3 +293,80 @@ class TestIngestCompany(unittest.TestCase):
         self.assertEqual(result["fetched"], 1)
         self.assertEqual(result["normalized_count"], 0)
         self.assertEqual(result["accepted"], 0)
+
+    @patch("app.workers.ingestion.employer.get_adapter")
+    @patch("app.workers.ingestion.employer.fetch_company_jobs")
+    @patch("app.workers.ingestion.employer.get_engine")
+    @patch("app.workers.ingestion.employer.process_company_jobs")
+    @patch("app.workers.ingestion.employer.mark_ats_synced")
+    def test_ingest_company_processes_jobs_in_batches(
+        self, mock_mark_synced, mock_process, mock_get_engine, mock_fetch, mock_get_adapter
+    ):
+        company = {"ats_provider": "test_provider", "company_id": "c1", "company_ats_id": "ats1"}
+        mock_get_adapter.return_value = MagicMock()
+        raw_jobs = [{"id": f"job-{i}"} for i in range(201)]
+        mock_fetch.return_value = (iter(raw_jobs), None)
+
+        mock_engine = MagicMock()
+        mock_conn = MagicMock()
+        mock_engine.begin.return_value.__enter__.return_value = mock_conn
+        mock_get_engine.return_value = mock_engine
+
+        def process_side_effect(conn, batch, adapter, company_id, provider, metrics):
+            for _ in batch:
+                metrics.observe_normalized()
+                metrics.observe_accept()
+
+        mock_process.side_effect = process_side_effect
+
+        result = ingest_company(company)
+
+        self.assertEqual(mock_process.call_count, 2)
+        first_batch = mock_process.call_args_list[0].args[1]
+        second_batch = mock_process.call_args_list[1].args[1]
+        self.assertEqual(len(first_batch), 200)
+        self.assertEqual(len(second_batch), 1)
+        self.assertEqual(result["fetched"], 201)
+        self.assertEqual(result["normalized_count"], 201)
+        self.assertEqual(result["accepted"], 201)
+        self.assertEqual(result["skipped"], 0)
+        mock_mark_synced.assert_called_once_with(mock_conn, "ats1", success=True)
+
+    @patch("app.workers.ingestion.employer.get_adapter")
+    @patch("app.workers.ingestion.employer.fetch_company_jobs")
+    @patch("app.workers.ingestion.employer.get_engine")
+    @patch("app.workers.ingestion.employer.process_company_jobs")
+    @patch("app.workers.ingestion.employer.mark_ats_synced")
+    def test_ingest_company_returns_partial_metrics_when_fetch_fails_mid_stream(
+        self, mock_mark_synced, mock_process, mock_get_engine, mock_fetch, mock_get_adapter
+    ):
+        company = {"ats_provider": "test_provider", "company_id": "c1", "company_ats_id": "ats1"}
+        mock_get_adapter.return_value = MagicMock()
+
+        def raw_jobs():
+            yield {"id": "job1"}
+            raise FetchCompanyJobsError("fetch_network_failed")
+
+        mock_fetch.return_value = (raw_jobs(), None)
+
+        mock_engine = MagicMock()
+        mock_conn = MagicMock()
+        mock_engine.begin.return_value.__enter__.return_value = mock_conn
+        mock_get_engine.return_value = mock_engine
+
+        def process_side_effect(conn, batch, adapter, company_id, provider, metrics):
+            for _ in batch:
+                metrics.observe_normalized()
+                metrics.observe_accept()
+
+        mock_process.side_effect = process_side_effect
+
+        result = ingest_company(company)
+
+        self.assertEqual(mock_process.call_count, 1)
+        self.assertEqual(result["error"], "fetch_network_failed")
+        self.assertEqual(result["fetched"], 1)
+        self.assertEqual(result["normalized_count"], 1)
+        self.assertEqual(result["accepted"], 1)
+        self.assertEqual(result["skipped"], 0)
+        mock_mark_synced.assert_called_once_with(mock_conn, "ats1", success=False)
