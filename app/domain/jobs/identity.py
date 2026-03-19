@@ -36,7 +36,7 @@ def compute_job_fingerprint(
 
     # Optymalizacja: Ograniczamy opis ZANIM przemieli go potężny regex
     # Bufor 1500 znaków z zapasem wystarczy, by po usunięciu spacji zostało 500 znaków.
-    raw_fragment = str(description or "")[:1500]
+    raw_fragment = str(description or "").strip()[:1500]
     fragment = normalize(raw_fragment)[:500]
 
     base = f"{company_id}|{company_name}|{title}|{location}|{fragment}"

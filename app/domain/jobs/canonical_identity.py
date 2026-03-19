@@ -13,7 +13,7 @@ def compute_canonical_job_id(job: dict) -> str:
     title = _normalize(job.get("title"))
     
     # Optymalizacja: ucinamy opis przed procesowaniem (bufor 3000 znaków)
-    raw_desc = str(job.get("description") or "")[:3000]
+    raw_desc = str(job.get("description") or "").strip()[:3000]
     description = _normalize(raw_desc)[:1000]
 
     hash_input = f"{company}|{title}|{description}"
