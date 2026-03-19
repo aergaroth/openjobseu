@@ -1,4 +1,4 @@
-from app.domain.taxonomy.enums import GeoClass, RemoteClass
+from app.domain.taxonomy.enums import ComplianceStatus, GeoClass, RemoteClass
 from app.domain.compliance.engine import apply_policy
 
 
@@ -55,3 +55,5 @@ def test_apply_policy_hard_geo_restriction_sets_rejection_reason():
     assert reason == "geo_restriction_hard"
     assert result["_compliance"]["policy_reason"] == "geo_restriction_hard"
     assert result["_compliance"]["geo_class"] == GeoClass.NON_EU
+    assert result["_compliance"]["compliance_status"] == ComplianceStatus.REJECTED.value
+    assert result["_compliance"]["compliance_score"] == 0

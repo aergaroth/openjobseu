@@ -188,9 +188,8 @@ def _detect_provider_with_shallow_crawl(final_url: str, html: str) -> tuple[str,
 
 
 def run_careers_discovery() -> Dict[str, int]:
+    start_time = time.perf_counter()
     engine = get_engine()
-
-    
 
     metrics = {
         "companies_scanned": 0,

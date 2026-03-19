@@ -50,11 +50,15 @@ def test_extract_salary_from_title():
     assert result["salary_currency"] == "EUR"
 
 
-def test_extract_salary_hourly_rate_not_supported():
+def test_extract_salary_hourly_rate_supported():
     text = "The rate for this contracting role is $50 - $80 / hr."
     result = extract_salary(description=text)
     
-    assert result is None
+    assert result is not None
+    assert result["salary_min"] == 50
+    assert result["salary_max"] == 80
+    assert result["salary_currency"] == "USD"
+    assert result["salary_period"] == "hour"
 
 
 def test_extract_salary_monthly_single_value():

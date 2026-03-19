@@ -72,6 +72,20 @@ class TestClassifyTaxonomyJobFamily:
         result = classify_taxonomy("Chief Happiness Officer")
         assert result["job_family"] == "unknown"
 
+    def test_data_not_in_database(self):
+        """Ensure 'data' doesn't match 'Database Administrator'"""
+        result = classify_taxonomy("Database Administrator")
+        assert result["job_family"] == "unknown"
+
+    def test_seo_not_in_museum(self):
+        """Ensure 'seo' doesn't match inside 'Museum'"""
+        result = classify_taxonomy("Museum Curator")
+        assert result["job_family"] == "unknown"
+
+    def test_product_owner(self):
+        result = classify_taxonomy("Product Owner")
+        assert result["job_family"] == "product_management"
+
 
 class TestClassifyTaxonomyJobRole:
     def test_engineer(self):
@@ -93,6 +107,14 @@ class TestClassifyTaxonomyJobRole:
     def test_product_manager_role(self):
         result = classify_taxonomy("Product Manager")
         assert result["job_role"] == "product_manager"
+
+    def test_product_owner_role(self):
+        result = classify_taxonomy("Product Owner")
+        assert result["job_role"] == "product_manager"
+
+    def test_data_analyst_role(self):
+        result = classify_taxonomy("Data Analyst")
+        assert result["job_role"] == "data_scientist"
 
     def test_unknown_role(self):
         result = classify_taxonomy("Chief Happiness Officer")
@@ -160,6 +182,10 @@ class TestClassifyTaxonomySpecialization:
 
     def test_frontend_specialization(self):
         result = classify_taxonomy("Frontend Developer")
+        assert result["specialization"] == "frontend"
+
+    def test_frontend_specialization_split(self):
+        result = classify_taxonomy("Front End Developer")
         assert result["specialization"] == "frontend"
 
     def test_fullstack_specialization(self):
