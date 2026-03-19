@@ -8,6 +8,7 @@ from app.adapters.ats.lever import LeverAdapter
 from app.adapters.ats.workable import WorkableAdapter
 from app.adapters.ats.ashby import AshbyAdapter
 from app.adapters.ats.personio import PersonioAdapter
+from app.adapters.ats.smartrecruiters import SmartrecruitersAdapter
 
 ADAPTERS = [
     GreenhouseAdapter(),
@@ -15,6 +16,7 @@ ADAPTERS = [
     WorkableAdapter(),
     AshbyAdapter(),
     PersonioAdapter(),
+    SmartrecruitersAdapter(),
 ]
 
 
@@ -184,6 +186,23 @@ VALID_JOBS = [
             "_ats_slug": "test-company"
         }
     ),
+    (
+        SmartrecruitersAdapter(),
+        {
+            "id": "123",
+            "name": "Senior Python Developer",
+            "location": {"city": "Remote", "country": "Europe", "remote": True},
+            "department": {"label": "Engineering"},
+            "releasedDate": "2024-01-15T10:00:00Z",
+            "applyUrl": "https://jobs.smartrecruiters.com/test-company/123",
+            "jobAd": {
+                "sections": {
+                    "jobDescription": {"text": "<p>We are looking for a senior Python developer...</p>"}
+                }
+            },
+            "_ats_slug": "test-company"
+        }
+    ),
 ]
 
 @pytest.mark.parametrize("adapter, raw_job", VALID_JOBS)
@@ -249,6 +268,9 @@ INVALID_JOBS = [
     # Personio missing attributes
     (PersonioAdapter(), {"name": "Developer", "description": "Desc", "office": "Remote", "_ats_slug": "test"}),
     (PersonioAdapter(), {"id": "123", "name": "Developer", "description": "Desc", "office": "Remote"}),
+    # Smartrecruiters missing attributes
+    (SmartrecruitersAdapter(), {"id": "123", "applyUrl": "http://x", "_ats_slug": "test"}),
+    (SmartrecruitersAdapter(), {"name": "Developer", "applyUrl": "http://x", "_ats_slug": "test"}),
 ]
 
 @pytest.mark.parametrize("adapter, raw_job", INVALID_JOBS)

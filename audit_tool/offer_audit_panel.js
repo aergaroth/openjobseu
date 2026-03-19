@@ -565,6 +565,10 @@ async function runAtsReverse(btn) {
   await runInternalAsync("ats-reverse", btn);
 }
 
+async function runDorking(btn) {
+  await runInternalAsync("dorking", btn);
+}
+
 async function runBackfillDepartment(btn) {
   await runInternalAsync("backfill-department", btn);
 }
@@ -607,27 +611,46 @@ async function runPreviewJob(btn) {
   const params = new URLSearchParams({ provider, slug });
   if (jobId) params.set("job_id", jobId);
   
-  await runInternal(`/internal/preview-job?${params.toString()}`, btn);
+  await runInternal(`/internal/preview-job?${params.toString()}`, btn, 'preview-cancel-btn');
 }
 
-async function runInternal(url, btn) {
+let syncAbortController = null;
+
+function cancelSync() {
+  if (syncAbortController) {
+    syncAbortController.abort();
+  }
+}
+
+async function runInternal(url, btn, cancelBtnId = null) {
   const out = document.getElementById("tick-output");
   const meta = document.getElementById("tick-meta");
   const statusContainer = document.getElementById("task-status-container");
+  const cancelBtn = cancelBtnId ? document.getElementById(cancelBtnId) : null;
 
   if (btn) {
     btn.disabled = true;
     btn.classList.add("loading");
   }
+  if (cancelBtn) {
+    cancelBtn.style.display = "inline-block";
+  }
+  
   meta.textContent = "running...";
   out.textContent = "";
   out.dataset.rawJson = "";
   if (statusContainer) statusContainer.style.display = "none";
 
+  if (syncAbortController) {
+    syncAbortController.abort();
+  }
+  syncAbortController = new AbortController();
+
   try {
     const response = await fetch(url, {
       method: "POST",
-      credentials: "same-origin"
+      credentials: "same-origin",
+      signal: syncAbortController.signal
     });
 
     const text = await response.text();
@@ -639,13 +662,22 @@ async function runInternal(url, btn) {
     meta.textContent = url;
     out.textContent = text || "(ok)";
   } catch (err) {
-    meta.textContent = "error";
-    out.textContent = String(err);
+    if (err.name === 'AbortError') {
+      meta.textContent = "cancelled";
+      out.textContent = "Request cancelled by user.";
+    } else {
+      meta.textContent = "error";
+      out.textContent = String(err);
+    }
   } finally {
     if (btn) {
       btn.disabled = false;
       btn.classList.remove("loading");
     }
+    if (cancelBtn) {
+      cancelBtn.style.display = "none";
+    }
+    syncAbortController = null;
   }
 }
 
@@ -789,8 +821,12 @@ async function runInternalAsync(taskName, btn, extraParams = {}) {
         if (result !== undefined && result !== null) {
           if (typeof result === 'object') {
             for (const [k, v] of Object.entries(result)) {
-              const valDisplay = (typeof v === 'object' && v !== null) ? esc(JSON.stringify(v)) : esc(String(v));
-              gridHtml += `<div class="task-stat-card"><strong>${esc(k)}</strong><span>${valDisplay}</span></div>`;
+              if (typeof v === 'object' && v !== null) {
+                const valDisplay = esc(JSON.stringify(v, null, 2));
+                gridHtml += `<div class="task-stat-card" style="grid-column: 1 / -1;"><strong>${esc(k)}</strong><pre class="json-dump" style="margin-top: 8px; max-height: 250px; overflow: auto; font-weight: normal; line-height: 1.4;">${valDisplay}</pre></div>`;
+              } else {
+                gridHtml += `<div class="task-stat-card"><strong>${esc(k)}</strong><span>${esc(String(v))}</span></div>`;
+              }
             }
           } else {
             gridHtml += `<div class="task-stat-card"><strong>Result</strong><span>${esc(String(result))}</span></div>`;

@@ -206,6 +206,8 @@
 
         <button onclick="runAtsReverse(this)">Run ATS reverse discovery</button>
 
+        <button onclick="runDorking(this)">Run Google dorking</button>
+
         <button onclick="runBackfillDepartment(this)">Backfill Departments</button>
 
         <button onclick="runBackfillCompliance(this)">Backfill Compliance</button>
@@ -232,6 +234,7 @@
         <input id="preview-slug" type="text" placeholder="ats_slug (e.g. netflix)" style="width:150px; margin:0; padding:6px;" />
         <input id="preview-job-id" type="text" placeholder="job_id (optional)" style="width:150px; margin:0; padding:6px;" />
         <button onclick="runPreviewJob(this)" style="min-width:auto; padding: 6px 16px;">Run Preview</button>
+        <button id="preview-cancel-btn" onclick="cancelSync()" class="btn-danger" style="display:none; min-width:auto; padding: 6px 16px;">Cancel</button>
       </div>
 
     </div>
