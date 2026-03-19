@@ -565,6 +565,10 @@ async function runAtsReverse(btn) {
   await runInternalAsync("ats-reverse", btn);
 }
 
+async function runDorking(btn) {
+  await runInternalAsync("dorking", btn);
+}
+
 async function runBackfillDepartment(btn) {
   await runInternalAsync("backfill-department", btn);
 }
@@ -607,27 +611,46 @@ async function runPreviewJob(btn) {
   const params = new URLSearchParams({ provider, slug });
   if (jobId) params.set("job_id", jobId);
   
-  await runInternal(`/internal/preview-job?${params.toString()}`, btn);
+  await runInternal(`/internal/preview-job?${params.toString()}`, btn, 'preview-cancel-btn');
 }
 
-async function runInternal(url, btn) {
+let syncAbortController = null;
+
+function cancelSync() {
+  if (syncAbortController) {
+    syncAbortController.abort();
+  }
+}
+
+async function runInternal(url, btn, cancelBtnId = null) {
   const out = document.getElementById("tick-output");
   const meta = document.getElementById("tick-meta");
   const statusContainer = document.getElementById("task-status-container");
+  const cancelBtn = cancelBtnId ? document.getElementById(cancelBtnId) : null;
 
   if (btn) {
     btn.disabled = true;
     btn.classList.add("loading");
   }
+  if (cancelBtn) {
+    cancelBtn.style.display = "inline-block";
+  }
+  
   meta.textContent = "running...";
   out.textContent = "";
   out.dataset.rawJson = "";
   if (statusContainer) statusContainer.style.display = "none";
 
+  if (syncAbortController) {
+    syncAbortController.abort();
+  }
+  syncAbortController = new AbortController();
+
   try {
     const response = await fetch(url, {
       method: "POST",
-      credentials: "same-origin"
+      credentials: "same-origin",
+      signal: syncAbortController.signal
     });
 
     const text = await response.text();
@@ -639,13 +662,22 @@ async function runInternal(url, btn) {
     meta.textContent = url;
     out.textContent = text || "(ok)";
   } catch (err) {
-    meta.textContent = "error";
-    out.textContent = String(err);
+    if (err.name === 'AbortError') {
+      meta.textContent = "cancelled";
+      out.textContent = "Request cancelled by user.";
+    } else {
+      meta.textContent = "error";
+      out.textContent = String(err);
+    }
   } finally {
     if (btn) {
       btn.disabled = false;
       btn.classList.remove("loading");
     }
+    if (cancelBtn) {
+      cancelBtn.style.display = "none";
+    }
+    syncAbortController = null;
   }
 }
 

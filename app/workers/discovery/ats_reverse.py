@@ -45,6 +45,7 @@ PROVIDERS_TO_PROBE = [
     "lever",
     "workable",
     "ashby",
+    "smartrecruiters",
 ]
 
 

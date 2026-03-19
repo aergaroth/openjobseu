@@ -28,7 +28,7 @@ def _extract_slug_from_url(url: str, provider: str) -> str | None:
             if match:
                 return match.group(1)
 
-        elif provider in ["lever", "greenhouse", "ashby", "workable"]:
+        elif provider in ["lever", "greenhouse", "ashby", "workable", "smartrecruiters"]:
             # Path-based slug: e.g., https://jobs.lever.co/slug/ or https://apply.workable.com/slug/
             parts = path.strip("/").split("/")
             if len(parts) > 0 and parts[0]:
