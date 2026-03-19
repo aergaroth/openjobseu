@@ -68,22 +68,7 @@ class PersonioAdapter(ATSAdapter):
             logger.warning("Personio XML parse failed for slug: %s", slug, exc_info=True)
             raise ValueError(f"Personio XML parse failed for {slug}") from e
 
-        return self._filter_incremental_jobs(jobs, updated_since)
-
-    def _filter_incremental_jobs(self, jobs: list[dict], updated_since: Any) -> list[dict]:
-        if updated_since in (None, ""):
-            return jobs
-
-        cutoff = to_utc_datetime(updated_since)
-        if cutoff is None:
-            return jobs
-
-        filtered_jobs: list[dict] = []
-        for job in jobs:
-            source_updated_at = to_utc_datetime(job.get("createdAt"))
-            if source_updated_at is None or source_updated_at >= cutoff:
-                filtered_jobs.append(job)
-        return filtered_jobs
+        return self._filter_incremental_jobs(jobs, updated_since, ["createdAt"])
 
     def normalize(self, raw_job: Dict) -> Dict | None:
         slug = raw_job.get("_ats_slug")
@@ -103,7 +88,8 @@ class PersonioAdapter(ATSAdapter):
         cleaned_description = clean_description(description, source=self.source_name)
         normalized_remote_scope = self.normalize_remote_scope(location)
         
-        remote_source_flag = "remote" in str(location).lower() or "remote" in str(title).lower()
+        is_remote_office = "remote" in location.lower()
+        remote_source_flag = self.detect_remote(title, location, explicit_flag=is_remote_office)
         
         company_name = slug.replace("-", " ").replace("_", " ").strip().title()
         
@@ -126,7 +112,15 @@ class PersonioAdapter(ATSAdapter):
         if not jobs:
             return None
             
-        remote_hits = sum(1 for j in jobs if "remote" in str(j.get("office", "")).lower() or "remote" in str(j.get("name", "")).lower())
+        remote_hits = sum(
+            1 for j in jobs 
+            if self.detect_remote(
+                j.get("name"), 
+                j.get("office"), 
+                explicit_flag="remote" in (j.get("office") or "").lower(),
+                is_probe=True
+            )
+        )
         
         recent_job = None
         if jobs:

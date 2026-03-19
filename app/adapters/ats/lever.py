@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 from typing import Any, Dict
 import logging
-from requests.exceptions import JSONDecodeError
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
@@ -22,19 +21,6 @@ class LeverAdapter(ATSAdapter):
     active = True
     API_URL_TEMPLATE = "https://api.lever.co/v0/postings/{slug}?mode=json"
 
-    REMOTE_KEYWORDS_NORMALIZE = [
-        "remote job",
-        "home based",
-        "work from home",
-        "fully remote",
-    ]
-    REMOTE_KEYWORDS_PROBE = [
-        "remote",
-        "anywhere",
-        "distributed",
-        "work from home",
-    ]
-
     @staticmethod
     def _resolve_slug(company: dict) -> str:
         slug = str(company.get("ats_slug") or "").strip()
@@ -49,52 +35,18 @@ class LeverAdapter(ATSAdapter):
         resp = self.session.get(api_url, timeout=15)
         resp.raise_for_status()
 
-        try:
-            jobs = resp.json()
-        except JSONDecodeError as e:
-            raw_text = resp.text[:500]
-            logger.error(
-                "Failed to decode JSON from Lever ATS", 
-                extra={
-                    "ats_slug": slug,
-                    "http_status": resp.status_code,
-                    "response_text": raw_text
-                }
-            )
-            raise ValueError(f"Lever API returned non-JSON response for {slug}") from e
+        jobs = self._parse_json(resp, slug)
 
         if not isinstance(jobs, list):
             raise ValueError("Lever API did not return a list payload")
 
-        jobs = self._filter_incremental_jobs(jobs, updated_since)
+        jobs = self._filter_incremental_jobs(jobs, updated_since, ["createdAt"])
 
         for job in jobs:
             if isinstance(job, dict):
                 job["_ats_slug"] = slug
 
         return jobs
-
-    @staticmethod
-    def _filter_incremental_jobs(jobs: list[dict], updated_since: Any) -> list[dict]:
-        if updated_since in (None, ""):
-            return jobs
-
-        cutoff = to_utc_datetime(updated_since)
-        if cutoff is None:
-            return jobs
-
-        filtered_jobs: list[dict] = []
-        for job in jobs:
-            if not isinstance(job, dict):
-                filtered_jobs.append(job)
-                continue
-
-            source_updated_at = to_utc_datetime(job.get("createdAt"))
-
-            if source_updated_at is None or source_updated_at >= cutoff:
-                filtered_jobs.append(job)
-
-        return filtered_jobs
 
     def normalize(self, raw_job: Dict) -> Dict | None:
         slug = raw_job.get("_ats_slug")
@@ -120,22 +72,20 @@ class LeverAdapter(ATSAdapter):
 
         # Assemble full description from Lever's fragmented payload
         desc_parts = []
-        if raw_job.get("description"):
-            desc_parts.append(str(raw_job["description"]))
-        elif raw_job.get("descriptionPlain"):
-            desc_parts.append(str(raw_job["descriptionPlain"]))
+        main_desc = self.build_description(raw_job, [(["description", "descriptionPlain"], None)])
+        if main_desc:
+            desc_parts.append(main_desc)
             
         for lst in raw_job.get("lists") or []:
             if isinstance(lst, dict):
-                if lst.get("text"):
-                    desc_parts.append(f"<h3>{lst['text']}</h3>")
-                if lst.get("content"):
-                    desc_parts.append(str(lst["content"]))
+                heading = lst.get("text")
+                content = lst.get("content")
+                if content:
+                    desc_parts.append(f"<h3>{heading}</h3>\n{content}" if heading else str(content))
                     
-        if raw_job.get("additional"):
-            desc_parts.append(str(raw_job["additional"]))
-        elif raw_job.get("additionalPlain"):
-            desc_parts.append(str(raw_job["additionalPlain"]))
+        add_desc = self.build_description(raw_job, [(["additional", "additionalPlain"], None)])
+        if add_desc:
+            desc_parts.append(add_desc)
             
         description = "\n\n".join(desc_parts)
 
@@ -143,8 +93,9 @@ class LeverAdapter(ATSAdapter):
             return None
 
         cleaned_description = clean_description(description, source=self.source_name)
-        full_text = f"{title} {location or ''} {workplace_type}".lower()
-        is_remote = any(kw in full_text for kw in self.REMOTE_KEYWORDS_NORMALIZE) or workplace_type.lower() == "remote"
+        
+        is_remote_location = "remote" in (location or "").lower()
+        is_remote = self.detect_remote(title, location, explicit_flag=(workplace_type.lower() == "remote" or is_remote_location), extra_text=workplace_type)
 
         normalized_remote_scope = self.normalize_remote_scope(location)
 
@@ -152,39 +103,8 @@ class LeverAdapter(ATSAdapter):
         if department and not isinstance(department, str):
             department = str(department)
 
-        salary_min = None
-        salary_max = None
-        salary_currency = None
-        salary_period = None
-        salary_source = None
-
         salary_range = raw_job.get("salaryRange") or raw_job.get("salary")
-        if isinstance(salary_range, dict):
-            try:
-                s_min = salary_range.get("min")
-                s_max = salary_range.get("max")
-                
-                if s_min is not None:
-                    salary_min = int(float(s_min))
-                if s_max is not None:
-                    salary_max = int(float(s_max))
-                    
-                salary_currency = salary_range.get("currency")
-                if isinstance(salary_currency, str):
-                    salary_currency = salary_currency.upper()
-                    
-                interval = str(salary_range.get("interval") or "").lower()
-                if "year" in interval:
-                    salary_period = "yearly"
-                elif "month" in interval:
-                    salary_period = "monthly"
-                elif "hour" in interval:
-                    salary_period = "hourly"
-
-                if salary_min or salary_max:
-                    salary_source = "ats_api"
-            except (ValueError, TypeError):
-                pass
+        salary_info = self.extract_salary(salary_range)
 
         return {
             "job_id": f"lever:{slug}:{raw_id}",
@@ -199,11 +119,7 @@ class LeverAdapter(ATSAdapter):
             "department": department or None,
             "status": "new",
             "first_seen_at": first_seen_at,
-            "salary_min": salary_min,
-            "salary_max": salary_max,
-            "salary_currency": salary_currency,
-            "salary_period": salary_period,
-            "salary_source": salary_source,
+            **salary_info,
         }
 
     def probe_jobs(self, slug: str) -> Dict[str, Any]:
@@ -215,19 +131,7 @@ class LeverAdapter(ATSAdapter):
         resp = self.session.get(api_url, timeout=15)
         resp.raise_for_status()
 
-        try:
-            jobs = resp.json()
-        except JSONDecodeError as e:
-            raw_text = resp.text[:500]
-            logger.error(
-                "Failed to decode JSON from Lever ATS probe", 
-                extra={
-                    "ats_slug": ats_slug,
-                    "http_status": resp.status_code,
-                    "response_text": raw_text
-                }
-            )
-            raise ValueError(f"Lever probe API returned non-JSON response for {ats_slug}") from e
+        jobs = self._parse_json(resp, ats_slug, context="probe")
 
         if not isinstance(jobs, list):
             raise ValueError("Lever API did not return a list payload")
@@ -252,9 +156,9 @@ class LeverAdapter(ATSAdapter):
             workplace_type = (job.get("workplaceType") or "").lower()
             
             location = sanitize_location(location_value) or ""
-            full_text = f"{title} {location} {workplace_type}".lower()
             
-            if workplace_type == "remote" or any(keyword in full_text for keyword in self.REMOTE_KEYWORDS_PROBE):
+            is_remote_location = "remote" in location.lower()
+            if self.detect_remote(title, location, explicit_flag=(workplace_type == "remote" or is_remote_location), extra_text=workplace_type, is_probe=True):
                 remote_hits += 1
 
         return {

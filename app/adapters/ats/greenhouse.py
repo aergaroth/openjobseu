@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 from typing import Any
 import logging
-from requests.exceptions import JSONDecodeError
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
 from app.adapters.ats.utils import (
@@ -21,18 +20,6 @@ class GreenhouseAdapter(ATSAdapter):
     API_URL_TEMPLATE = (
         "https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs?content=true"
     )
-    REMOTE_KEYWORDS_NORMALIZE = [
-        "remote job",
-        "home based",
-        "work from home",
-        "fully remote",
-    ]
-    REMOTE_KEYWORDS_PROBE = [
-        "remote",
-        "anywhere",
-        "distributed",
-        "work from home",
-    ]
 
     @staticmethod
     def _resolve_board_token(company: dict) -> str:
@@ -52,23 +39,11 @@ class GreenhouseAdapter(ATSAdapter):
         resp = self.session.get(api_url, timeout=15)
         resp.raise_for_status()
 
-        try:
-            payload = resp.json()
-        except JSONDecodeError as e:
-            raw_text = resp.text[:500]
-            logger.error(
-                "Failed to decode JSON from Greenhouse ATS", 
-                extra={
-                    "ats_slug": board_token,
-                    "http_status": resp.status_code,
-                    "response_text": raw_text
-                }
-            )
-            raise ValueError(f"Greenhouse API returned non-JSON response for {board_token}") from e
+        payload = self._parse_json(resp, board_token)
 
         jobs = self._extract_jobs_from_payload(payload, "fetch")
 
-        jobs = self._filter_incremental_jobs(jobs, updated_since)
+        jobs = self._filter_incremental_jobs(jobs, updated_since, ["updated_at", "pubDate"])
 
         # Inject board_token into each job for stateless normalize()
         for job in jobs:
@@ -76,30 +51,6 @@ class GreenhouseAdapter(ATSAdapter):
                 job["_ats_board_token"] = board_token
 
         return jobs
-
-    @staticmethod
-    def _filter_incremental_jobs(jobs: list[dict], updated_since: Any) -> list[dict]:
-        if updated_since in (None, ""):
-            return jobs
-
-        cutoff = to_utc_datetime(updated_since)
-        if cutoff is None:
-            return jobs
-
-        filtered_jobs: list[dict] = []
-        for job in jobs:
-            if not isinstance(job, dict):
-                filtered_jobs.append(job)
-                continue
-
-            source_updated_at = to_utc_datetime(job.get("updated_at"))
-            if source_updated_at is None:
-                source_updated_at = to_utc_datetime(job.get("pubDate"))
-
-            if source_updated_at is None or source_updated_at >= cutoff:
-                filtered_jobs.append(job)
-
-        return filtered_jobs
 
     def normalize(self, raw_job: dict) -> dict | None:
         # Extract board_token from raw_job (injected by fetch)
@@ -128,16 +79,17 @@ class GreenhouseAdapter(ATSAdapter):
             or self._fallback_company_name(board_token)
         )
 
-        description = raw_job.get("content") or raw_job.get("description") or ""
-        if not isinstance(description, str):
-            description = str(description)
+        description = self.build_description(raw_job, [
+            (["content", "description"], None)
+        ])
 
         if not raw_id or not title or not source_url:
             return None
 
         cleaned_description = clean_description(description, source=self.source_name)
-        full_text = f"{title} {location or ''}".lower()
-        is_remote = any(kw in full_text for kw in self.REMOTE_KEYWORDS_NORMALIZE)
+        
+        is_remote_location = "remote" in (location or "").lower()
+        is_remote = self.detect_remote(title, location, explicit_flag=is_remote_location)
 
         # Normalize remote_scope using base class method
         normalized_remote_scope = self.normalize_remote_scope(location)
@@ -151,41 +103,9 @@ class GreenhouseAdapter(ATSAdapter):
         if department and not isinstance(department, str):
             department = str(department)
 
-        salary_min = None
-        salary_max = None
-        salary_currency = None
-        salary_period = None
-        salary_source = None
-
         pay_bounds = raw_job.get("pay_bounds")
-        if isinstance(pay_bounds, list) and len(pay_bounds) > 0:
-            bound = pay_bounds[0]
-            if isinstance(bound, dict):
-                try:
-                    s_min = bound.get("min_value")
-                    s_max = bound.get("max_value")
-                    
-                    if s_min is not None:
-                        salary_min = int(float(s_min))
-                    if s_max is not None:
-                        salary_max = int(float(s_max))
-                        
-                    salary_currency = bound.get("currency")
-                    if isinstance(salary_currency, str):
-                        salary_currency = salary_currency.upper()
-                        
-                    unit = str(bound.get("unit") or "").lower()
-                    if "year" in unit:
-                        salary_period = "yearly"
-                    elif "month" in unit:
-                        salary_period = "monthly"
-                    elif "hour" in unit:
-                        salary_period = "hourly"
-
-                    if salary_min or salary_max:
-                        salary_source = "ats_api"
-                except (ValueError, TypeError):
-                    pass
+        bound = pay_bounds[0] if isinstance(pay_bounds, list) and pay_bounds else None
+        salary_info = self.extract_salary(bound)
 
         return {
             "job_id": f"greenhouse:{board_token}:{raw_id}",
@@ -200,11 +120,7 @@ class GreenhouseAdapter(ATSAdapter):
             "department": department or None,
             "status": "new",
             "first_seen_at": first_seen_at,
-            "salary_min": salary_min,
-            "salary_max": salary_max,
-            "salary_currency": salary_currency,
-            "salary_period": salary_period,
-            "salary_source": salary_source,
+            **salary_info,
         }
 
     def probe_jobs(self, slug: str) -> dict[str, Any]:
@@ -216,19 +132,7 @@ class GreenhouseAdapter(ATSAdapter):
         resp = self.session.get(api_url, timeout=15)
         resp.raise_for_status()
 
-        try:
-            payload = resp.json()
-        except JSONDecodeError as e:
-            raw_text = resp.text[:500]
-            logger.error(
-                "Failed to decode JSON from Greenhouse ATS probe", 
-                extra={
-                    "ats_slug": board_token,
-                    "http_status": resp.status_code,
-                    "response_text": raw_text
-                }
-            )
-            raise ValueError(f"Greenhouse probe API returned non-JSON response for {board_token}") from e
+        payload = self._parse_json(resp, board_token, context="probe")
 
         jobs = self._extract_jobs_from_payload(payload, "probe")
 
@@ -257,8 +161,9 @@ class GreenhouseAdapter(ATSAdapter):
                 location_value = raw_location
 
             location = sanitize_location(location_value) or ""
-            full_text = f"{title} {location}".lower()
-            if any(keyword in full_text for keyword in self.REMOTE_KEYWORDS_PROBE):
+            
+            is_remote_location = "remote" in location.lower()
+            if self.detect_remote(title, location, explicit_flag=is_remote_location, is_probe=True):
                 remote_hits += 1
 
         return {
