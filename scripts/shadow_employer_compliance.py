@@ -1,3 +1,9 @@
+"""
+Runs a shadow evaluation of the compliance engine (geo and remote classifiers) 
+against existing jobs in the database to test changes in policy rules without 
+persisting the results.
+"""
+
 import os
 import sys
 import argparse

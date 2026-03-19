@@ -133,7 +133,7 @@ def test_internal_audit_jobs_filters_and_counts():
 
     job_1 = _make_job(
         "audit:1",
-        source="remotive",
+        source="greenhouse:alpha",
         status="new",
         company=f"{marker}-alpha",
         title=f"{marker} Backend Engineer",
@@ -141,7 +141,7 @@ def test_internal_audit_jobs_filters_and_counts():
     )
     job_2 = _make_job(
         "audit:2",
-        source="remotive",
+        source="greenhouse:alpha",
         status="active",
         company=f"{marker}-beta",
         title=f"{marker} Frontend Engineer",
@@ -149,7 +149,7 @@ def test_internal_audit_jobs_filters_and_counts():
     )
     job_3 = _make_job(
         "audit:3",
-        source="remoteok",
+        source="lever:gamma",
         status="new",
         company=f"{marker}-gamma",
         title=f"{marker} Data Engineer",
@@ -186,7 +186,7 @@ def test_internal_audit_jobs_filters_and_counts():
     response = client.get(
         "/internal/audit/jobs",
         params={
-            "source": "remotive",
+            "source": "greenhouse:alpha",
             "company": marker,
             "limit": 1,
         },
@@ -197,7 +197,7 @@ def test_internal_audit_jobs_filters_and_counts():
     assert data["total"] == 2
     assert data["limit"] == 1
     assert len(data["items"]) == 1
-    assert data["counts"]["source"]["remotive"] == 2
+    assert data["counts"]["source"]["greenhouse:alpha"] == 2
     assert data["counts"]["status"]["new"] == 1
     assert data["counts"]["status"]["active"] == 1
     assert data["counts"]["compliance_status"][ComplianceStatus.APPROVED.value] == 1
@@ -218,8 +218,8 @@ def test_internal_audit_jobs_filters_and_counts():
     filters_response = client.get("/internal/audit/filters")
     assert filters_response.status_code == 200
     source_values = filters_response.json()["source"]
-    assert "remotive" in source_values
-    assert "remoteok" in source_values
+    assert "greenhouse:alpha" in source_values
+    assert "lever:gamma" in source_values
 
 
 def test_internal_audit_tick_dev_runs_tick_with_text_output(monkeypatch):
@@ -250,7 +250,7 @@ def test_internal_audit_company_stats():
             upsert_job(
                 _make_job(
                     job_id,
-                    source="remotive",
+                    source="greenhouse:low",
                     status="new",
                     company=f"{marker}-low",
                     title=f"{marker} low {i}",
@@ -271,7 +271,7 @@ def test_internal_audit_company_stats():
             upsert_job(
                 _make_job(
                     job_id,
-                    source="remotive",
+                    source="greenhouse:high",
                     status="new",
                     company=f"{marker}-high",
                     title=f"{marker} high {i}",
@@ -292,7 +292,7 @@ def test_internal_audit_company_stats():
             upsert_job(
                 _make_job(
                     job_id,
-                    source="remotive",
+                    source="greenhouse:small",
                     status="new",
                     company=f"{marker}-small",
                     title=f"{marker} small {i}",
@@ -324,12 +324,18 @@ def test_internal_audit_company_stats():
     assert payload["min_total_jobs"] == 10
     items = payload["items"]
     assert len(items) == 2
-    assert [item["legal_name"] for item in items] == [f"{marker}-low", f"{marker}-high"]
+    # Teraz wyniki są sortowane po ilości zaakceptowanych (approved) ofert malejąco
+    assert [item["legal_name"] for item in items] == [f"{marker}-high", f"{marker}-low"]
+    
     assert items[0]["total_jobs"] == 12
-    assert items[0]["approved"] == 3
-    assert items[0]["rejected"] == 9
-    assert items[0]["approved_ratio_pct"] == 25.0
-    assert items[1]["approved_ratio_pct"] == 75.0
+    assert items[0]["approved"] == 9
+    assert items[0]["rejected"] == 3
+    assert items[0]["approved_ratio_pct"] == 75.0
+    
+    assert items[1]["total_jobs"] == 12
+    assert items[1]["approved"] == 3
+    assert items[1]["rejected"] == 9
+    assert items[1]["approved_ratio_pct"] == 25.0
 
 
 def test_internal_audit_source_stats_7d():
@@ -339,11 +345,11 @@ def test_internal_audit_source_stats_7d():
     updates = []
     with engine.begin() as conn:
         for i in range(4):
-            job_id = f"audit-source-remotive:{i}"
+            job_id = f"audit-source-ashby:{i}"
             upsert_job(
                 _make_job(
                     job_id,
-                    source="remotive",
+                    source="ashby:test",
                     status="new",
                     company=f"{marker}-r",
                     title=f"{marker} remotive {i}",
@@ -385,7 +391,7 @@ def test_internal_audit_source_stats_7d():
             upsert_job(
                 _make_job(
                     job_id,
-                    source="remoteok",
+                    source="workable:old",
                     status="new",
                     company=f"{marker}-o",
                     title=f"{marker} old {i}",
@@ -423,12 +429,18 @@ def test_internal_audit_source_stats_7d():
 
     assert payload["window"] == "last_7_days"
     items = payload["items"]
-    assert [item["source"] for item in items] == ["remotive", "greenhouse:acme"]
-    assert items[0]["total_jobs"] == 4
-    assert items[0]["approved"] == 1
-    assert items[0]["rejected"] == 3
-    assert items[0]["approved_ratio_pct"] == 25.0
-    assert items[1]["approved_ratio_pct"] == 100.0
+    # Teraz wyniki są sortowane po ilości zaakceptowanych ofert malejąco
+    assert [item["source"] for item in items] == ["greenhouse:acme", "ashby:test"]
+    
+    assert items[0]["total_jobs"] == 2
+    assert items[0]["approved"] == 2
+    assert items[0]["rejected"] == 0
+    assert items[0]["approved_ratio_pct"] == 100.0
+    
+    assert items[1]["total_jobs"] == 4
+    assert items[1]["approved"] == 1
+    assert items[1]["rejected"] == 3
+    assert items[1]["approved_ratio_pct"] == 25.0
 
 
 def test_internal_discovery_audit_returns_recent_discovered_ats():

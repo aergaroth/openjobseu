@@ -39,8 +39,8 @@ def test_upsert_merges_same_fingerprint_from_different_sources():
         description="Build APIs for EU clients.",
     )
     job_b = _make_job(
-        "remotive:123",
-        source="remotive",
+        "lever:other:123",
+        source="lever:other",
         source_job_id="123",
         title="Backend Engineer",
         description="Build APIs for EU clients.",
@@ -63,7 +63,7 @@ def test_upsert_merges_same_fingerprint_from_different_sources():
 
     assert len(rows) == 2
     assert rows[0]["source"] == "greenhouse:acme"
-    assert rows[1]["source"] == "remotive"
+    assert rows[1]["source"] == "lever:other"
     assert rows[0]["source_job_id"] == "123"
     assert rows[1]["source_job_id"] == "123"
     assert rows[0]["job_id"] == rows[1]["job_id"]
@@ -72,15 +72,15 @@ def test_upsert_merges_same_fingerprint_from_different_sources():
 def test_upsert_reuses_same_source_mapping():
 
     first = _make_job(
-        "remotive:first",
-        source="remotive",
+        "lever:other:first",
+        source="lever:other",
         source_job_id="42",
         title="Backend Engineer",
         description="Build APIs for EU clients.",
     )
     updated = _make_job(
-        "remotive:second",
-        source="remotive",
+        "lever:other:second",
+        source="lever:other",
         source_job_id="42",
         title="Principal Backend Engineer",
         description="Build APIs for EU clients and mentor.",
@@ -101,7 +101,7 @@ def test_upsert_reuses_same_source_mapping():
                     js.seen_count
                 FROM jobs j
                 JOIN job_sources js ON js.job_id = j.job_id
-                WHERE js.source = 'remotive' AND js.source_job_id = '42'
+                WHERE js.source = 'lever:other' AND js.source_job_id = '42'
             """)
         ).mappings().one()
 

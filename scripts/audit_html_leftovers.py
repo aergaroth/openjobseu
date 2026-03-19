@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+Scans the database for job descriptions that still contain unescaped HTML tags 
+after the normal ATS extraction process, outputting the most common leftover tags.
+"""
+
 import os
 import sys
 import re

@@ -22,7 +22,7 @@ def test_fetch_phase_logs_on_debug(monkeypatch):
     )
 
     log_helpers.log_ingestion(
-        source="remoteok",
+        source="greenhouse:acme",
         phase="fetch",
         raw_count=7,
     )
@@ -35,7 +35,7 @@ def test_fetch_phase_logs_on_debug(monkeypatch):
 
     assert isinstance(msg, str)
     assert extra["component"] == "ingestion"
-    assert extra["source"] == "remoteok"
+    assert extra["source"] == "greenhouse:acme"
     assert extra["phase"] == "fetch"
     assert extra["raw_count"] == 7
 
@@ -60,7 +60,7 @@ def test_ingestion_summary_logs_on_info(monkeypatch):
     )
 
     log_helpers.log_ingestion(
-        source="remotive",
+        source="lever:acme",
         phase="ingestion_summary",
         fetched=4,
         normalized=3,
@@ -82,7 +82,7 @@ def test_ingestion_summary_logs_on_info(monkeypatch):
     extra = info_calls[0]["extra"]
 
     # Sprawdzamy tylko semantykę message
-    assert msg.startswith("ingestion_summary[remotive]")
+    assert msg.startswith("ingestion_summary[lever:acme]")
 
     # Sprawdzamy kluczowe pola, nie pełną strukturę
     assert extra["component"] == "ingestion"

@@ -1,5 +1,7 @@
 import logging
 import os
+import re
+import json
 from collections import deque
 import uuid
 import time
@@ -49,6 +51,7 @@ from storage.repositories.discovery_repository import (
 from storage.db_engine import get_engine
 
 from app.security.internal_access import require_internal_access
+from app.domain.jobs.job_processing import process_ingested_job
 import app.workers.ingestion.employer as employer_worker
 
 logger = logging.getLogger("openjobseu.runtime")
@@ -363,6 +366,72 @@ def backfill_salary(limit: int = Query(1000, ge=1, le=10000)):
 def backfill_department():
     updated_count = backfill_missing_departments()
     return {"status": "ok", "updated_jobs_count": updated_count}
+
+
+def _strip_html(obj):
+    if isinstance(obj, dict):
+        return {k: _strip_html(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_strip_html(v) for v in obj]
+    elif isinstance(obj, str):
+        return re.sub(r"<[^>]+>", "", obj)
+    return obj
+
+
+@router.post("/preview-job", dependencies=[Depends(require_internal_or_user_api_access)])
+def preview_job_endpoint(provider: str, slug: str, job_id: str | None = None):
+    try:
+        adapter = get_adapter(provider)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    output = [f"Fetching jobs for '{slug}' via '{provider}'...\n"]
+    
+    try:
+        raw_jobs = adapter.fetch({"ats_slug": slug})
+    except Exception as e:
+        output.append(f"Failed to fetch jobs: {e}")
+        return Response(content="\n".join(output), media_type="text/plain")
+
+    if not raw_jobs:
+        output.append("No jobs found for this slug.")
+        return Response(content="\n".join(output), media_type="text/plain")
+
+    found = False
+    for raw_job in raw_jobs:
+        normalized = adapter.normalize(raw_job)
+        if not normalized:
+            continue
+        
+        if job_id and str(normalized.get("source_job_id")) != str(job_id):
+            continue
+
+        found = True
+        output.append("=" * 80)
+        output.append(f"RAW JOB PAYLOAD (ID: {normalized.get('source_job_id')}):")
+        display_raw = _strip_html(raw_job)
+        raw_json = json.dumps(display_raw, indent=2, ensure_ascii=False)
+        output.append(raw_json[:3000] + ("\n... [TRUNCATED]" if len(raw_json) > 3000 else ""))
+
+        output.append("\n" + "=" * 80)
+        output.append("COMPLIANCE & PROCESSING REPORT:")
+        processed_job, report = process_ingested_job(normalized, source=f"debug:{provider}")
+        
+        output.append(json.dumps(report, indent=2, ensure_ascii=False))
+        
+        output.append("\nPROCESSED JOB (FINAL):")
+        if processed_job:
+            processed_job.pop("description", None)  # Omit long description for terminal readability
+            output.append(json.dumps(processed_job, indent=2, ensure_ascii=False))
+        else:
+            output.append("Job was REJECTED by policy engine and returned None.")
+
+        break
+
+    if not found:
+        output.append(f"No matching job found (checked {len(raw_jobs)} jobs).")
+
+    return Response(content="\n".join(output), media_type="text/plain")
 
 
 ASYNC_TASKS = {}
