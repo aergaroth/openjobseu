@@ -71,6 +71,23 @@ def test_personio_fetch_invalid_xml(monkeypatch):
 def test_personio_normalize_deduces_remote_flag_correctly():
     adapter = PersonioAdapter()
     
-    assert adapter.normalize({"id": "1", "_ats_slug": "a", "name": "Remote Engineer", "office": "Berlin"})["remote_source_flag"] is True
-    assert adapter.normalize({"id": "2", "_ats_slug": "a", "name": "Engineer", "office": "EU Remote"})["remote_source_flag"] is True
+    assert adapter.normalize({"id": "1", "_ats_slug": "a", "name": "Remote Engineer", "office": "Berlin"})["remote_source_flag"] is False
+    assert adapter.normalize({"id": "2", "_ats_slug": "a", "name": "Engineer", "office": "Remote"})["remote_source_flag"] is True
+    assert adapter.normalize({"id": "3", "_ats_slug": "a", "name": "Engineer", "office": "EU Remote"})["remote_source_flag"] is True
     assert adapter.normalize({"id": "3", "_ats_slug": "a", "name": "Engineer", "office": "Berlin"})["remote_source_flag"] is False
+
+def test_personio_probe_jobs_success(monkeypatch):
+    adapter = PersonioAdapter()
+    monkeypatch.setattr(adapter, "fetch", lambda company, **kw: [
+        {"name": "Remote Dev", "office": "Remote", "createdAt": "2023-01-01T00:00:00Z"},
+        {"name": "Office Dev", "office": "Berlin"}
+    ])
+    res = adapter.probe_jobs("test")
+    assert res["jobs_total"] == 2
+    assert res["remote_hits"] == 1
+    assert res["recent_job_at"] == "2023-01-01T00:00:00Z"
+    
+def test_personio_probe_jobs_empty(monkeypatch):
+    adapter = PersonioAdapter()
+    monkeypatch.setattr(adapter, "fetch", lambda company, **kw: [])
+    assert adapter.probe_jobs("test") is None

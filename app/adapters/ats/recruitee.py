@@ -1,6 +1,5 @@
 import logging
 from typing import Any, Dict, List
-from requests.exceptions import JSONDecodeError
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
@@ -25,43 +24,19 @@ class RecruiteeAdapter(ATSAdapter):
         resp = self.session.get(url, timeout=15.0)
         resp.raise_for_status()
 
-        try:
-            data = resp.json()
-        except JSONDecodeError as e:
-            raw_text = resp.text[:500]
-            logger.error(
-                "Failed to decode JSON from Recruitee ATS", 
-                extra={
-                    "ats_slug": slug,
-                    "http_status": resp.status_code,
-                    "response_text": raw_text
-                }
-            )
-            raise ValueError(f"Recruitee API returned non-JSON response for {slug}") from e
+        data = self._parse_json(resp, slug)
 
-        offers = data.get("offers", [])
+        offers = data.get("offers")
+        if offers is None:
+            offers = []
+            
+        if not isinstance(offers, list):
+            raise ValueError(f"Recruitee API did not return an offers list for {slug}")
+
         for offer in offers:
             if isinstance(offer, dict):
                 offer["_ats_slug"] = slug
-        return self._filter_incremental_jobs(offers, updated_since)
-
-    def _filter_incremental_jobs(self, jobs: list[dict], updated_since: Any) -> list[dict]:
-        if updated_since in (None, ""):
-            return jobs
-
-        cutoff = to_utc_datetime(updated_since)
-        if cutoff is None:
-            return jobs
-
-        filtered_jobs: list[dict] = []
-        for job in jobs:
-            if not isinstance(job, dict):
-                filtered_jobs.append(job)
-                continue
-            source_updated_at = to_utc_datetime(job.get("created_at"))
-            if source_updated_at is None or source_updated_at >= cutoff:
-                filtered_jobs.append(job)
-        return filtered_jobs
+        return self._filter_incremental_jobs(offers, updated_since, ["created_at"])
 
     def normalize(self, raw_job: Dict) -> Dict | None:
         slug = raw_job.get("_ats_slug")
@@ -69,9 +44,10 @@ class RecruiteeAdapter(ATSAdapter):
             logger.warning("Recruitee normalize missing _ats_slug", extra={"raw_job_id": raw_job.get("id")})
             return None
 
-        job_id = str(raw_job.get("id"))
-        if not job_id:
+        raw_id = raw_job.get("id")
+        if not raw_id:
             return None
+        job_id = str(raw_id)
 
         title = raw_job.get("title", "")
         location = raw_job.get("location", "")
@@ -79,15 +55,14 @@ class RecruiteeAdapter(ATSAdapter):
         department = raw_job.get("department", "")
         remote = raw_job.get("remote", False)
         
-        desc_parts = []
-        if raw_job.get("description"):
-            desc_parts.append(str(raw_job["description"]))
-        if raw_job.get("requirements"):
-            desc_parts.append("<h3>Requirements</h3>")
-            desc_parts.append(str(raw_job["requirements"]))
-            
-        full_desc = "\n\n".join(desc_parts)
-        cleaned_description = clean_description(full_desc, source=self.source_name)
+        description = self.build_description(raw_job, [
+            ("description", None),
+            ("requirements", "Requirements"),
+        ])
+        cleaned_description = clean_description(description, source=self.source_name)
+        
+        is_remote_location = "remote" in (location or "").lower()
+        is_remote = self.detect_remote(title, location, explicit_flag=(remote is True or is_remote_location))
         
         normalized_remote_scope = self.normalize_remote_scope(location if location else ("Remote" if remote else ""))
 
@@ -103,7 +78,7 @@ class RecruiteeAdapter(ATSAdapter):
             "company_name": company_name,
             "description": cleaned_description.strip(),
             "remote_scope": normalized_remote_scope,
-            "remote_source_flag": remote,
+            "remote_source_flag": is_remote,
             "source_url": url,
             "status": "new",
             "department": department,
@@ -116,7 +91,15 @@ class RecruiteeAdapter(ATSAdapter):
             
         return {
             "jobs_total": len(jobs),
-            "remote_hits": sum(1 for j in jobs if j.get("remote") or "remote" in str(j.get("location", "")).lower()),
+            "remote_hits": sum(
+                1 for j in jobs 
+                if self.detect_remote(
+                    j.get("title"), 
+                    j.get("location"), 
+                    explicit_flag=(bool(j.get("remote")) or "remote" in (j.get("location") or "").lower()), 
+                    is_probe=True
+                )
+            ),
             "recent_job_at": jobs[0].get("created_at") if jobs else None,
         }
 
