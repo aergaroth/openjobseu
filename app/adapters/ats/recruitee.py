@@ -21,7 +21,10 @@ class RecruiteeAdapter(ATSAdapter):
         url = f"https://{slug}.recruitee.com/api/offers"
         # Let exceptions bubble up to the worker for centralized error handling.
         # The base adapter uses `requests`, so we use `self.session`.
-        resp = self.session.get(url, timeout=15.0)
+        
+        # Explicitly ask Recruitee not to keep-alive the connection to prevent 
+        # [SSL: UNEXPECTED_EOF_WHILE_READING] warnings in logs caused by abrupt server closures.
+        resp = self.session.get(url, timeout=15.0, headers={"Connection": "close"})
         resp.raise_for_status()
 
         data = self._parse_json(resp, slug)

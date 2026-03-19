@@ -1,3 +1,8 @@
+"""
+Audits the /jobs/feed endpoint to analyze the distribution of geographic 
+restrictions and classifications among currently visible jobs.
+"""
+
 import requests
 from collections import Counter
 

@@ -7,7 +7,7 @@ from app.domain.compliance.classifiers.geo import classify_geo_scope
 def _make_job(job_id: str, first_seen_at: str) -> dict:
     return {
         "job_id": job_id,
-        "source": "remotive",
+        "source": "greenhouse:test",
         "source_job_id": job_id.split(":")[-1],
         "source_url": f"https://example.com/jobs/{job_id}",
         "title": "Backend Engineer",
@@ -114,7 +114,7 @@ def test_upsert_uses_source_first_seen_at():
     fake_init_db()
 
     source_first_seen = "2026-01-05T10:00:00+00:00"
-    job = _make_job("remotive:test-first-seen", source_first_seen)
+    job = _make_job("greenhouse:test-first-seen", source_first_seen)
     fake_upsert_job(job)
 
     row = _IN_MEMORY_JOBS.get(job["job_id"])
@@ -126,7 +126,7 @@ def test_upsert_uses_source_first_seen_at():
 def test_upsert_keeps_earliest_first_seen_at_on_conflict():
     fake_init_db()
 
-    job_id = "remotive:test-first-seen-conflict"
+    job_id = "greenhouse:test-first-seen-conflict"
     older = _make_job(job_id, "2026-01-05T10:00:00+00:00")
     newer = _make_job(job_id, "2026-01-07T10:00:00+00:00")
 
@@ -142,7 +142,7 @@ def test_upsert_keeps_earliest_first_seen_at_on_conflict():
 def test_upsert_persists_derived_compliance_classes():
     fake_init_db()
 
-    job = _make_job("remotive:test-classes", "2026-01-05T10:00:00+00:00")
+    job = _make_job("greenhouse:test-classes", "2026-01-05T10:00:00+00:00")
     job["remote_scope"] = "EU-wide"
     job["_compliance"] = {
         "policy_reason": None,
@@ -160,7 +160,7 @@ def test_upsert_persists_derived_compliance_classes():
 def test_upsert_marks_geo_non_eu_when_policy_flags_geo_restriction():
     fake_init_db()
 
-    job = _make_job("remotive:test-geo-restriction", "2026-01-05T10:00:00+00:00")
+    job = _make_job("greenhouse:test-geo-restriction", "2026-01-05T10:00:00+00:00")
     job["remote_scope"] = "Worldwide"
     job["_compliance"] = {
         "policy_reason": "geo_restriction",

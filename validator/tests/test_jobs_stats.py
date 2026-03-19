@@ -13,7 +13,7 @@ engine = get_engine()
 def _make_job(job_id: str) -> dict:
     return {
         "job_id": job_id,
-        "source": "remotive",
+        "source": "greenhouse:acme",
         "source_job_id": job_id.split(":")[-1],
         "source_url": f"https://example.com/jobs/{job_id}",
         "title": f"{job_id} title",

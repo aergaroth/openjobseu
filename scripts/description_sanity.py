@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+Audits and optionally cleans up job descriptions in the database using 
+predefined spam or garbage patterns (e.g., leftover tracking markers).
+"""
+
 
 import argparse
 import os

@@ -1,3 +1,8 @@
+"""
+One-off database migration script to backfill the `companies` table and `jobs.company_id`
+based on the distinct `company_name` strings currently stored in the `jobs` table.
+"""
+
 import os
 import sys
 import argparse

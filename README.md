@@ -134,6 +134,22 @@ pytest -q
 
 ---
 
+## Utility Scripts
+
+The `scripts/` directory contains various CLI tools for auditing, maintenance, and debugging:
+
+- **`preview_job.py`**: Fetches a raw job payload from an ATS provider and simulates normalization and compliance processing. Useful for debugging mappings.
+- **`tick-full-sync.sh`**: Triggers a full, non-incremental ingestion sync across all registered ATS companies, handling pagination and rate limits.
+- **`db_smoke_check.py`**: Performs a basic smoke test against the local DB and API to ensure correct ingestion and serving.
+- **`shadow_employer_compliance.py`**: Runs a shadow evaluation of the compliance engine against existing jobs to safely test policy changes.
+- **`description_sanity.py`**: Audits and optionally cleans up job descriptions using predefined spam or garbage patterns.
+- **`audit_html_leftovers.py`**: Scans the database for job descriptions that still contain unescaped HTML tags.
+- **`eu_scope_audit.py`**: Audits the public feed to analyze the distribution of geographic restrictions.
+- **`source_discovery_audit.py`**: Evaluates a specific ATS board token to determine if it's a strong candidate for ingestion.
+- **`migrate_jobs_to_companies.py`**: One-off migration script used to backfill company identities.
+
+---
+
 ## Infrastructure hint
 
 Terraform environments are split:

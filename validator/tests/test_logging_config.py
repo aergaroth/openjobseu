@@ -62,7 +62,7 @@ def test_json_formatter_renders_json_with_extras():
             "msg": "tick complete",
             "args": (),
             "ingested": 5,
-            "source": "remotive",
+            "source": "greenhouse:acme",
         }
     )
 
@@ -72,4 +72,4 @@ def test_json_formatter_renders_json_with_extras():
     assert payload["logger"] == "openjobseu.test"
     assert payload["message"] == "tick complete"
     assert payload["ingested"] == 5
-    assert payload["source"] == "remotive"
+    assert payload["source"] == "greenhouse:acme"

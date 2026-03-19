@@ -1,3 +1,8 @@
+"""
+Evaluates a specific Greenhouse board token to determine if it is a strong 
+candidate for ingestion by analyzing the volume of remote and EU-eligible jobs.
+"""
+
 import requests
 import time
 import sys

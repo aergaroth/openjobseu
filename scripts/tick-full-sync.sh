@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+#
+# Triggers a full synchronization (ingestion) of all registered ATS companies 
+# by overriding the incremental fetch limit. It calculates the necessary 
+# number of batches and safely handles potential Cloud Run timeouts.
+#
+
 set -eu
 
 # Priority:
