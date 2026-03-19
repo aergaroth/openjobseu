@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import logging
 from time import perf_counter
 import concurrent.futures
+from typing import Iterator
 
 import app.adapters.ats as ats  # noqa: F401
 from app.adapters.ats.registry import get_adapter
@@ -14,7 +15,7 @@ from storage.repositories.ats_repository import (
 )
 
 from app.workers.ingestion.log_helpers import log_ingestion
-from app.workers.ingestion.fetch import fetch_company_jobs
+from app.workers.ingestion.fetch import FetchCompanyJobsError, fetch_company_jobs
 from app.workers.ingestion.metrics import IngestionMetrics
 from app.workers.ingestion.process_loop import process_company_jobs
 
@@ -23,6 +24,49 @@ SOURCE = "employer_ing"
 
 GLOBAL_INCREMENTAL_FETCH = True
 GLOBAL_COMPANIES_LIMIT = 100
+
+
+def _merge_metrics(target: IngestionMetrics, source: IngestionMetrics):
+    target.normalized += source.normalized
+    target.accepted += source.accepted
+    target.skipped += source.skipped
+    target.rejected_policy_count += source.rejected_policy_count
+    target.hard_geo_rejected_count += source.hard_geo_rejected_count
+    target.salary_detected += source.salary_detected
+    target.salary_missing += source.salary_missing
+
+    for reason, count in source.rejected_by_reason.items():
+        target.rejected_by_reason[reason] += count
+
+    for remote_model, count in source.remote_model_counts.items():
+        target.remote_model_counts[remote_model] += count
+
+
+def _iter_job_batches(
+    raw_jobs: Iterator[dict],
+    batch_size: int,
+):
+    while True:
+        batch = []
+        fetch_error = None
+        completed = False
+
+        try:
+            for _ in range(batch_size):
+                batch.append(next(raw_jobs))
+        except StopIteration:
+            completed = True
+        except FetchCompanyJobsError as exc:
+            fetch_error = exc
+
+        if batch or fetch_error:
+            yield batch, fetch_error
+
+        if fetch_error:
+            break
+
+        if completed:
+            break
 
 
 def ingest_company(company: dict):
@@ -109,21 +153,31 @@ def ingest_company(company: dict):
         })
 
     engine = get_engine()
-    metrics = IngestionMetrics(fetched_count=len(raw_jobs))
+    metrics = IngestionMetrics()
     try:
         batch_size = 200
-        for i in range(0, len(raw_jobs), batch_size):
-            batch = raw_jobs[i : i + batch_size]
-            with engine.begin() as conn:
-                process_company_jobs(
-                    conn,
-                    batch,
-                    adapter,
-                    company_id,
-                    provider,
-                    metrics,
-                )
-                
+        for batch, fetch_error in _iter_job_batches(raw_jobs, batch_size):
+            metrics.fetched += len(batch)
+            if batch:
+                batch_metrics = IngestionMetrics()
+                with engine.begin() as conn:
+                    process_company_jobs(
+                        conn,
+                        batch,
+                        adapter,
+                        company_id,
+                        provider,
+                        batch_metrics,
+                    )
+                _merge_metrics(metrics, batch_metrics)
+
+            if fetch_error:
+                with engine.begin() as conn:
+                    mark_ats_synced(conn, company.get("company_ats_id"), success=False)
+                result = metrics.to_result_dict()
+                result["error"] = fetch_error.error_code
+                return _finalize(result)
+
         with engine.begin() as conn:
             mark_ats_synced(conn, company.get("company_ats_id"), success=True)
 
@@ -138,10 +192,10 @@ def ingest_company(company: dict):
             },
         )
         return _finalize({
-            "fetched": len(raw_jobs),
+            "fetched": metrics.fetched,
             "normalized_count": metrics.normalized,
-            "accepted": 0,
-            "skipped": 0,
+            "accepted": metrics.accepted,
+            "skipped": metrics.skipped,
             "error": "transaction_failed",
         })
 

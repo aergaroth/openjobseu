@@ -1,7 +1,7 @@
 import pytest
 import requests
 from unittest.mock import MagicMock
-from app.workers.ingestion.fetch import fetch_company_jobs
+from app.workers.ingestion.fetch import FetchCompanyJobsError, fetch_company_jobs
 
 def test_fetch_company_jobs_success():
     adapter = MagicMock()
@@ -10,7 +10,25 @@ def test_fetch_company_jobs_success():
     
     jobs, err = fetch_company_jobs(company, adapter)
     assert err is None
-    assert jobs == [{"id": 1}, {"id": 2}]
+    assert list(jobs) == [{"id": 1}, {"id": 2}]
+
+
+def test_fetch_company_jobs_wraps_mid_stream_network_error():
+    def _stream():
+        yield {"id": 1}
+        raise requests.ConnectionError("Connection dropped")
+
+    adapter = MagicMock()
+    adapter.fetch.return_value = _stream()
+    company = {"ats_provider": "greenhouse", "company_id": "c1", "ats_slug": "acme"}
+
+    jobs, err = fetch_company_jobs(company, adapter)
+
+    assert err is None
+    assert next(jobs) == {"id": 1}
+    with pytest.raises(FetchCompanyJobsError, match="fetch_network_failed") as exc_info:
+        next(jobs)
+    assert exc_info.value.error_code == "fetch_network_failed"
 
 def test_fetch_company_jobs_http_error_404():
     adapter = MagicMock()
