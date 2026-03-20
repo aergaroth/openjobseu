@@ -1,6 +1,6 @@
 resource "google_cloud_tasks_queue" "tick_pipeline" {
   name     = "openjobseu-tick-pipeline"
-  location = var.region
+  location = var.api_region
 
   rate_limits {
     max_concurrent_dispatches = 1
