@@ -128,6 +128,11 @@ resource "google_cloud_run_v2_service" "this" {
       }
 
       env {
+        name  = "PUBLIC_FEED_BUCKET"
+        value = "openjobseu.org"
+      }
+
+      env {
         name = "GOOGLE_API_KEY"
         value_source {
           secret_key_ref {
@@ -168,4 +173,10 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
   location = var.region
   role     = "roles/run.invoker"
   member   = "allUsers"
+}
+
+resource "google_storage_bucket_iam_member" "cloud_run_feed_write" {
+  bucket = "openjobseu.org"
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:cloudrun-prod-runtime@openjobseu.iam.gserviceaccount.com"
 }

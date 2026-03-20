@@ -1,6 +1,6 @@
 (() => {
   const API_BASE = "https://openjobseu-anobnjle6q-lz.a.run.app";
-  const FEED_URL = `${API_BASE}/jobs/feed`;
+  const FEED_URL = "/feed.json";
   const STATS_URL = `${API_BASE}/jobs/stats/compliance-7d`;
 
   const metaEl = document.getElementById("meta");

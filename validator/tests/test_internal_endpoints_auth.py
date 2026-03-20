@@ -34,7 +34,8 @@ def test_all_internal_routes_are_protected_structurally():
             if dep.dependency in (
                 require_user_login, 
                 require_user_api_access, 
-                require_internal_or_user_api_access
+                require_internal_or_user_api_access,
+                require_internal_access
             ):
                 has_auth = True
                 break
@@ -55,6 +56,7 @@ def test_internal_endpoints_functional_auth_rejection():
     app.dependency_overrides[require_user_login] = mock_unauthorized
     app.dependency_overrides[require_user_api_access] = mock_unauthorized
     app.dependency_overrides[require_internal_or_user_api_access] = mock_unauthorized
+    app.dependency_overrides[require_internal_access] = mock_unauthorized
 
     endpoints = [
         ("GET", "/internal/audit/jobs"),

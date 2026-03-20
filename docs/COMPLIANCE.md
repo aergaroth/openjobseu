@@ -34,7 +34,7 @@ OpenJobsEU uses deterministic, code-defined compliance stages:
    - `compliance_score`: `0..100`
 
 Public distribution uses this score conservatively:
-- `/jobs/feed` exposes only visible jobs with `compliance_score >= 80`
+- `feed.json` (static GCS export) exposes only visible jobs with `compliance_score >= 80`
 
 Current policy paths:
 - `employer_ing` uses policy v3 signals with hard geo restriction detection (`geo_restriction_hard`)

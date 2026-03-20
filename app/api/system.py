@@ -25,32 +25,30 @@ import app.workers.ingestion.employer as employer_worker
 
 logger = logging.getLogger("openjobseu.runtime")
 
-system_router = APIRouter(
-    tags=["internal-system"],
-    dependencies=[Depends(require_internal_or_user_api_access)],
-)
+system_ops_router = APIRouter(tags=["internal-system-ops"])
+system_hybrid_router = APIRouter(tags=["internal-system-hybrid"])
 
 TICK_SOURCE = "employer_ing"
 
 
-@system_router.get("/metrics")
+@system_hybrid_router.get("/metrics")
 def internal_metrics():
     return get_system_metrics()
 
 
-@system_router.post("/backfill-compliance")
+@system_ops_router.post("/backfill-compliance")
 def backfill_compliance(limit: int = Query(1000, ge=1, le=10000)):
     updated_count = backfill_missing_compliance_classes(limit=limit)
     return {"status": "ok", "updated_jobs_count": updated_count}
 
 
-@system_router.post("/backfill-salary")
+@system_ops_router.post("/backfill-salary")
 def backfill_salary(limit: int = Query(1000, ge=1, le=10000)):
     updated_count = backfill_missing_salary_fields(limit=limit)
     return {"status": "ok", "updated_jobs_count": updated_count}
 
 
-@system_router.post("/backfill-department")
+@system_ops_router.post("/backfill-department")
 def backfill_department():
     updated_count = backfill_missing_departments()
     return {"status": "ok", "updated_jobs_count": updated_count}
@@ -66,7 +64,7 @@ def _strip_html(obj):
     return obj
 
 
-@system_router.post("/preview-job")
+@system_hybrid_router.post("/preview-job")
 def preview_job_endpoint(provider: str, slug: str, job_id: str | None = None):
     try:
         adapter = get_adapter(provider)
@@ -122,7 +120,7 @@ def preview_job_endpoint(provider: str, slug: str, job_id: str | None = None):
     return Response(content="\n".join(output), media_type="text/plain")
 
 
-@system_router.post("/tick")
+@system_ops_router.post("/tick")
 def manual_tick(
     request: Request,
     response_format: str = Query("auto", alias="format", pattern="^(auto|text|json)$"),
@@ -139,7 +137,7 @@ def manual_tick(
     )
 
 
-@system_router.post("/tick/execute")
+@system_ops_router.post("/tick/execute")
 async def execute_tick(request: Request):
     body = await request.json()
     group = body.get("group", "all")
