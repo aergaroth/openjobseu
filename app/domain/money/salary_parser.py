@@ -55,13 +55,15 @@ NEGATIVE_CONTEXT_PATTERN = re.compile(
 
 CURRENCY_CONTEXT_PATTERN = re.compile(r"[€$£]|\b(?:eur|usd|gbp|pln|zł)\b")
 
+_CP = r"(?:[€$£]|\b(?:usd|eur|gbp|pln|zł)\b)"
+
 SALARY_REGEX_PATTERNS = [
-    (re.compile(r"(?:[€$£]|pln|zł)?\s*(\d{1,3}[\s,]?)\s?[kK]\s*[-–—]\s*(?:[€$£]|pln|zł)?\s*(\d{1,3}[\s,]?)\s?[kK]"), 1000, True, "k_range"), 
-    (re.compile(r"(?:[€$£]|pln|zł)?\s*(\d[\d\s,]{1,})\s*(?:[€$£]|pln|zł)?\s*[-–—]\s*(?:[€$£]|pln|zł)?\s*(\d[\d\s,]{1,})\s*(?:[€$£]|pln|zł)?"), 1, True, "spaced_thousands_range"),
-    (re.compile(r"(\d[\d\s,]{1,})\s*(?:[€$£]|pln|zł)\s+(\d[\d\s,]{1,})"), 1, True, "currency_separated_range"),
-    (re.compile(r"(\d[\d\s,]{1,})\s*(?:[-–—]\s*(\d[\d\s,]{1,}))?\s*(?:usd|eur|gbp|pln|zł|€|\$|£)?\s?/?\s?(?:per\s+)?(hour|hr|day|month|year|annum|yr)\b"), 1, True, "hourly_rate"),
-    (re.compile(r"(?:[€$£]|pln|zł)?\s*(\d{1,3}[\s,]?)\s?[kK]\b"), 1000, False, "k_single"),
-    (re.compile(r"(?:[€$£]|pln|zł)?\s*(\d[\d\s,]{1,})\b"), 1, False, "spaced_thousands_single"),
+    (re.compile(_CP + r"?\s*(\d{1,3}(?:[.,]\d{1,2})?)\s*(?:[kK])?\s*[-–—]\s*" + _CP + r"?\s*(\d{1,3}(?:[.,]\d{1,2})?)\s*[kK]\b\s*" + _CP + r"?"), 1000, True, "k_range"), 
+    (re.compile(_CP + r"?\s*(\d[\d\s,]{1,})\s*" + _CP + r"?\s*[-–—]\s*" + _CP + r"?\s*(\d[\d\s,]{1,})\s*" + _CP + r"?"), 1, True, "spaced_thousands_range"),
+    (re.compile(r"(\d[\d\s,]{1,})\s*" + _CP + r"\s+(\d[\d\s,]{1,})"), 1, True, "currency_separated_range"),
+    (re.compile(r"(\d[\d\s,]{1,})\s*(?:[-–—]\s*(\d[\d\s,]{1,}))?\s*" + _CP + r"?\s?/?\s?(?:per\s+)?(hour|hr|day|month|year|annum|yr)\b"), 1, True, "hourly_rate"),
+    (re.compile(_CP + r"?\s*(\d{1,3}(?:[.,]\d{1,2})?)\s*[kK]\b\s*" + _CP + r"?"), 1000, False, "k_single"),
+    (re.compile(_CP + r"?\s*(\d[\d\s,]{1,})\b\s*" + _CP + r"?"), 1, False, "spaced_thousands_single"),
 ]
 
 @dataclass
@@ -224,14 +226,24 @@ def _parse_salary_match(match_text: str, full_text: str) -> Optional[SalaryMatch
         match = pattern.search(match_text) 
         if match:
             try:
-                val1_str = match.group(1).replace(" ", "").replace(",", "")
-                val1 = int(val1_str) * multiplier
+                val1_str = match.group(1).replace(" ", "")
+                if pattern_name in ("k_range", "k_single"):
+                    val1_str = val1_str.replace(",", ".")
+                    val1 = float(val1_str) * multiplier
+                else:
+                    val1_str = val1_str.replace(",", "")
+                    val1 = float(val1_str) * multiplier
                 
                 if is_range:
                     val2_str = match.group(2)
                     if val2_str:
-                        val2_str = val2_str.replace(" ", "").replace(",", "")
-                        val2 = int(val2_str) * multiplier
+                        val2_str = val2_str.replace(" ", "")
+                        if pattern_name in ("k_range", "k_single"):
+                            val2_str = val2_str.replace(",", ".")
+                            val2 = float(val2_str) * multiplier
+                        else:
+                            val2_str = val2_str.replace(",", "")
+                            val2 = float(val2_str) * multiplier
                         salary_match.salary_min = min(val1, val2)
                         salary_match.salary_max = max(val1, val2)
                     else:
@@ -242,8 +254,9 @@ def _parse_salary_match(match_text: str, full_text: str) -> Optional[SalaryMatch
                     salary_match.salary_max = val1 
                 
                 salary_match.pattern_name = pattern_name
+                salary_match.salary_raw = match.group(0)
                 
-                salary_match.salary_currency = detect_currency(match_text) or detect_currency(full_text)
+                salary_match.salary_currency = detect_currency(salary_match.salary_raw) or detect_currency(match_text) or detect_currency(full_text)
 
                 if pattern_name == "hourly_rate":
                     period_str = match.groups()[-1]

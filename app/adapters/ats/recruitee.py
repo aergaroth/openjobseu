@@ -53,11 +53,31 @@ class RecruiteeAdapter(ATSAdapter):
         job_id = str(raw_id)
 
         title = raw_job.get("title", "")
-        location = raw_job.get("location", "")
+        
+        # Safely extract location from split fields if standard 'location' is missing
+        raw_location = raw_job.get("location")
+        city = raw_job.get("city")
+        country = raw_job.get("country")
+        
+        loc_parts = []
+        for loc_piece in [raw_location, city, country]:
+            if loc_piece and str(loc_piece).strip() and str(loc_piece).strip() not in loc_parts:
+                loc_parts.append(str(loc_piece).strip())
+        location = ", ".join(loc_parts)
+        
         url = raw_job.get("careers_url", "")
         department = raw_job.get("department", "")
         remote = raw_job.get("remote", False)
         
+        # Extract description from translations if top-level fields are missing
+        translations = raw_job.get("translations") or {}
+        translation_data = translations.get("en") or (next(iter(translations.values())) if translations else {})
+        
+        if not raw_job.get("description") and translation_data.get("description"):
+            raw_job["description"] = translation_data.get("description")
+        if not raw_job.get("requirements") and translation_data.get("requirements"):
+            raw_job["requirements"] = translation_data.get("requirements")
+
         description = self.build_description(raw_job, [
             ("description", None),
             ("requirements", "Requirements"),
@@ -98,8 +118,8 @@ class RecruiteeAdapter(ATSAdapter):
                 1 for j in jobs 
                 if self.detect_remote(
                     j.get("title"), 
-                    j.get("location"), 
-                    explicit_flag=(bool(j.get("remote")) or "remote" in (j.get("location") or "").lower()), 
+                    f"{j.get('location', '')} {j.get('country', '')}", 
+                    explicit_flag=(bool(j.get("remote")) or "remote" in str(j.get("location") or "").lower()), 
                     is_probe=True
                 )
             ),

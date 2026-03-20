@@ -75,5 +75,29 @@
     "currency": null,
     "period": "year",
     "confidence": 60
+  },
+  {
+    "text": "17–23K PLN or 4,5-6k USD net on B2B",
+    "min": 17000,
+    "max": 23000,
+    "currency": "PLN",
+    "period": "month",
+    "confidence": 70
+  },
+  {
+    "text": "100k - 120k USD lub 90k - 110k EUR",
+    "min": 100000,
+    "max": 120000,
+    "currency": "USD",
+    "period": "year",
+    "confidence": 80
+  },
+  {
+    "text": "Base salary £70,000 - £90,000 / $90,000 - $115,000",
+    "min": 70000,
+    "max": 90000,
+    "currency": "GBP",
+    "period": "year",
+    "confidence": 80
   }
 ]
