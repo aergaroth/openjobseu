@@ -38,11 +38,13 @@ variable "session_secret_key" {
   type        = string
   description = "Secret key for signing session cookies"
   sensitive   = true
+  default     = "dummy-session-key"
 }
 
 variable "allowed_auth_email" {
   type        = string
   description = "Email allowed to access the audit panel"
+  default     = "dummy@example.com"
 }
 
 variable "google_api_key" {
