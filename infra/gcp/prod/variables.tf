@@ -6,6 +6,12 @@ variable "project_id" {
 variable "region" {
   type        = string
   description = "GCP region"
+  default     = "europe-north1"
+}
+
+variable "api_region" {
+  type        = string
+  description = "API key"
   default     = "europe-west1"
 }
 
