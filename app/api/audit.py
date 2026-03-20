@@ -3,7 +3,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse
 
 from app.security.auth import require_user_login, require_user_api_access
@@ -176,10 +176,10 @@ def api_force_sync_ats(company_ats_id: str):
 
 
 @audit_api_router.post("/tick-dev")
-def run_tick_from_audit():
+def run_tick_from_audit(request: Request):
     # Lazy import to avoid circular dependency
     from app.api.system import tick
-    result = tick(force_text=True)
+    result = tick(request=request, force_text=True)
     if isinstance(result, Response):
         return result
     if isinstance(result, str):
