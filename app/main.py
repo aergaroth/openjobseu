@@ -11,7 +11,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from sqlalchemy import text
 from storage.db_engine import get_engine, db_healthcheck
-from app.internal import router as internal_router
+from app.api.router import router as internal_router
 from app.api.jobs import router as jobs_router
 from app.api.companies import router as companies_router
 from app.security.auth import auth_router, configure_oauth

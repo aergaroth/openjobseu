@@ -15,7 +15,7 @@ def test_api_force_sync_ats_success(monkeypatch):
             "company_id": "test-id",
             "legal_name": "Test Co",
         }
-    monkeypatch.setattr("app.internal.get_ats_integration_by_id", mock_get_ats)
+    monkeypatch.setattr("app.api.audit.get_ats_integration_by_id", mock_get_ats)
 
     # Mock adapter implementation
     class DummyAdapter:
@@ -28,7 +28,7 @@ def test_api_force_sync_ats_success(monkeypatch):
             return DummyAdapter()
         raise ValueError(f"Unknown provider: {provider}")
         
-    monkeypatch.setattr("app.internal.get_adapter", mock_get_adapter)
+    monkeypatch.setattr("app.api.audit.get_adapter", mock_get_adapter)
 
     # Request (Auth is bypassed automatically because testclient is whitelisted)
     response = client.post("/internal/audit/ats-force-sync/fake_id")
@@ -39,7 +39,7 @@ def test_api_force_sync_ats_success(monkeypatch):
 
 
 def test_api_force_sync_ats_not_found(monkeypatch):
-    monkeypatch.setattr("app.internal.get_ats_integration_by_id", lambda *args, **kwargs: None)
+    monkeypatch.setattr("app.api.audit.get_ats_integration_by_id", lambda *args, **kwargs: None)
 
     response = client.post("/internal/audit/ats-force-sync/unknown_id")
     

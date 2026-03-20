@@ -1,3 +1,5 @@
+from typing import List, Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, Query, Response
 from datetime import datetime, timezone
 
@@ -15,8 +17,56 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-@router.get("")
+class JobItem(BaseModel):
+    job_id: str
+    source: str
+    source_url: str
+    title: str
+    company_name: str
+    remote_scope: Optional[str] = None
+    status: str
+    first_seen_at: datetime
+    last_seen_at: Optional[datetime] = None
+
+class PaginatedJobsResponse(BaseModel):
+    items: List[JobItem]
+    total: int
+    limit: int
+    offset: int
+
+class FeedMeta(BaseModel):
+    generated_at: str
+    count: int
+    status: str
+    limit: int
+    version: str
+
+class FeedJobItem(BaseModel):
+    id: str
+    title: str
+    company: str
+    remote_scope: Optional[str] = None
+    source: str
+    url: str
+    first_seen_at: datetime
+    status: str
+
+class FeedResponse(BaseModel):
+    meta: FeedMeta
+    jobs: List[FeedJobItem]
+
+class ComplianceStatsResponse(BaseModel):
+    window: str
+    total_jobs: int
+    approved: int
+    review: int
+    rejected: int
+    approved_ratio_pct: Optional[float] = None
+
+
+@router.get("", response_model=PaginatedJobsResponse)
 def list_jobs(
+    response: Response,
     status: str | None = Query("visible"),
     q: str | None = Query(None, description="Fast fuzzy text search across title and company"),
     company: str | None = None,
@@ -24,8 +74,9 @@ def list_jobs(
     source: str | None = None,
     remote_scope: str | None = None,
     limit: int = Query(40, ge=1, le=100),
-    offset: int = Query(0, ge=0),
+    offset: int = Query(0, ge=0, le=10000, description="Pagination offset (max 10000)"),
 ):
+    response.headers["Cache-Control"] = "public, max-age=60"
     items, total = get_jobs_paginated(
         status=status,
         q=q,
@@ -57,7 +108,7 @@ def serialize_feed_job(job: dict) -> dict:
     }
 
 
-@router.get("/feed")
+@router.get("/feed", response_model=FeedResponse)
 def jobs_feed(response: Response):
     jobs = get_jobs(
         status="visible",
@@ -81,6 +132,7 @@ def jobs_feed(response: Response):
     return payload
 
 
-@router.get("/stats/compliance-7d")
-def jobs_compliance_stats_7d():
+@router.get("/stats/compliance-7d", response_model=ComplianceStatsResponse)
+def jobs_compliance_stats_7d(response: Response):
+    response.headers["Cache-Control"] = "public, max-age=300"
     return get_compliance_stats_last_7d()

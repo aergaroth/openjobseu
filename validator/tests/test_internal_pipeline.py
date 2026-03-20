@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-import app.internal as internal
+import app.api.system as system_api
 from app.main import app
 
 client = TestClient(app)
@@ -34,7 +34,7 @@ def pipeline_spy(monkeypatch):
         calls.append({})
         return _fake_pipeline_result()
 
-    monkeypatch.setattr(internal, "run_pipeline", _fake_run_pipeline)
+    monkeypatch.setattr(system_api, "run_pipeline", _fake_run_pipeline)
     return calls
 
 
@@ -54,7 +54,7 @@ def test_tick_runs_employer_pipeline(monkeypatch, pipeline_spy):
 
 
 def test_tick_forces_text_output_with_query_param(monkeypatch, pipeline_spy):
-    monkeypatch.setattr(internal, "should_use_text_logs", lambda: False)
+    monkeypatch.setattr(system_api, "should_use_text_logs", lambda: False)
 
     response = client.post("/internal/tick?format=text")
 
@@ -65,7 +65,7 @@ def test_tick_forces_text_output_with_query_param(monkeypatch, pipeline_spy):
 
 
 def test_tick_forces_json_output_with_query_param(monkeypatch, pipeline_spy):
-    monkeypatch.setattr(internal, "should_use_text_logs", lambda: True)
+    monkeypatch.setattr(system_api, "should_use_text_logs", lambda: True)
 
     response = client.post("/internal/tick?format=json")
 
