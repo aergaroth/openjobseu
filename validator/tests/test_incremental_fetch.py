@@ -16,7 +16,7 @@ def test_tick_endpoint_incremental_false(monkeypatch):
     monkeypatch.setattr(employer_worker, "GLOBAL_INCREMENTAL_FETCH", True)
     
     # Mock run_pipeline to avoid running the actual process in the endpoint test
-    with patch("app.internal.run_pipeline") as mock_pipeline:
+    with patch("app.api.system.run_pipeline") as mock_pipeline:
         mock_pipeline.return_value = {"status": "ok", "actions": []}
         
         # TestClient bypasses internal security by default (see: test_auth.py)
@@ -34,7 +34,7 @@ def test_tick_endpoint_limit_parameter(monkeypatch):
     # Ensure the default limit is set
     monkeypatch.setattr(employer_worker, "GLOBAL_COMPANIES_LIMIT", 100)
     
-    with patch("app.internal.run_pipeline") as mock_pipeline:
+    with patch("app.api.system.run_pipeline") as mock_pipeline:
         mock_pipeline.return_value = {"status": "ok", "actions": []}
         
         # Call with a custom limit

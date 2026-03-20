@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.security.auth import require_internal_or_user_api_access
-import app.internal as internal
+import app.api.tasks as tasks_api
 
 client = TestClient(app)
 
@@ -14,7 +14,7 @@ client = TestClient(app)
 @pytest.fixture(autouse=True)
 def clear_async_tasks():
     """Clear the ASYNC_TASKS registry before each test to ensure isolation."""
-    internal.ASYNC_TASKS.clear()
+    tasks_api.ASYNC_TASKS.clear()
     yield
 
 
@@ -36,7 +36,7 @@ def test_task_execution_and_log_capture(monkeypatch):
         logger.info("mocked discovery running")
         return {"mocked": "result"}
 
-    monkeypatch.setattr(internal, "run_discovery_pipeline", mock_discovery)
+    monkeypatch.setattr(tasks_api, "run_discovery_pipeline", mock_discovery)
 
     post_response = client.post("/internal/tasks/discovery")
     assert post_response.status_code == 200
@@ -64,7 +64,7 @@ def test_task_failure_handling(monkeypatch):
         logger.info("about to fail")
         raise ValueError("simulated error")
 
-    monkeypatch.setattr(internal, "run_ats_guessing", mock_failing_task)
+    monkeypatch.setattr(tasks_api, "run_ats_guessing", mock_failing_task)
 
     post_response = client.post("/internal/tasks/guess")
     assert post_response.status_code == 200
@@ -88,7 +88,7 @@ def test_task_log_truncation(monkeypatch):
             logger.info(f"log line {i}")
         return True
 
-    monkeypatch.setattr(internal, "run_careers_discovery", mock_chatty_task)
+    monkeypatch.setattr(tasks_api, "run_careers_discovery", mock_chatty_task)
     task_id = client.post("/internal/tasks/careers").json()["task_id"]
     logs = client.get(f"/internal/tasks/{task_id}").json()["logs"]
 
@@ -102,21 +102,21 @@ def test_task_log_truncation(monkeypatch):
 def test_cleanup_old_tasks():
     now = time.time()
     
-    internal.ASYNC_TASKS["t1"] = {"status": "completed", "finished_at": now - 100}
-    internal.ASYNC_TASKS["t2"] = {"status": "completed", "finished_at": now - 700}
-    internal.ASYNC_TASKS["t3"] = {"status": "failed", "finished_at": now - 800}
-    internal.ASYNC_TASKS["t4"] = {"status": "running"}  # Should not be deleted even if old
+    tasks_api.ASYNC_TASKS["t1"] = {"status": "completed", "finished_at": now - 100}
+    tasks_api.ASYNC_TASKS["t2"] = {"status": "completed", "finished_at": now - 700}
+    tasks_api.ASYNC_TASKS["t3"] = {"status": "failed", "finished_at": now - 800}
+    tasks_api.ASYNC_TASKS["t4"] = {"status": "running"}  # Should not be deleted even if old
     
-    internal._cleanup_old_tasks(retention_seconds=600)
+    tasks_api._cleanup_old_tasks(retention_seconds=600)
     
-    assert "t1" in internal.ASYNC_TASKS
-    assert "t2" not in internal.ASYNC_TASKS
-    assert "t3" not in internal.ASYNC_TASKS
-    assert "t4" in internal.ASYNC_TASKS
+    assert "t1" in tasks_api.ASYNC_TASKS
+    assert "t2" not in tasks_api.ASYNC_TASKS
+    assert "t3" not in tasks_api.ASYNC_TASKS
+    assert "t4" in tasks_api.ASYNC_TASKS
 
 
 def test_prevent_concurrent_tasks():
-    internal.ASYNC_TASKS["dummy_id"] = {
+    tasks_api.ASYNC_TASKS["dummy_id"] = {
         "task": "backfill-salary",
         "status": "running"
     }
@@ -150,7 +150,7 @@ def test_trigger_dorking_task(monkeypatch):
         logger.info("dorking discovery executed in background")
         return {"status": "ok", "discovered_slugs": 5}
 
-    monkeypatch.setattr(internal, "run_dorking_discovery", mock_dorking)
+    monkeypatch.setattr(tasks_api, "run_dorking_discovery", mock_dorking)
 
     response = client.post("/internal/tasks/dorking")
     assert response.status_code == 200

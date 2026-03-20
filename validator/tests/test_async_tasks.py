@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-import app.internal as internal_api
+import app.api.tasks as tasks_api
 
 client = TestClient(app)
 
@@ -12,7 +12,7 @@ def test_cancel_async_task_running(monkeypatch):
     mock_tasks = {
         task_id: {"status": "running", "task": "backfill-salary"}
     }
-    monkeypatch.setattr(internal_api, "ASYNC_TASKS", mock_tasks)
+    monkeypatch.setattr(tasks_api, "ASYNC_TASKS", mock_tasks)
 
     response = client.post(f"/internal/tasks/{task_id}/cancel")
     
@@ -26,7 +26,7 @@ def test_cancel_async_task_already_completed(monkeypatch):
     mock_tasks = {
         task_id: {"status": "completed", "task": "tick"}
     }
-    monkeypatch.setattr(internal_api, "ASYNC_TASKS", mock_tasks)
+    monkeypatch.setattr(tasks_api, "ASYNC_TASKS", mock_tasks)
 
     response = client.post(f"/internal/tasks/{task_id}/cancel")
     
@@ -36,14 +36,14 @@ def test_cancel_async_task_already_completed(monkeypatch):
 
 def test_cancel_async_task_not_found(monkeypatch):
     """Testuje błąd 404 dla nieistniejącego ID zadania."""
-    monkeypatch.setattr(internal_api, "ASYNC_TASKS", {})
+    monkeypatch.setattr(tasks_api, "ASYNC_TASKS", {})
     response = client.post("/internal/tasks/non-existent-id/cancel")
     assert response.status_code == 404
 
 def test_run_backfill_salary_task_respects_cancel_flag(monkeypatch):
     """Testuje czy główna pętla zadania backfill przerywa pracę gdy pojawi się flaga cancel."""
     task_id = "test-cancel-loop-123"
-    internal_api.ASYNC_TASKS[task_id] = {
+    tasks_api.ASYNC_TASKS[task_id] = {
         "status": "running",
         "task": "backfill-salary"
     }
@@ -54,13 +54,13 @@ def test_run_backfill_salary_task_respects_cancel_flag(monkeypatch):
         call_state["chunks_processed"] += 1
         if call_state["chunks_processed"] == 1:
             # Symulujemy kliknięcie anulowania przez użytkownika w trakcie trwania pierwszej paczki
-            internal_api.ASYNC_TASKS[task_id]["cancel_requested"] = True
+            tasks_api.ASYNC_TASKS[task_id]["cancel_requested"] = True
             return 5 # Przetworzono 5 ofert
         return 10 # Ta część kodu nigdy nie powinna zostać osiągnięta
 
-    monkeypatch.setattr(internal_api, "backfill_missing_salary_fields", mock_backfill)
+    monkeypatch.setattr(tasks_api, "backfill_missing_salary_fields", mock_backfill)
 
-    result = internal_api.run_backfill_salary_task(limit=100, task_id=task_id)
+    result = tasks_api.run_backfill_salary_task(limit=100, task_id=task_id)
 
     assert result == {"status": "cancelled", "updated_jobs_count": 5}
     assert call_state["chunks_processed"] == 1 # Funkcja powinna wywołać backfill tylko raz i zrzucić pętlę

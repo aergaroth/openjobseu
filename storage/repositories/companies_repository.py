@@ -36,4 +36,4 @@ def get_companies_paginated(
         """
         rows = conn.execute(text(query), params).mappings().all()
 
-    return [dict(r) for r in rows], total or 0
+    return [dict(r, company_id=str(r["company_id"])) for r in rows], total or 0

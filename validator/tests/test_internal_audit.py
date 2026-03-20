@@ -8,7 +8,8 @@ os.environ.setdefault("DB_MODE", "standard")
 
 from fastapi.testclient import TestClient
 
-import app.internal as internal_api
+import app.api.system as system_api
+import app.api.discovery as discovery_api
 from app.domain.taxonomy.enums import ComplianceStatus, GeoClass, RemoteClass
 from app.main import app
 from storage.repositories.jobs_repository import upsert_job
@@ -229,7 +230,7 @@ def test_internal_audit_tick_dev_runs_tick_with_text_output(monkeypatch):
         captured["force_text"] = force_text
         return "tick as text"
 
-    monkeypatch.setattr(internal_api, "tick", fake_tick)
+    monkeypatch.setattr(system_api, "tick", fake_tick)
 
     response = client.post("/internal/audit/tick-dev")
     assert response.status_code == 200
@@ -595,7 +596,7 @@ def test_internal_discovery_run_returns_metrics(monkeypatch):
         }
     }
     
-    monkeypatch.setattr(internal_api, "run_discovery_pipeline", lambda: fake_result)
+    monkeypatch.setattr(discovery_api, "run_discovery_pipeline", lambda: fake_result)
     
     response = client.post("/internal/discovery/run")
     assert response.status_code == 200

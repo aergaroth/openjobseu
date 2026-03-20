@@ -59,7 +59,7 @@ def test_ready_endpoint_returns_503_when_not_bootstrapped(client):
 @pytest.fixture(autouse=True)
 def _mock_tick(monkeypatch):
     monkeypatch.setattr(
-        "app.internal.run_pipeline",
+        "app.api.system.run_pipeline",
         lambda *args, **kwargs: {
             "actions": ["smoke"],
             "metrics": {"tick_duration_ms": 1},

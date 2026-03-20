@@ -14,9 +14,10 @@ def _insert_company(conn, name: str):
     conn.execute(
         text("""
             INSERT INTO companies (
-                company_id, legal_name, brand_name, hq_country, remote_posture, is_active, created_at, updated_at
+                company_id, legal_name, brand_name, hq_country, remote_posture, is_active, 
+                approved_jobs_count, total_jobs_count, created_at, updated_at
             ) VALUES (
-                :id, :name, :name, 'PL', 'UNKNOWN', true, NOW(), NOW()
+                :id, :name, :name, 'PL', 'UNKNOWN', true, 0, 0, NOW(), NOW()
             )
         """),
         {"id": str(uuid.uuid4()), "name": name}
@@ -32,6 +33,9 @@ def test_list_companies_pagination_structure():
     response = client.get("/companies?limit=2&offset=1")
     assert response.status_code == 200
     data = response.json()
+    
+    assert "cache-control" in response.headers
+    assert "max-age=60" in response.headers["cache-control"]
 
     assert "items" in data
     assert "total" in data
