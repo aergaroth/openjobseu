@@ -1,7 +1,8 @@
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
+from google.oauth2 import id_token
 
 from app.main import app
 from app.security.auth import (
@@ -9,6 +10,7 @@ from app.security.auth import (
     require_user_api_access,
     require_internal_or_user_api_access,
 )
+from app.security.internal_access import require_internal_access
 
 client = TestClient(app)
 
@@ -70,3 +72,49 @@ def test_internal_endpoints_functional_auth_rejection():
             assert response.json()["detail"] == "Mocked Auth Reject"
     finally:
         app.dependency_overrides.clear()
+
+
+def test_require_internal_access_with_valid_oidc(monkeypatch):
+    """Testuje czy poprawny token OIDC autoryzuje żądanie z zewnątrz."""
+    # 1. Zmockuj weryfikację tokenu przez bibliotekę Google
+    def mock_verify_oauth2_token(token, request, audience=None):
+        if token == "valid-mock-token":
+            return {"email": "scheduler-internal@example.com"}
+        raise ValueError("Invalid token signature")
+        
+    monkeypatch.setattr(id_token, "verify_oauth2_token", mock_verify_oauth2_token)
+    monkeypatch.setenv("SCHEDULER_SA_EMAIL", "scheduler-internal@example.com")
+
+    # 2. Skonstruuj fałszywy obiekt żądania (pochodzący spoza localhost/testclient)
+    scope = {
+        "type": "http",
+        "client": ("198.51.100.1", 12345), # Zewnętrzny adres IP
+        "headers": [(b"authorization", b"Bearer valid-mock-token")]
+    }
+    request = Request(scope)
+
+    # 3. Jeśli token jest prawidłowy, funkcja nie powinna rzucić wyjątku
+    assert require_internal_access(request) is None
+
+
+def test_require_internal_access_unauthorized_email_oidc(monkeypatch):
+    """Testuje czy poprawny token, ale nieuprawniony e-mail zostanie odrzucony."""
+    def mock_verify_oauth2_token(token, request, audience=None):
+        return {"email": "hacker@evil.com"}
+        
+    monkeypatch.setattr(id_token, "verify_oauth2_token", mock_verify_oauth2_token)
+    monkeypatch.setenv("SCHEDULER_SA_EMAIL", "scheduler-internal@example.com")
+    monkeypatch.setenv("ALLOWED_AUTH_EMAIL", "admin@example.com")
+
+    scope = {
+        "type": "http",
+        "client": ("198.51.100.1", 12345),
+        "headers": [(b"authorization", b"Bearer valid-mock-token")]
+    }
+    request = Request(scope)
+
+    # Oczekujemy, że FastAPI rzuci wyjątek autoryzacji
+    with pytest.raises(HTTPException) as exc:
+        require_internal_access(request)
+        
+    assert exc.value.status_code == 401

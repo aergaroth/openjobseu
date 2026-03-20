@@ -107,12 +107,16 @@ resource "google_cloud_run_v2_service" "this" {
         value = random_password.internal_secret.result
       }
       env {
+        name  = "SCHEDULER_SA_EMAIL"
+        value = google_service_account.scheduler_sa.email
+      }
+      env {
         name  = "TICK_TASK_QUEUE_PROJECT"
         value = var.project_id
       }
       env {
         name  = "TICK_TASK_QUEUE_LOCATION"
-        value = var.api_region
+        value = var.queue_region
       }
       env {
         name  = "TICK_TASK_QUEUE_NAME"
