@@ -99,7 +99,8 @@ def run_pipeline(group: str = "all", context: dict[str, Any] | None = None) -> d
         "tick_finished",
         extra={
             "component": "pipeline",
-            "phase": "pipeline_completed",
+            "phase": "tick_finished",
+            "pipeline_status": "pipeline_completed",
             "group": group,
             "tick_started_at": tick_started_at,
             "tick_finished_at": tick_finished_at,

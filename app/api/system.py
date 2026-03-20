@@ -165,21 +165,25 @@ async def execute_tick(request: Request):
 
 def tick(
     *,
-    request: Request,
+    request: Request | None = None,
     response_format: str = "auto",
     force_text: bool = False,
     group: str = "all",
     incremental: bool = True,
     limit: int = 100,
 ):
-    queue_configured = is_tick_queue_configured()
+    queue_configured = is_tick_queue_configured() and request is not None
     context = build_tick_context(
         request=request,
         group=group,
         incremental=incremental,
         limit=limit,
         execution_mode="async_trigger" if queue_configured else "sync_request",
-        trigger_source="cloud_scheduler" if request.headers.get("x-cloudscheduler-jobname") else "manual_request",
+        trigger_source=(
+            "cloud_scheduler"
+            if request is not None and request.headers.get("x-cloudscheduler-jobname")
+            else "manual_request"
+        ),
     )
 
     if queue_configured:
