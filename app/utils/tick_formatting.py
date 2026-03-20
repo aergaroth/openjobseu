@@ -2,6 +2,20 @@ from app.domain.taxonomy.enums import RemoteClass
 
 
 def format_tick_summary(payload: dict) -> str:
+    if payload.get("phase") == "trigger_accepted":
+        lines = [
+            f"Tick accepted ({payload.get('mode')})",
+            "=" * 60,
+            "",
+            f"tick_id={payload.get('tick_id')}",
+            f"request_id={payload.get('request_id')}",
+            f"group={payload.get('group')}",
+            f"scheduler_execution={payload.get('scheduler_execution')}",
+            f"task_name={payload.get('task_name')}",
+            "",
+        ]
+        return "\n".join(lines)
+
     metrics = payload.get("metrics", {})
     ingestion = metrics.get("ingestion", {})
     per_source = ingestion.get("per_source", {})

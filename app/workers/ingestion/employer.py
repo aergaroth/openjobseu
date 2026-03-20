@@ -14,6 +14,7 @@ from storage.repositories.ats_repository import (
     mark_ats_synced,
 )
 
+from app.utils.tick_context import get_current_tick_context
 from app.workers.ingestion.log_helpers import log_ingestion
 from app.workers.ingestion.fetch import FetchCompanyJobsError, fetch_company_jobs
 from app.workers.ingestion.metrics import IngestionMetrics
@@ -24,6 +25,7 @@ SOURCE = "employer_ing"
 
 GLOBAL_INCREMENTAL_FETCH = True
 GLOBAL_COMPANIES_LIMIT = 100
+INGESTION_POOL_TIMEOUT_SECONDS = 1740
 
 
 def _merge_metrics(target: IngestionMetrics, source: IngestionMetrics):
@@ -75,6 +77,7 @@ def ingest_company(company: dict):
     updated_since = company.get("last_sync_at") if GLOBAL_INCREMENTAL_FETCH else None
     company_id = str(company.get("company_id") or "")
     ats_slug = company.get("ats_slug")
+    tick_context = get_current_tick_context()
 
     logger.info(
         "company_ingestion_start",
@@ -82,6 +85,7 @@ def ingest_company(company: dict):
             "company_id": company_id,
             "ats_provider": provider,
             "ats_slug": ats_slug,
+            **tick_context,
         },
     )
 
@@ -99,6 +103,7 @@ def ingest_company(company: dict):
                 "skipped": res.get("skipped", 0),
                 "error": res.get("error"),
                 "salary_detected": res.get("salary_detected", 0),
+                **tick_context,
             },
         )
         return res
@@ -112,6 +117,7 @@ def ingest_company(company: dict):
                 "company_id": company.get("company_id"),
                 "ats_provider": company.get("ats_provider"),
                 "ats_slug": company.get("ats_slug"),
+                **tick_context,
             },
         )
         return _finalize({
@@ -129,6 +135,7 @@ def ingest_company(company: dict):
                 "company_id": company.get("company_id"),
                 "ats_provider": provider,
                 "ats_slug": company.get("ats_slug"),
+                **tick_context,
             },
         )
         return _finalize({
@@ -189,6 +196,7 @@ def ingest_company(company: dict):
                 "company_id": company_id,
                 "ats_provider": provider,
                 "ats_slug": ats_slug,
+                **tick_context,
             },
         )
         return _finalize({
@@ -231,6 +239,7 @@ def run_employer_ingestion() -> dict:
     total_hard_geo_rejected = 0
 
     try:
+        tick_context = get_current_tick_context()
         companies_load_started = perf_counter()
         with engine.connect() as conn:
             companies = load_active_ats_companies(conn, limit=GLOBAL_COMPANIES_LIMIT)
@@ -243,14 +252,19 @@ def run_employer_ingestion() -> dict:
             raw_count=total_companies,
             companies_processed=total_companies,
             companies_load_duration_ms=companies_load_duration_ms,
+            **tick_context,
         )
 
         ingestion_loop_started = perf_counter()
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
         try:
             futures = {executor.submit(ingest_company, company): company for company in companies}
-            # Podnosimy maksymalny czas by dopasować do środowisk w tle (np. 55 minut)
-            for future in concurrent.futures.as_completed(futures, timeout=3300):
+            # Bufor poniżej deadline Cloud Tasks (30 min) pozwala zalogować timeout
+            # przed twardym ucięciem requestu HTTP przez platformę.
+            for future in concurrent.futures.as_completed(
+                futures,
+                timeout=INGESTION_POOL_TIMEOUT_SECONDS,
+            ):
                 try:
                     result = future.result()
 
@@ -285,11 +299,19 @@ def run_employer_ingestion() -> dict:
                             "company_id": str(company_context.get("company_id") or ""),
                             "ats_provider": company_context.get("ats_provider"),
                             "ats_slug": company_context.get("ats_slug"),
+                            **tick_context,
                         }
                     )
                     companies_failed += 1
         except concurrent.futures.TimeoutError:
-            logger.error("employer_ingestion_pool_timeout", extra={"msg": "Thread pool exhausted on hanging adapters", "timeout_sec": 3300})
+            logger.error(
+                "employer_ingestion_pool_timeout",
+                extra={
+                    "msg": "Thread pool exceeded Cloud Tasks-compatible deadline",
+                    "timeout_sec": INGESTION_POOL_TIMEOUT_SECONDS,
+                    **tick_context,
+                },
+            )
         finally:
             # Niezwykle ważne: wait=False sprawi, że główny wątek (API/Worker) ucieknie 
             # i dokończy tick, a cancel_futures przerwie oczekujące zadania w kolejce!
@@ -318,6 +340,7 @@ def run_employer_ingestion() -> dict:
             ingestion_loop_duration_ms=ingestion_loop_duration_ms,
             duration_ms=duration_ms,
             error=str(exc),
+            **tick_context,
         )
         raise
 
@@ -340,6 +363,7 @@ def run_employer_ingestion() -> dict:
         companies_load_duration_ms=companies_load_duration_ms,
         ingestion_loop_duration_ms=ingestion_loop_duration_ms,
         duration_ms=duration_ms,
+        **tick_context,
     )
 
     return {
@@ -364,6 +388,7 @@ def run_employer_ingestion() -> dict:
             "accepted_jobs": total_accepted,
             "hard_geo_rejected_count": total_hard_geo_rejected,
             "duration_ms": duration_ms,
+            **tick_context,
         },
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
