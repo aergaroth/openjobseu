@@ -47,7 +47,7 @@ resource "google_secret_manager_secret_iam_member" "cloud_run_google_cse_id" {
 resource "google_cloud_run_v2_service" "this" {
   name     = var.service_name
   location = var.region
-  deletion_protection = true
+  deletion_protection = false
 
   template {
 
