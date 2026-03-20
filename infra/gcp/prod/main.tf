@@ -112,7 +112,7 @@ resource "google_cloud_run_v2_service" "this" {
       }
       env {
         name  = "TICK_TASK_QUEUE_LOCATION"
-        value = var.scheduler_region
+        value = var.region
       }
       env {
         name  = "TICK_TASK_QUEUE_NAME"
