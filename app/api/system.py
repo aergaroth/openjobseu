@@ -1,12 +1,15 @@
+import json
 import logging
 import re
-import json
+from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
 from app.security.auth import require_internal_or_user_api_access
 
 from app.logging import should_use_text_logs
+from app.utils.cloud_tasks import create_tick_task, is_tick_queue_configured
+from app.utils.tick_context import build_tick_context
 from app.utils.tick_formatting import format_tick_summary
 import app.adapters.ats as ats  # noqa: F401
 from app.adapters.ats.registry import get_adapter
@@ -71,7 +74,7 @@ def preview_job_endpoint(provider: str, slug: str, job_id: str | None = None):
         raise HTTPException(status_code=400, detail=str(e))
 
     output = [f"Fetching jobs for '{slug}' via '{provider}'...\n"]
-    
+
     try:
         raw_jobs = adapter.fetch({"ats_slug": slug})
     except Exception as e:
@@ -87,7 +90,7 @@ def preview_job_endpoint(provider: str, slug: str, job_id: str | None = None):
         normalized = adapter.normalize(raw_job)
         if not normalized:
             continue
-        
+
         if job_id and str(normalized.get("source_job_id")) != str(job_id):
             continue
 
@@ -101,9 +104,9 @@ def preview_job_endpoint(provider: str, slug: str, job_id: str | None = None):
         output.append("\n" + "=" * 80)
         output.append("COMPLIANCE & PROCESSING REPORT:")
         processed_job, report = process_ingested_job(normalized, source=f"debug:{provider}")
-        
+
         output.append(json.dumps(report, indent=2, ensure_ascii=False))
-        
+
         output.append("\nPROCESSED JOB (FINAL):")
         if processed_job:
             processed_job.pop("description", None)  # Omit long description for terminal readability
@@ -120,21 +123,171 @@ def preview_job_endpoint(provider: str, slug: str, job_id: str | None = None):
 
 
 @system_router.post("/tick")
-def manual_tick(response_format: str = Query("auto", alias="format", pattern="^(auto|text|json)$"), group: str = Query("all", pattern="^(all|ingestion|maintenance)$"), incremental: bool = Query(True, description="Enable incremental fetch based on last sync date"), limit: int = Query(100, ge=1, le=1000, description="Limit the number of companies processed in this tick")):
-    return tick(response_format=response_format, group=group, incremental=incremental, limit=limit)
+def manual_tick(
+    request: Request,
+    response_format: str = Query("auto", alias="format", pattern="^(auto|text|json)$"),
+    group: str = Query("all", pattern="^(all|ingestion|maintenance)$"),
+    incremental: bool = Query(True, description="Enable incremental fetch based on last sync date"),
+    limit: int = Query(100, ge=1, le=1000, description="Limit the number of companies processed in this tick"),
+):
+    return tick(
+        request=request,
+        response_format=response_format,
+        group=group,
+        incremental=incremental,
+        limit=limit,
+    )
 
 
-def tick(*, response_format: str = "auto", force_text: bool = False, group: str = "all", incremental: bool = True, limit: int = 100):
+@system_router.post("/tick/execute")
+async def execute_tick(request: Request):
+    body = await request.json()
+    group = body.get("group", "all")
+    incremental = bool(body.get("incremental", True))
+    limit = int(body.get("limit", 100))
+    response_format = body.get("response_format", "json")
+
+    context = build_tick_context(
+        request=request,
+        request_id=request.headers.get("x-request-id") or body.get("request_id"),
+        tick_id=request.headers.get("x-tick-id") or body.get("tick_id"),
+        group=group,
+        incremental=incremental,
+        limit=limit,
+        execution_mode="async_task",
+        trigger_source="cloud_tasks",
+        scheduler_job_name=request.headers.get("x-scheduler-job-name") or body.get("scheduler_job_name"),
+        scheduler_schedule_time=request.headers.get("x-scheduler-schedule-time") or body.get("scheduler_schedule_time"),
+        task_name=request.headers.get("x-cloudtasks-taskname"),
+    )
+    return _execute_tick(response_format=response_format, force_text=False, context=context)
+
+
+def tick(
+    *,
+    request: Request | None = None,
+    response_format: str = "auto",
+    force_text: bool = False,
+    group: str = "all",
+    incremental: bool = True,
+    limit: int = 100,
+):
+    queue_configured = is_tick_queue_configured() and request is not None
+    context = build_tick_context(
+        request=request,
+        group=group,
+        incremental=incremental,
+        limit=limit,
+        execution_mode="async_trigger" if queue_configured else "sync_request",
+        trigger_source=(
+            "cloud_scheduler"
+            if request is not None and request.headers.get("x-cloudscheduler-jobname")
+            else "manual_request"
+        ),
+    )
+
+    if queue_configured:
+        return _enqueue_tick(
+            request=request,
+            response_format=response_format,
+            force_text=force_text,
+            context=context,
+        )
+
+    return _execute_tick(
+        response_format=response_format,
+        force_text=force_text,
+        context={**context, "execution_mode": "sync_request", "trigger_source": "direct_request"},
+    )
+
+
+def _enqueue_tick(*, request: Request, response_format: str, force_text: bool, context: dict):
+    query = urlencode({"group": context["group"]})
+    handler_url = f"{str(request.base_url).rstrip('/')}/internal/tick/execute?{query}"
+    task_response = create_tick_task(
+        task_id=context["tick_id"],
+        handler_url=handler_url,
+        payload={
+            "tick_id": context["tick_id"],
+            "request_id": context["request_id"],
+            "group": context["group"],
+            "incremental": context["incremental"],
+            "limit": context["limit"],
+            "response_format": "json",
+            "scheduler_job_name": context.get("scheduler_job_name"),
+            "scheduler_schedule_time": context.get("scheduler_schedule_time"),
+        },
+        headers={
+            "Content-Type": "application/json",
+            "X-Internal-Secret": request.headers.get("x-internal-secret", ""),
+            "X-Request-Id": context["request_id"],
+            "X-Tick-Id": context["tick_id"],
+            "X-Scheduler-Job-Name": context.get("scheduler_job_name", ""),
+            "X-Scheduler-Schedule-Time": context.get("scheduler_schedule_time", ""),
+        },
+    )
+
+    payload = {
+        "status": "accepted",
+        "phase": "trigger_accepted",
+        "mode": "prod",
+        "sources": [TICK_SOURCE] if context["group"] in ("all", "ingestion") else [],
+        "tick_id": context["tick_id"],
+        "request_id": context["request_id"],
+        "group": context["group"],
+        "incremental": context["incremental"],
+        "limit": context["limit"],
+        "scheduler_job_name": context.get("scheduler_job_name"),
+        "scheduler_schedule_time": context.get("scheduler_schedule_time"),
+        "scheduler_execution": context.get("scheduler_execution"),
+        "task_name": task_response.get("name"),
+    }
+
+    logger.info("tick_trigger_accepted", extra={"component": "runtime", **payload})
+
+    render_mode = (response_format or "auto").strip().lower()
+    if force_text:
+        render_mode = "text"
+    if render_mode == "text" or (render_mode == "auto" and should_use_text_logs()):
+        return Response(
+            content=format_tick_summary(payload),
+            media_type="text/plain",
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False),
+        media_type="application/json",
+        status_code=status.HTTP_202_ACCEPTED,
+    )
+
+
+def _execute_tick(*, response_format: str, force_text: bool, context: dict):
     ingestion_mode = "prod"
-    tick_sources = [TICK_SOURCE] if group in ("all", "ingestion") else []
-    employer_worker.GLOBAL_INCREMENTAL_FETCH = incremental
-    employer_worker.GLOBAL_COMPANIES_LIMIT = limit
+    tick_sources = [TICK_SOURCE] if context["group"] in ("all", "ingestion") else []
+    employer_worker.GLOBAL_INCREMENTAL_FETCH = context["incremental"]
+    employer_worker.GLOBAL_COMPANIES_LIMIT = context["limit"]
 
-    logger.info("tick_start", extra={"component": "runtime", "phase": "tick_start", "mode": ingestion_mode, "sources": tick_sources, "group": group, "incremental": incremental, "limit": limit})
+    logger.info(
+        "tick_execution_started",
+        extra={
+            "component": "runtime",
+            "phase": "tick_execution_started",
+            "mode": ingestion_mode,
+            "sources": tick_sources,
+            **context,
+        },
+    )
 
-    result = run_pipeline(group=group)
+    result = run_pipeline(group=context["group"], context=context)
 
-    payload = {"status": "ok", "mode": ingestion_mode, "sources": tick_sources, **result}
+    payload = {
+        "status": "completed",
+        "phase": "pipeline_completed",
+        "mode": ingestion_mode,
+        "sources": tick_sources,
+        **result,
+    }
 
     render_mode = (response_format or "auto").strip().lower()
     if force_text:
