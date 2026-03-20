@@ -53,7 +53,7 @@ resource "google_cloud_run_v2_service" "this" {
 
     service_account = "cloudrun-prod-runtime@openjobseu.iam.gserviceaccount.com"
 
-    timeout = "180s"
+    timeout = "1800s"
 
     containers {
       image = var.image
@@ -105,6 +105,22 @@ resource "google_cloud_run_v2_service" "this" {
       env {
         name  = "INTERNAL_SECRET"
         value = random_password.internal_secret.result
+      }
+      env {
+        name  = "TICK_TASK_QUEUE_PROJECT"
+        value = var.project_id
+      }
+      env {
+        name  = "TICK_TASK_QUEUE_LOCATION"
+        value = var.region
+      }
+      env {
+        name  = "TICK_TASK_QUEUE_NAME"
+        value = google_cloud_tasks_queue.tick_pipeline.name
+      }
+      env {
+        name  = "TICK_TASK_DISPATCH_DEADLINE"
+        value = "1800s"
       }
 
       env {
