@@ -71,74 +71,80 @@ def _fetch_github_remote_companies():
 
 
 def run_company_source_discovery():
-    start_time = time.perf_counter()
-
-    engine = get_engine()
-
-    with engine.connect() as conn:
-        existing_names = get_existing_brand_names(conn)
-
+    started = time.perf_counter()
     metrics = {
         "companies_found": 0,
         "companies_inserted": 0,
         "companies_skipped": 0,
     }
 
-    # Aggregate sources
-    sources = [
-        _fetch_github_remote_companies(),
-    ]
-    companies = [item for sublist in sources for item in sublist]
+    try:
+        engine = get_engine()
+        with engine.connect() as conn:
+            existing_names = get_existing_brand_names(conn)
 
-    total = len(companies)
-    for idx, c in enumerate(companies, 1):
-        metrics["companies_found"] += 1
+        # Aggregate sources
+        sources = [
+            _fetch_github_remote_companies(),
+        ]
+        companies = [item for sublist in sources for item in sublist]
 
-        name = c.get("name") or "Unknown"
-        if name.lower() in existing_names:
-            metrics["companies_skipped"] += 1
-            continue
+        total = len(companies)
+        for idx, c in enumerate(companies, 1):
+            metrics["companies_found"] += 1
 
-        homepage = c.get("url")
-        if not homepage:
-            continue
-
-        candidate_urls = _guess_careers(homepage)
-        careers_url = None
-        for url in candidate_urls:
-            try:
-                # Use a HEAD request for efficiency to find the first working URL
-                response = requests.head(url, timeout=3, allow_redirects=True, verify=False)
-                if response.ok:
-                    careers_url = response.url  # Use the final URL after redirects
-                    break
-            except requests.RequestException:
+            name = c.get("name") or "Unknown"
+            if name.lower() in existing_names:
+                metrics["companies_skipped"] += 1
                 continue
 
-        try:
-            with engine.begin() as conn:
-                inserted = insert_source_company(
-                    conn,
-                    name=name,
-                    careers_url=careers_url,
-                )
+            homepage = c.get("url")
+            if not homepage:
+                continue
 
-            if inserted:
-                metrics["companies_inserted"] += 1
-                existing_names.add(name.lower())
-        except Exception as exc:
-            logger.error(f"error processing company in company_sources [{name}]: {exc}", exc_info=True)
-            
-        if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
-            pct = int((idx / total) * 100)
-            filled = int(20 * idx / total)
-            bar = "█" * filled + "-" * (20 - filled)
-            logger.info(f"company_sources progress: [{bar}] {pct}% ({idx}/{total})")
+            candidate_urls = _guess_careers(homepage)
+            careers_url = None
+            for url in candidate_urls:
+                try:
+                    # Use a HEAD request for efficiency to find the first working URL
+                    response = requests.head(url, timeout=3, allow_redirects=True, verify=False)
+                    if response.ok:
+                        careers_url = response.url  # Use the final URL after redirects
+                        break
+                except requests.RequestException:
+                    continue
 
-    metrics["duration_ms"] = int((time.perf_counter() - start_time) * 1000)
-    logger.info(
-        "company_source_discovery",
-        extra=metrics
-    )
+            try:
+                with engine.begin() as conn:
+                    inserted = insert_source_company(
+                        conn,
+                        name=name,
+                        careers_url=careers_url,
+                    )
+
+                if inserted:
+                    metrics["companies_inserted"] += 1
+                    existing_names.add(name.lower())
+            except Exception as exc:
+                logger.error(f"error processing company in company_sources [{name}]: {exc}", exc_info=True)
+                
+            if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
+                pct = int((idx / total) * 100)
+                filled = int(20 * idx / total)
+                bar = "█" * filled + "-" * (20 - filled)
+                logger.info(f"company_sources progress: [{bar}] {pct}% ({idx}/{total})")
+    except Exception as exc:
+        logger.error(
+            "company_sources pipeline failed",
+            exc_info=True,
+            extra={"component": "discovery", "phase": "company_sources"}
+        )
+        raise
+    finally:
+        metrics["duration_ms"] = int((time.perf_counter() - started) * 1000)
+        logger.info(
+            "company_source_discovery",
+            extra=metrics
+        )
 
     return metrics

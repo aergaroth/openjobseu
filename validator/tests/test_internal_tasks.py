@@ -1,3 +1,4 @@
+import os
 import logging
 import pytest
 from fastapi.testclient import TestClient
@@ -52,3 +53,21 @@ def test_cloud_tasks_enqueuing_behavior(monkeypatch):
     data = response.json()
     assert data["status"] == "enqueued"
     assert data["cloud_task_name"] is not None
+
+
+def test_cloud_tasks_enqueuing_error_handling(monkeypatch):
+    """
+    Testuje zachowanie API w przypadku niedostępności lub awarii usługi Google Cloud Tasks.
+    """
+    monkeypatch.setattr(tasks_api, "is_tick_queue_configured", lambda: True)
+    
+    def mock_create_tick_task_fail(*args, **kwargs):
+        # Symulujemy błąd zgłoszony przez bibliotekę requests (np. timeout lub 503 z GCP)
+        raise RuntimeError("GCP API Connection Timeout")
+        
+    monkeypatch.setattr(tasks_api, "create_tick_task", mock_create_tick_task_fail)
+    
+    response = client.post("/internal/tasks/discovery?incremental=true")
+    
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Failed to enqueue task in Cloud Tasks"

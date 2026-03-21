@@ -99,8 +99,7 @@ def _is_recent(recent_job_at: object) -> bool:
 
 
 def run_ats_guessing() -> dict[str, int]:
-    start_time = time.perf_counter()
-    engine = get_engine()
+    started = time.perf_counter()
     metrics = {
         "companies_scanned": 0,
         "slug_candidates_tested": 0,
@@ -109,126 +108,135 @@ def run_ats_guessing() -> dict[str, int]:
         "ats_skipped_quality": 0,
     }
 
-    with engine.connect() as conn:
-        companies = load_discovery_companies(conn, phase="ats_guessing", limit=MAX_COMPANIES_PER_RUN)
+    try:
+        engine = get_engine()
+        with engine.connect() as conn:
+            companies = load_discovery_companies(conn, phase="ats_guessing", limit=MAX_COMPANIES_PER_RUN)
 
-    total = len(companies)
-    for idx, row in enumerate(companies, 1):
-        metrics["companies_scanned"] += 1
-        company_id = None
+        total = len(companies)
+        for idx, row in enumerate(companies, 1):
+            metrics["companies_scanned"] += 1
+            company_id = None
 
-        try:
-            if hasattr(row, "_mapping"):
-                company_id = str(row._mapping["company_id"])
-                company_name = row._mapping.get("brand_name") or row._mapping.get("legal_name")
-                careers_url = row._mapping.get("careers_url")
-            elif hasattr(row, "get"):
-                company_id = str(row["company_id"])
-                company_name = row.get("brand_name") or row.get("legal_name")
-                careers_url = row.get("careers_url")
-            else:
-                company_id = str(getattr(row, "company_id", row[0] if isinstance(row, tuple) else ""))
-                company_name = getattr(row, "brand_name", None) or getattr(row, "legal_name", None)
-                careers_url = getattr(row, "careers_url", None)
-        
-            slug_candidates = _generate_slug_candidates(company_name)
+            try:
+                if hasattr(row, "_mapping"):
+                    company_id = str(row._mapping["company_id"])
+                    company_name = row._mapping.get("brand_name") or row._mapping.get("legal_name")
+                    careers_url = row._mapping.get("careers_url")
+                elif hasattr(row, "get"):
+                    company_id = str(row["company_id"])
+                    company_name = row.get("brand_name") or row.get("legal_name")
+                    careers_url = row.get("careers_url")
+                else:
+                    company_id = str(getattr(row, "company_id", row[0] if isinstance(row, tuple) else ""))
+                    company_name = getattr(row, "brand_name", None) or getattr(row, "legal_name", None)
+                    careers_url = getattr(row, "careers_url", None)
+            
+                slug_candidates = _generate_slug_candidates(company_name)
 
-            if not slug_candidates:
-                continue
+                if not slug_candidates:
+                    continue
 
-            found_ats = False
+                found_ats = False
 
-            for provider in PROVIDERS_TO_PROBE:
-                if found_ats:
-                    break
-
-                with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-                    future_to_slug = {
-                        executor.submit(probe_ats, provider, slug): slug
-                        for slug in slug_candidates
-                    }
-
-                    for future in concurrent.futures.as_completed(future_to_slug):
-                        slug = future_to_slug[future]
-                        metrics["slug_candidates_tested"] += 1
-                        
-                        try:
-                            probe_result = future.result()
-                        except Exception as e:
-                            logger.debug(f"error probing {provider} {slug}: {e}")
-                            continue
-
-                        if not probe_result:
-                            continue
-
-                        metrics["ats_detected"] += 1
-
-                        try:
-                            jobs_total = int(probe_result.get("jobs_total") or 0)
-                        except (ValueError, TypeError):
-                            jobs_total = 0
-                            
-                        try:
-                            remote_hits = int(probe_result.get("remote_hits") or 0)
-                        except (ValueError, TypeError):
-                            remote_hits = 0
-                        recent_job_at = probe_result.get("recent_job_at")
-
-                        if (
-                            jobs_total < QUALITY_MIN_JOBS
-                            or remote_hits < QUALITY_MIN_REMOTE_HITS
-                            or not _is_recent(recent_job_at)
-                        ):
-                            metrics["ats_skipped_quality"] += 1
-                            continue
-
-                        with engine.begin() as conn:
-                            inserted = insert_discovered_company_ats(
-                                conn,
-                                company_id=company_id,
-                                provider=provider,
-                                ats_slug=slug,
-                                careers_url=careers_url,
-                            )
-
-                        if inserted:
-                            metrics["ats_inserted"] += 1
-                        else:
-                            metrics.setdefault("ats_duplicates", 0)
-                            metrics["ats_duplicates"] += 1
-
-                        found_ats = True
-                        
-                        # Anulujemy pozostałe requesty (te w kolejce, aby oszczędzić limit API i zrzucić wątki)
-                        for f in future_to_slug:
-                            f.cancel()
-                        
-                        # Przerywamy iterację as_completed, by przejść do kolejnej firmy (lub wyjść z pętli)
+                for provider in PROVIDERS_TO_PROBE:
+                    if found_ats:
                         break
-        except Exception as e:
-            logger.error(f"error processing company in ats_guessing [{company_id}]: {e}", exc_info=True, extra={
-                "company_id": company_id,
-                "component": "discovery"
-            })
-        finally:
-            if company_id:
-                with engine.begin() as conn:
-                    update_discovery_last_checked_at(conn, company_id=company_id, phase="ats_guessing")
-                    
-        if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
-            pct = int((idx / total) * 100)
-            filled = int(20 * idx / total)
-            bar = "█" * filled + "-" * (20 - filled)
-            logger.info(f"ats_guessing progress: [{bar}] {pct}% ({idx}/{total})")
 
-    metrics["duration_ms"] = int((time.perf_counter() - start_time) * 1000)
-    logger.info(
-        "ats_guessing_summary",
-        extra={
-            "component": "discovery",
-            "phase": "ats_guessing",
-            **metrics,
-        },
-    )
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                        future_to_slug = {
+                            executor.submit(probe_ats, provider, slug): slug
+                            for slug in slug_candidates
+                        }
+
+                        for future in concurrent.futures.as_completed(future_to_slug):
+                            slug = future_to_slug[future]
+                            metrics["slug_candidates_tested"] += 1
+                            
+                            try:
+                                probe_result = future.result()
+                            except Exception as e:
+                                logger.debug(f"error probing {provider} {slug}: {e}")
+                                continue
+
+                            if not probe_result:
+                                continue
+
+                            metrics["ats_detected"] += 1
+
+                            try:
+                                jobs_total = int(probe_result.get("jobs_total") or 0)
+                            except (ValueError, TypeError):
+                                jobs_total = 0
+                                
+                            try:
+                                remote_hits = int(probe_result.get("remote_hits") or 0)
+                            except (ValueError, TypeError):
+                                remote_hits = 0
+                            recent_job_at = probe_result.get("recent_job_at")
+
+                            if (
+                                jobs_total < QUALITY_MIN_JOBS
+                                or remote_hits < QUALITY_MIN_REMOTE_HITS
+                                or not _is_recent(recent_job_at)
+                            ):
+                                metrics["ats_skipped_quality"] += 1
+                                continue
+
+                            with engine.begin() as conn:
+                                inserted = insert_discovered_company_ats(
+                                    conn,
+                                    company_id=company_id,
+                                    provider=provider,
+                                    ats_slug=slug,
+                                    careers_url=careers_url,
+                                )
+
+                            if inserted:
+                                metrics["ats_inserted"] += 1
+                            else:
+                                metrics.setdefault("ats_duplicates", 0)
+                                metrics["ats_duplicates"] += 1
+
+                            found_ats = True
+                            
+                            # Anulujemy pozostałe requesty (te w kolejce, aby oszczędzić limit API i zrzucić wątki)
+                            for f in future_to_slug:
+                                f.cancel()
+                            
+                            # Przerywamy iterację as_completed, by przejść do kolejnej firmy (lub wyjść z pętli)
+                            break
+            except Exception as e:
+                logger.error(f"error processing company in ats_guessing [{company_id}]: {e}", exc_info=True, extra={
+                    "company_id": company_id,
+                    "component": "discovery"
+                })
+            finally:
+                if company_id:
+                    with engine.begin() as conn:
+                        update_discovery_last_checked_at(conn, company_id=company_id, phase="ats_guessing")
+                        
+            if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
+                pct = int((idx / total) * 100)
+                filled = int(20 * idx / total)
+                bar = "█" * filled + "-" * (20 - filled)
+                logger.info(f"ats_guessing progress: [{bar}] {pct}% ({idx}/{total})")
+    except Exception as exc:
+        logger.error(
+            "ats_guessing pipeline failed",
+            exc_info=True,
+            extra={"component": "discovery", "phase": "ats_guessing"}
+        )
+        raise
+    finally:
+        metrics["duration_ms"] = int((time.perf_counter() - started) * 1000)
+        logger.info(
+            "ats_guessing_summary",
+            extra={
+                "component": "discovery",
+                "phase": "ats_guessing",
+                **metrics,
+            },
+        )
 
     return metrics

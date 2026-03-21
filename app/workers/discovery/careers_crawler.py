@@ -188,8 +188,7 @@ def _detect_provider_with_shallow_crawl(final_url: str, html: str) -> tuple[str,
 
 
 def run_careers_discovery() -> Dict[str, int]:
-    start_time = time.perf_counter()
-    engine = get_engine()
+    started = time.perf_counter()
 
     metrics = {
         "companies_scanned": 0,
@@ -200,11 +199,114 @@ def run_careers_discovery() -> Dict[str, int]:
         "ats_duplicates": 0,
     }
 
-    with engine.connect() as conn:
-        rows = load_discovery_companies(conn, phase="careers", limit=MAX_COMPANIES_PER_RUN)
+    try:
+        engine = get_engine()
+        with engine.connect() as conn:
+            rows = load_discovery_companies(conn, phase="careers", limit=MAX_COMPANIES_PER_RUN)
 
-    if not rows:
-        metrics["duration_ms"] = int((time.perf_counter() - start_time) * 1000)
+        if not rows:
+            return metrics
+
+        total = len(rows)
+        for idx, row in enumerate(rows, 1):
+            metrics["companies_scanned"] += 1
+            company_id = None
+
+            try:
+                if hasattr(row, "_mapping"):
+                    company_id = str(row._mapping["company_id"])
+                    careers_url = row._mapping.get("careers_url")
+                elif hasattr(row, "get"):
+                    company_id = str(row["company_id"])
+                    careers_url = row.get("careers_url")
+                else:
+                    company_id = str(getattr(row, "company_id", row[0] if isinstance(row, tuple) else ""))
+                    careers_url = getattr(row, "careers_url", None)
+                    
+                if not careers_url:
+                    continue
+
+                response = _fetch_careers_page(careers_url)
+                if not response:
+                    continue
+
+                final_url = response.url
+                body = response.text
+
+                provider_slug = _detect_provider_from_redirects(response)
+
+                if not provider_slug:
+                    provider_slug = _detect_provider_with_shallow_crawl(final_url, body)
+
+                if not provider_slug:
+                    continue
+
+                provider, slug = provider_slug
+                if not _is_valid_slug(slug):
+                    logger.info(
+                        "discovery_slug_rejected",
+                        extra={"component": "discovery", "phase": "careers_discovery", "slug": slug},
+                    )
+                    continue
+                metrics["ats_detected"] += 1
+
+                probe_result = probe_ats(provider, slug)
+                metrics["ats_probed"] += 1
+                if not probe_result:
+                    continue
+
+                try:
+                    jobs_total = int(probe_result.get("jobs_total") or 0)
+                except (ValueError, TypeError):
+                    jobs_total = 0
+                    
+                try:
+                    remote_hits = int(probe_result.get("remote_hits") or 0)
+                except (ValueError, TypeError):
+                    remote_hits = 0
+                recent_job_at = probe_result.get("recent_job_at")
+
+                if jobs_total < QUALITY_MIN_JOBS or remote_hits < QUALITY_MIN_REMOTE_HITS or not _is_recent(recent_job_at):
+                    metrics["ats_skipped_quality"] += 1
+                    continue
+
+                with engine.begin() as conn:
+                    inserted = insert_discovered_company_ats(
+                        conn,
+                        company_id=str(company_id),
+                        provider=provider,
+                        ats_slug=slug,
+                        careers_url=careers_url,
+                    )
+
+                if inserted:
+                    metrics["ats_inserted"] += 1
+                else:
+                    metrics["ats_duplicates"] += 1
+            except Exception as e:
+                logger.error(f"error processing company in careers_crawler [{company_id}]: {e}", exc_info=True, extra={
+                    "company_id": company_id,
+                    "component": "discovery"
+                })
+            finally:
+                if company_id:
+                    with engine.begin() as conn:
+                        update_discovery_last_checked_at(conn, company_id=company_id, phase="careers")
+                        
+            if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
+                pct = int((idx / total) * 100)
+                filled = int(20 * idx / total)
+                bar = "█" * filled + "-" * (20 - filled)
+                logger.info(f"careers_crawler progress: [{bar}] {pct}% ({idx}/{total})")
+    except Exception as exc:
+        logger.error(
+            "careers_crawler pipeline failed",
+            exc_info=True,
+            extra={"component": "discovery", "phase": "careers_discovery"}
+        )
+        raise
+    finally:
+        metrics["duration_ms"] = int((time.perf_counter() - started) * 1000)
         logger.info(
             "discovery_summary",
             extra={
@@ -213,108 +315,5 @@ def run_careers_discovery() -> Dict[str, int]:
                 **metrics,
             },
         )
-        return metrics
-
-    total = len(rows)
-    for idx, row in enumerate(rows, 1):
-        metrics["companies_scanned"] += 1
-        company_id = None
-
-        try:
-            if hasattr(row, "_mapping"):
-                company_id = str(row._mapping["company_id"])
-                careers_url = row._mapping.get("careers_url")
-            elif hasattr(row, "get"):
-                company_id = str(row["company_id"])
-                careers_url = row.get("careers_url")
-            else:
-                company_id = str(getattr(row, "company_id", row[0] if isinstance(row, tuple) else ""))
-                careers_url = getattr(row, "careers_url", None)
-                
-            if not careers_url:
-                continue
-
-            response = _fetch_careers_page(careers_url)
-            if not response:
-                continue
-
-            final_url = response.url
-            body = response.text
-
-            provider_slug = _detect_provider_from_redirects(response)
-
-            if not provider_slug:
-                provider_slug = _detect_provider_with_shallow_crawl(final_url, body)
-
-            if not provider_slug:
-                continue
-
-            provider, slug = provider_slug
-            if not _is_valid_slug(slug):
-                logger.info(
-                    "discovery_slug_rejected",
-                    extra={"component": "discovery", "phase": "careers_discovery", "slug": slug},
-                )
-                continue
-            metrics["ats_detected"] += 1
-
-            probe_result = probe_ats(provider, slug)
-            metrics["ats_probed"] += 1
-            if not probe_result:
-                continue
-
-            try:
-                jobs_total = int(probe_result.get("jobs_total") or 0)
-            except (ValueError, TypeError):
-                jobs_total = 0
-                
-            try:
-                remote_hits = int(probe_result.get("remote_hits") or 0)
-            except (ValueError, TypeError):
-                remote_hits = 0
-            recent_job_at = probe_result.get("recent_job_at")
-
-            if jobs_total < QUALITY_MIN_JOBS or remote_hits < QUALITY_MIN_REMOTE_HITS or not _is_recent(recent_job_at):
-                metrics["ats_skipped_quality"] += 1
-                continue
-
-            with engine.begin() as conn:
-                inserted = insert_discovered_company_ats(
-                    conn,
-                    company_id=str(company_id),
-                    provider=provider,
-                    ats_slug=slug,
-                    careers_url=careers_url,
-                )
-
-            if inserted:
-                metrics["ats_inserted"] += 1
-            else:
-                metrics["ats_duplicates"] += 1
-        except Exception as e:
-            logger.error(f"error processing company in careers_crawler [{company_id}]: {e}", exc_info=True, extra={
-                "company_id": company_id,
-                "component": "discovery"
-            })
-        finally:
-            if company_id:
-                with engine.begin() as conn:
-                    update_discovery_last_checked_at(conn, company_id=company_id, phase="careers")
-                    
-        if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
-            pct = int((idx / total) * 100)
-            filled = int(20 * idx / total)
-            bar = "█" * filled + "-" * (20 - filled)
-            logger.info(f"careers_crawler progress: [{bar}] {pct}% ({idx}/{total})")
-
-    metrics["duration_ms"] = int((time.perf_counter() - start_time) * 1000)
-    logger.info(
-        "discovery_summary",
-        extra={
-            "component": "discovery",
-            "phase": "careers_discovery",
-            **metrics,
-        },
-    )
 
     return metrics
