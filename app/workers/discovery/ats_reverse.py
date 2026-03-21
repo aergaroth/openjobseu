@@ -105,8 +105,7 @@ def _is_recent(recent_job_at: object) -> bool:
 
 
 def run_ats_reverse_discovery() -> dict[str, int]:
-    start_time = time.perf_counter()
-    engine = get_engine()
+    started = time.perf_counter()
     metrics = {
         "slugs_tested": 0,
         "ats_detected": 0,
@@ -115,85 +114,94 @@ def run_ats_reverse_discovery() -> dict[str, int]:
         "ats_duplicates": 0,
     }
 
-    slugs_to_test = _load_slugs()
-    total = len(PROVIDERS_TO_PROBE) * len(slugs_to_test)
-    idx = 0
+    try:
+        engine = get_engine()
+        slugs_to_test = _load_slugs()
+        total = len(PROVIDERS_TO_PROBE) * len(slugs_to_test)
+        idx = 0
 
-    for provider in PROVIDERS_TO_PROBE:
-        for slug in slugs_to_test:
-            idx += 1
-            try:
-                # Deduplication check before querying API to save requests
-                with engine.connect() as conn:
-                    if check_ats_exists(conn, provider, slug):
-                        metrics["ats_duplicates"] += 1
+        for provider in PROVIDERS_TO_PROBE:
+            for slug in slugs_to_test:
+                idx += 1
+                try:
+                    # Deduplication check before querying API to save requests
+                    with engine.connect() as conn:
+                        if check_ats_exists(conn, provider, slug):
+                            metrics["ats_duplicates"] += 1
+                            continue
+
+                    metrics["slugs_tested"] += 1
+                    probe_result = probe_ats(provider, slug)
+                    if not probe_result:
                         continue
 
-                metrics["slugs_tested"] += 1
-                probe_result = probe_ats(provider, slug)
-                if not probe_result:
-                    continue
+                    metrics["ats_detected"] += 1
 
-                metrics["ats_detected"] += 1
+                    try:
+                        jobs_total = int(probe_result.get("jobs_total") or 0)
+                    except (ValueError, TypeError):
+                        jobs_total = 0
 
-                try:
-                    jobs_total = int(probe_result.get("jobs_total") or 0)
-                except (ValueError, TypeError):
-                    jobs_total = 0
+                    try:
+                        remote_hits = int(probe_result.get("remote_hits") or 0)
+                    except (ValueError, TypeError):
+                        remote_hits = 0
 
-                try:
-                    remote_hits = int(probe_result.get("remote_hits") or 0)
-                except (ValueError, TypeError):
-                    remote_hits = 0
+                    recent_job_at = probe_result.get("recent_job_at")
 
-                recent_job_at = probe_result.get("recent_job_at")
+                    if (
+                        jobs_total < QUALITY_MIN_JOBS
+                        or remote_hits < QUALITY_MIN_REMOTE_HITS
+                        or not _is_recent(recent_job_at)
+                    ):
+                        metrics["ats_skipped_quality"] += 1
+                        continue
 
-                if (
-                    jobs_total < QUALITY_MIN_JOBS
-                    or remote_hits < QUALITY_MIN_REMOTE_HITS
-                    or not _is_recent(recent_job_at)
-                ):
-                    metrics["ats_skipped_quality"] += 1
-                    continue
+                    with engine.begin() as conn:
+                        name = slug.capitalize()
+                        company_id = get_or_create_placeholder_company(conn, name)
 
-                with engine.begin() as conn:
-                    name = slug.capitalize()
-                    company_id = get_or_create_placeholder_company(conn, name)
+                        inserted = insert_discovered_company_ats(
+                            conn,
+                            company_id=company_id,
+                            provider=provider,
+                            ats_slug=slug,
+                            careers_url=None
+                        )
 
-                    inserted = insert_discovered_company_ats(
-                        conn,
-                        company_id=company_id,
-                        provider=provider,
-                        ats_slug=slug,
-                        careers_url=None
-                    )
+                    if inserted:
+                        metrics["ats_inserted"] += 1
+                    else:
+                        metrics["ats_duplicates"] += 1
+                        
+                except Exception as e:
+                    logger.error(f"error processing slug in ats_reverse [{provider}/{slug}]: {e}", exc_info=True, extra={
+                        "provider": provider,
+                        "slug": slug,
+                        "component": "discovery"
+                    })
 
-                if inserted:
-                    metrics["ats_inserted"] += 1
-                else:
-                    metrics["ats_duplicates"] += 1
-                    
-            except Exception as e:
-                logger.error(f"error processing slug in ats_reverse [{provider}/{slug}]: {e}", exc_info=True, extra={
-                    "provider": provider,
-                    "slug": slug,
-                    "component": "discovery"
-                })
-
-            if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
-                pct = int((idx / total) * 100)
-                filled = int(20 * idx / total)
-                bar = "█" * filled + "-" * (20 - filled)
-                logger.info(f"ats_reverse progress: [{bar}] {pct}% ({idx}/{total})")
-
-    metrics["duration_ms"] = int((time.perf_counter() - start_time) * 1000)
-    logger.info(
-        "ats_reverse_discovery_summary",
-        extra={
-            "component": "discovery",
-            "phase": "ats_reverse",
-            **metrics,
-        },
-    )
+                if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
+                    pct = int((idx / total) * 100)
+                    filled = int(20 * idx / total)
+                    bar = "█" * filled + "-" * (20 - filled)
+                    logger.info(f"ats_reverse progress: [{bar}] {pct}% ({idx}/{total})")
+    except Exception as exc:
+        logger.error(
+            "ats_reverse pipeline failed",
+            exc_info=True,
+            extra={"component": "discovery", "phase": "ats_reverse"}
+        )
+        raise
+    finally:
+        metrics["duration_ms"] = int((time.perf_counter() - started) * 1000)
+        logger.info(
+            "ats_reverse_discovery_summary",
+            extra={
+                "component": "discovery",
+                "phase": "ats_reverse",
+                **metrics,
+            },
+        )
 
     return metrics

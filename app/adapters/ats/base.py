@@ -79,7 +79,6 @@ class ATSAdapter(ABC):
         self.session.headers.update({
             "User-Agent": "OpenJobsEU/1.0 (https://openjobseu.org)",
             "Accept": "application/json",
-            "Accept-Encoding": "gzip, deflate",
         })
     source_name: str
     

@@ -1,3 +1,10 @@
+data "google_project" "current" {}
+
+locals {
+  # Wymuszenie deterministycznego URL dla Cloud Run (omija problemy z weryfikacją OIDC na starych adresach)
+  run_uri = "https://${var.service_name}-${data.google_project.current.number}.${var.region}.run.app"
+}
+
 resource "google_service_account" "scheduler_sa" {
   account_id   = "scheduler-internal"
   display_name = "Cloud Scheduler Internal Caller"
@@ -30,7 +37,7 @@ resource "google_cloud_scheduler_job" "tick_ingestion" {
 
   http_target {
     http_method = "POST"
-    uri         = "${google_cloud_run_v2_service.this.uri}/internal/tick?group=ingestion"
+    uri         = "${local.run_uri}/internal/tick?group=ingestion"
 
     headers = {
       Content-Type      = "application/json"
@@ -50,7 +57,7 @@ resource "google_cloud_scheduler_job" "dorking_discovery" {
 
   http_target {
     http_method = "POST"
-    uri         = "${google_cloud_run_v2_service.this.uri}/internal/tasks/dorking"
+    uri         = "${local.run_uri}/internal/tasks/dorking"
 
     headers = {
       Content-Type      = "application/json"
@@ -71,7 +78,7 @@ resource "google_cloud_scheduler_job" "tick_maintenance" {
 
   http_target {
     http_method = "POST"
-    uri         = "${google_cloud_run_v2_service.this.uri}/internal/tick?group=maintenance"
+    uri         = "${local.run_uri}/internal/tick?group=maintenance"
 
     headers = {
       Content-Type      = "application/json"
@@ -91,7 +98,7 @@ resource "google_cloud_scheduler_job" "discovery" {
 
   http_target {
     http_method = "POST"
-    uri         = "${google_cloud_run_v2_service.this.uri}/internal/discovery/run"
+    uri         = "${local.run_uri}/internal/discovery/run"
 
     headers = {
       Content-Type      = "application/json"

@@ -67,6 +67,10 @@ resource "google_cloud_run_v2_service" "this" {
 
       resources {
         cpu_idle = true
+        limits = {
+          memory = "1024Mi"
+          cpu    = "1000m"
+        }
       }
 
       env {
@@ -176,4 +180,22 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
   role     = "roles/run.invoker"
   member   = "allUsers"
 
+}
+
+resource "google_project_iam_member" "cloud_run_tasks_enqueuer" {
+  project = var.project_id
+  role    = "roles/cloudtasks.enqueuer"
+  member  = "serviceAccount:cloudrun-dev-runtime@dev-openjobseu.iam.gserviceaccount.com"
+}
+
+resource "google_storage_bucket_iam_member" "cloud_run_feed_write" {
+  bucket = "openjobseu.org"
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:cloudrun-dev-runtime@dev-openjobseu.iam.gserviceaccount.com"
+}
+
+resource "google_service_account_iam_member" "cloud_run_can_act_as_scheduler" {
+  service_account_id = google_service_account.scheduler_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:cloudrun-dev-runtime@dev-openjobseu.iam.gserviceaccount.com"
 }
