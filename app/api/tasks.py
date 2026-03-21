@@ -86,9 +86,6 @@ def trigger_async_task(
         payload = {"incremental": incremental, "limit": limit}
         headers = {"Content-Type": "application/json"}
         
-        # Przekazanie poświadczeń autoryzacyjnych do Cloud Tasks
-        if request.headers.get("authorization"):
-            headers["Authorization"] = request.headers.get("authorization")
         if request.headers.get("x-internal-secret"):
             headers["X-Internal-Secret"] = request.headers.get("x-internal-secret")
 

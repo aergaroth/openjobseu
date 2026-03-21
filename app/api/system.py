@@ -202,28 +202,32 @@ def tick(
 def _enqueue_tick(*, request: Request, response_format: str, force_text: bool, context: dict):
     query = urlencode({"group": context["group"]})
     handler_url = f"{str(request.base_url).rstrip('/')}/internal/tick/execute?{query}"
-    task_response = create_tick_task(
-        task_id=context["tick_id"],
-        handler_url=handler_url,
-        payload={
-            "tick_id": context["tick_id"],
-            "request_id": context["request_id"],
-            "group": context["group"],
-            "incremental": context["incremental"],
-            "limit": context["limit"],
-            "response_format": "json",
-            "scheduler_job_name": context.get("scheduler_job_name"),
-            "scheduler_schedule_time": context.get("scheduler_schedule_time"),
-        },
-        headers={
-            "Content-Type": "application/json",
-            "X-Internal-Secret": request.headers.get("x-internal-secret", ""),
-            "X-Request-Id": context["request_id"],
-            "X-Tick-Id": context["tick_id"],
-            "X-Scheduler-Job-Name": context.get("scheduler_job_name", ""),
-            "X-Scheduler-Schedule-Time": context.get("scheduler_schedule_time", ""),
-        },
-    )
+    try:
+        task_response = create_tick_task(
+            task_id=context["tick_id"],
+            handler_url=handler_url,
+            payload={
+                "tick_id": context["tick_id"],
+                "request_id": context["request_id"],
+                "group": context["group"],
+                "incremental": context["incremental"],
+                "limit": context["limit"],
+                "response_format": "json",
+                "scheduler_job_name": context.get("scheduler_job_name"),
+                "scheduler_schedule_time": context.get("scheduler_schedule_time"),
+            },
+            headers={
+                "Content-Type": "application/json",
+                "X-Internal-Secret": request.headers.get("x-internal-secret", ""),
+                "X-Request-Id": context["request_id"],
+                "X-Tick-Id": context["tick_id"],
+                "X-Scheduler-Job-Name": context.get("scheduler_job_name", ""),
+                "X-Scheduler-Schedule-Time": context.get("scheduler_schedule_time", ""),
+            },
+        )
+    except Exception:
+        logger.exception("Failed to enqueue tick task in Cloud Tasks")
+        raise HTTPException(status_code=500, detail="Failed to enqueue task in Cloud Tasks")
 
     payload = {
         "status": "accepted",
