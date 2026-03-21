@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import re
 from urllib.parse import urlencode
 
@@ -201,7 +202,8 @@ def tick(
 
 def _enqueue_tick(*, request: Request, response_format: str, force_text: bool, context: dict):
     query = urlencode({"group": context["group"]})
-    handler_url = f"{str(request.base_url).rstrip('/')}/internal/tick/execute?{query}"
+    base_url = os.getenv("BASE_URL", str(request.base_url).rstrip('/'))
+    handler_url = f"{base_url}/internal/tick/execute?{query}"
     try:
         task_response = create_tick_task(
             task_id=context["tick_id"],
