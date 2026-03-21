@@ -1,3 +1,4 @@
+import os
 import json
 import logging
 import uuid
@@ -79,7 +80,8 @@ def trigger_async_task(
     task_id = str(uuid.uuid4())
     
     if is_tick_queue_configured():
-        handler_url = f"{str(request.base_url).rstrip('/')}/internal/tasks/{task_name}/execute"
+        base_url = os.getenv("BASE_URL", str(request.base_url).rstrip('/'))
+        handler_url = f"{base_url}/internal/tasks/{task_name}/execute"
         
         payload = {"incremental": incremental, "limit": limit}
         headers = {"Content-Type": "application/json"}
@@ -90,12 +92,16 @@ def trigger_async_task(
         if request.headers.get("x-internal-secret"):
             headers["X-Internal-Secret"] = request.headers.get("x-internal-secret")
 
-        task_response = create_tick_task(
-            task_id=task_id,
-            handler_url=handler_url,
-            payload=payload,
-            headers=headers
-        )
+        try:
+            task_response = create_tick_task(
+                task_id=task_id,
+                handler_url=handler_url,
+                payload=payload,
+                headers=headers
+            )
+        except Exception as e:
+            logger.error(f"Failed to enqueue task {task_name}", extra={"error": str(e)})
+            raise HTTPException(status_code=500, detail="Failed to enqueue task in Cloud Tasks")
         
         return Response(
             content=json.dumps({

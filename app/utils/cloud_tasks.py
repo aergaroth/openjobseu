@@ -35,20 +35,29 @@ def create_tick_task(
     credentials, _ = google.auth.default(scopes=[CLOUD_PLATFORM_SCOPE])
     session = AuthorizedSession(credentials)
 
+    task_payload = {
+        "name": task_name,
+        "dispatchDeadline": os.getenv("TICK_TASK_DISPATCH_DEADLINE", "1800s"),
+        "httpRequest": {
+            "httpMethod": "POST",
+            "url": handler_url,
+            "headers": headers,
+            "body": base64.b64encode(json.dumps(payload).encode("utf-8")).decode("utf-8"),
+        },
+    }
+
+    service_account_email = os.getenv("SCHEDULER_SA_EMAIL")
+    audience = os.getenv("BASE_URL")
+    
+    if service_account_email and audience:
+        task_payload["httpRequest"]["oidcToken"] = {
+            "serviceAccountEmail": service_account_email,
+            "audience": audience
+        }
+
     response = session.post(
         f"https://cloudtasks.googleapis.com/v2/{parent}/tasks",
-        json={
-            "task": {
-                "name": task_name,
-                "dispatchDeadline": os.getenv("TICK_TASK_DISPATCH_DEADLINE", "1800s"),
-                "httpRequest": {
-                    "httpMethod": "POST",
-                    "url": handler_url,
-                    "headers": headers,
-                    "body": base64.b64encode(json.dumps(payload).encode("utf-8")).decode("utf-8"),
-                },
-            }
-        },
+        json={"task": task_payload},
         timeout=30,
     )
     response.raise_for_status()

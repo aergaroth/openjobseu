@@ -34,6 +34,7 @@ def test_internal_access_missing_auth_header():
 def test_internal_access_valid_oidc_token(mock_verify, monkeypatch):
     """Test sprawdza poprawnie zweryfikowany token OIDC"""
     monkeypatch.setenv("SCHEDULER_SA_EMAIL", "scheduler-internal@openjobseu.iam.gserviceaccount.com")
+    monkeypatch.setenv("BASE_URL", "https://dev-openjobseu-123.europe-north1.run.app")
 
     # Symulujemy poprawne działanie biblioteki Google Auth, zwracając payload tokena
     mock_verify.return_value = {
