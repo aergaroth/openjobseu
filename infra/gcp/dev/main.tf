@@ -134,6 +134,10 @@ resource "google_cloud_run_v2_service" "this" {
         value = google_cloud_tasks_queue.tick_pipeline.name
       }
       env {
+        name  = "BASE_URL"
+        value = local.run_uri
+      }
+      env {
         name  = "TICK_TASK_DISPATCH_DEADLINE"
         value = "180s"
       }

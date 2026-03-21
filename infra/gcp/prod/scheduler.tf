@@ -45,6 +45,7 @@ resource "google_cloud_scheduler_job" "tick_ingestion" {
 
     oidc_token {
       service_account_email = google_service_account.scheduler_sa.email
+      audience              = local.run_uri
     }
   }
 }
@@ -65,6 +66,7 @@ resource "google_cloud_scheduler_job" "dorking_discovery" {
 
     oidc_token {
       service_account_email = google_service_account.scheduler_sa.email
+      audience              = local.run_uri
     }
   }
 }
@@ -86,6 +88,7 @@ resource "google_cloud_scheduler_job" "tick_maintenance" {
 
     oidc_token {
       service_account_email = google_service_account.scheduler_sa.email
+      audience              = local.run_uri
     }
   }
 }
@@ -106,6 +109,7 @@ resource "google_cloud_scheduler_job" "discovery" {
 
     oidc_token {
       service_account_email = google_service_account.scheduler_sa.email
+      audience              = local.run_uri
     }
   }
 }
