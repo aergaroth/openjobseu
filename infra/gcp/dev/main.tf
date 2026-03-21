@@ -188,12 +188,6 @@ resource "google_project_iam_member" "cloud_run_tasks_enqueuer" {
   member  = "serviceAccount:cloudrun-dev-runtime@dev-openjobseu.iam.gserviceaccount.com"
 }
 
-resource "google_storage_bucket_iam_member" "cloud_run_feed_write" {
-  bucket = "openjobseu.org"
-  role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:cloudrun-dev-runtime@dev-openjobseu.iam.gserviceaccount.com"
-}
-
 resource "google_service_account_iam_member" "cloud_run_can_act_as_scheduler" {
   service_account_id = google_service_account.scheduler_sa.name
   role               = "roles/iam.serviceAccountUser"
