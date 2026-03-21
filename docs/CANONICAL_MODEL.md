@@ -58,7 +58,7 @@ Historical alias still present in some data paths/metrics:
 - **job_quality_score**: integer `0..100`
 
 Feed usage:
-- `/jobs/feed` returns visible jobs with `compliance_score >= 80`
+- `feed.json` (static GCS export) returns visible jobs with `compliance_score >= 80`
 
 ---
 

@@ -9,6 +9,19 @@ variable "region" {
   default     = "europe-north1"
 }
 
+variable "queue_region" {
+  type        = string
+  description = "Region for Cloud Tasks queue"
+  default     = "europe-west1"
+}
+
+variable "scheduler_region" {
+  type        = string
+  description = "Region for Cloud Scheduler"
+  default     = "europe-west1"
+}
+
+
 variable "service_name" {
   type        = string
   description = "Cloud Run service name"

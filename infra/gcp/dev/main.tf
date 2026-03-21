@@ -114,6 +114,26 @@ resource "google_cloud_run_v2_service" "this" {
         value = random_password.internal_secret.result
       }
       env {
+        name  = "SCHEDULER_SA_EMAIL"
+        value = google_service_account.scheduler_sa.email
+      }
+      env {
+        name  = "TICK_TASK_QUEUE_PROJECT"
+        value = var.project_id
+      }
+      env {
+        name  = "TICK_TASK_QUEUE_LOCATION"
+        value = var.queue_region
+      }
+      env {
+        name  = "TICK_TASK_QUEUE_NAME"
+        value = google_cloud_tasks_queue.tick_pipeline.name
+      }
+      env {
+        name  = "TICK_TASK_DISPATCH_DEADLINE"
+        value = "180s"
+      }
+      env {
         name = "GOOGLE_API_KEY"
         value_source {
           secret_key_ref {

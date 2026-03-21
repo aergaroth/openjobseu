@@ -29,10 +29,15 @@ def test_pipeline_runs_steps_in_order(monkeypatch):
         "run_maintenance_pipeline",
         lambda: order.append("maintenance"),
     )
+    monkeypatch.setattr(
+        pipeline,
+        "run_frontend_export",
+        lambda: order.append("frontend_export"),
+    )
 
     pipeline.run_pipeline()
 
-    assert order == ["ingestion", "lifecycle", "availability", "market_metrics", "maintenance"]
+    assert order == ["ingestion", "lifecycle", "availability", "market_metrics", "maintenance", "frontend_export"]
     
     order.clear()
     pipeline.run_pipeline("ingestion")
@@ -40,7 +45,7 @@ def test_pipeline_runs_steps_in_order(monkeypatch):
     
     order.clear()
     pipeline.run_pipeline("maintenance")
-    assert order == ["lifecycle", "availability", "market_metrics", "maintenance"]
+    assert order == ["lifecycle", "availability", "market_metrics", "maintenance", "frontend_export"]
 
 
 def test_pipeline_orchestration_full_flow(monkeypatch):
@@ -74,6 +79,10 @@ def test_pipeline_orchestration_full_flow(monkeypatch):
     def _fake_maintenance():
         order.append("maintenance")
         return {"metrics": {"component": "maintenance", "job_stats_updated": 5, "scores_updated": 5}}
+        
+    def _fake_frontend_export():
+        order.append("frontend_export")
+        return {"metrics": {"component": "frontend_export", "exported_jobs": 100}}
 
     info_calls = []
     monkeypatch.setattr(pipeline, "run_employer_ingestion", _fake_employer_ingestion)
@@ -81,6 +90,7 @@ def test_pipeline_orchestration_full_flow(monkeypatch):
     monkeypatch.setattr(pipeline, "run_availability_pipeline", _fake_availability)
     monkeypatch.setattr(pipeline, "run_market_metrics_worker", _fake_market_metrics)
     monkeypatch.setattr(pipeline, "run_maintenance_pipeline", _fake_maintenance)
+    monkeypatch.setattr(pipeline, "run_frontend_export", _fake_frontend_export)
     monkeypatch.setattr(
         pipeline.logger,
         "info",
@@ -91,7 +101,7 @@ def test_pipeline_orchestration_full_flow(monkeypatch):
 
     result = pipeline.run_pipeline()
 
-    assert order == ["ingestion", "lifecycle", "availability", "market_metrics", "maintenance"]
+    assert order == ["ingestion", "lifecycle", "availability", "market_metrics", "maintenance", "frontend_export"]
     assert result["actions"] == ["employer_ingestion_completed"]
     assert result["metrics"]["ingestion"]["source"] == "employer_ing"
     assert result["metrics"]["availability"]["checked"] == 5

@@ -107,12 +107,16 @@ resource "google_cloud_run_v2_service" "this" {
         value = random_password.internal_secret.result
       }
       env {
+        name  = "SCHEDULER_SA_EMAIL"
+        value = google_service_account.scheduler_sa.email
+      }
+      env {
         name  = "TICK_TASK_QUEUE_PROJECT"
         value = var.project_id
       }
       env {
         name  = "TICK_TASK_QUEUE_LOCATION"
-        value = var.api_region
+        value = var.queue_region
       }
       env {
         name  = "TICK_TASK_QUEUE_NAME"
@@ -121,6 +125,11 @@ resource "google_cloud_run_v2_service" "this" {
       env {
         name  = "TICK_TASK_DISPATCH_DEADLINE"
         value = "1800s"
+      }
+
+      env {
+        name  = "PUBLIC_FEED_BUCKET"
+        value = "openjobseu.org"
       }
 
       env {
@@ -164,4 +173,10 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
   location = var.region
   role     = "roles/run.invoker"
   member   = "allUsers"
+}
+
+resource "google_storage_bucket_iam_member" "cloud_run_feed_write" {
+  bucket = "openjobseu.org"
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:cloudrun-prod-runtime@openjobseu.iam.gserviceaccount.com"
 }

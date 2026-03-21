@@ -2,9 +2,9 @@
 
 ## Overview
 
-OpenJobsEU is a backend-first, compliance-focused pipeline for aggregating legally accessible remote job offers with EU relevance signals.
+OpenJobsEU is designed as a **Modular Monolith** deployed in a **Serverless** environment (GCP Cloud Run). It is a backend-first, compliance-focused pipeline for aggregating legally accessible remote job offers with EU relevance signals.
 
-The runtime is intentionally read-only on the public side and operationally explicit on the internal side.
+The platform is optimized for zero-maintenance operation, high scalability during ingestion bursts, and minimal cloud infrastructure costs (zero-compute public architecture).
 
 ---
 
@@ -14,16 +14,17 @@ The runtime is intentionally read-only on the public side and operationally expl
 
 Pipeline mode flow:
 
-ATS Adapters -> Employer Ingestion Worker -> Policy Signals -> DB Upsert -> Post-Ingestion Workers -> Read APIs
+`Cloud Scheduler` -> `Cloud Tasks` -> `Ingestion Worker` -> `DB Upsert` -> `Post-Ingestion Workers` -> `Feed Exporter (GCS)` -> `Public (CDN)`
 
 ---
 
 ## Runtime Orchestration
 
-- Runtime entrypoint: `app.workers.pipeline.run_pipeline`
+- Runtime entrypoint: `POST /internal/tick/execute` (via Cloud Tasks) -> `app.workers.pipeline.run_pipeline`
 - Tick pipeline orchestration:
   - runs `run_employer_ingestion()`
   - runs `run_post_ingestion()`
+  - runs `run_frontend_export()`
 - Ingestion worker is single-source and ATS-backed (`employer_ing`)
 
 ---
@@ -81,22 +82,24 @@ Compliance policy is applied during ingestion before persistence.
 `run_post_ingestion()` executes:
 - availability checks (`app/workers/availability.py`)
 - lifecycle transitions (`app/workers/lifecycle.py`)
+- daily market metrics (`app/workers/market_metrics.py`)
+- static frontend and feed JSON generation to Cloud Storage (`app/workers/frontend_exporter.py`)
 
 Lifecycle states in runtime:
 - `new`, `active`, `stale`, `expired`, `unreachable`
 
 ---
 
-## API Layer
+## API Layer & Zero-Compute Public Strategy
 
 Public endpoints:
 - `GET /health`
 - `GET /ready`
 - `GET /jobs`
-- `GET /jobs/feed`
+- `GET /feed.json` (Served directly by GCS Edge cache, bypassing Cloud Run)
 - `GET /jobs/stats/compliance-7d`
 
-Feed behavior:
+Feed behavior (`feed.json` contract):
 - visible jobs only (`new`, `active`)
 - minimum compliance score: `80`
 - cache header: `Cache-Control: public, max-age=300`
@@ -110,9 +113,8 @@ Internal endpoints:
 - `GET /internal/audit/stats/source-7d`
 - `POST /internal/audit/tick-dev`
 - `POST /internal/backfill-compliance`
-- `POST /internal/backfill-salary`
-- `GET /internal/discovery/audit`
-- `GET /internal/discovery/candidates`
+- `POST /internal/tasks/{task_name}` (Delegates async processes to Cloud Tasks)
+- `POST /internal/tasks/{task_name}/execute` (Cloud Tasks handler)
 - `POST /internal/discovery/careers`
 - `POST /internal/discovery/guess`
 - `POST /internal/discovery/run`
@@ -142,7 +144,12 @@ Infrastructure is managed with Terraform in split environments:
 - `infra/gcp/dev`
 - `infra/gcp/prod`
 
-Production scheduler triggers `POST /internal/tick` every 15 minutes.
+Core GCP services used:
+- **Cloud Run**: Core compute layer (configured with `cpu_idle=true`).
+- **Cloud Scheduler**: Cron triggers for pipelines.
+- **Cloud Tasks**: Durable async job queue for long-running endpoints (bypassing timeouts).
+- **Cloud SQL (PostgreSQL)**: GIN-indexed relational database.
+- **Cloud Storage (GCS)**: Highly available CDN for serving the static `feed.json`.
 
 ---
 
@@ -278,12 +285,13 @@ Executed after ingestion by main pipeline:
 - lifecycle transitions (`app/workers/lifecycle.py`)
 - availability verification (`app/workers/availability.py`)
 - daily market aggregations (`app/workers/market_metrics.py`)
+- static feed generation (`app/workers/frontend_exporter.py`)
 
 #### Text diagram
-`ATS adapter` → `normalize` → `compliance` → `persistence` → `lifecycle workers`
+`ATS adapter` → `normalize` → `compliance` → `persistence` → `lifecycle workers` → `GCS Export`
 
 Expanded path in code:
-`adapter.fetch` → `adapter.normalize` → `process_ingested_job` → `upsert_job + insert_compliance_report` → `run_lifecycle_pipeline/run_availability_pipeline/run_market_metrics_worker`
+`adapter.fetch` → `adapter.normalize` → `process_ingested_job` → `upsert_job + insert_compliance_report` → `run_lifecycle_pipeline/run_availability_pipeline/run_market_metrics_worker/run_frontend_export`
 
 ### 5. Discovery architecture
 
@@ -334,14 +342,18 @@ Discovery orchestrator: `app/workers/discovery/pipeline.py`
    - Reads: `jobs`, `job_sources`
    - Writes: `market_daily_stats`, `market_daily_stats_segments`
 
+5. **Frontend Exporter worker** – `app/workers/frontend_exporter.py`
+   - Reads: `jobs`
+   - Writes: `feed.json` and `frontend/*` objects to public GCS bucket
+
 #### Discovery workers (separate discovery pipeline)
 - `run_careers_discovery` and `run_ats_guessing`
   - Reads: `companies`
   - Writes: `company_ats`, `companies.discovery_last_checked_at`
 
 #### Utility/backfill workers exposed via internal API
-- `POST /internal/backfill-compliance` → `app/utils/backfill_compliance.py`
-- `POST /internal/backfill-salary` → `app/utils/backfill_salary.py`
+- `POST /internal/tasks/backfill-compliance` → `app/utils/backfill_compliance.py`
+- `POST /internal/tasks/backfill-salary` → `app/utils/backfill_salary.py`
 
 ### 7. Data model overview
 
@@ -402,7 +414,7 @@ Schema source: `storage/migrations/*.sql` + repository usage in `storage/reposit
 - `GET /ready` (`app/main.py`) – readiness state.
 - `GET /companies` (`app/api/companies.py`) – public directory of remote-friendly companies.
 - `GET /jobs` (`app/api/jobs.py`) – filtered list supporting GIN trigram fuzzy search (`?q=`) from `storage.repositories.jobs_repository.get_jobs`.
-- `GET /jobs/feed` – visible jobs feed with `min_compliance_score=80`, cache headers.
+- `GET /feed.json` – zero-compute visible jobs feed, updated by pipeline and served via GCS.
 - `GET /jobs/stats/compliance-7d` – compliance aggregate from `jobs`.
 
 #### Internal endpoints
@@ -413,9 +425,8 @@ Schema source: `storage/migrations/*.sql` + repository usage in `storage/reposit
 - `GET /internal/audit/stats/company` – company compliance ratios (`jobs` + `companies`).
 - `GET /internal/audit/stats/source-7d` – source compliance ratios (`jobs` + `job_sources`).
 - `POST /internal/audit/tick-dev` – tick endpoint with forced text output.
-- `POST /internal/backfill-compliance` – backfill worker trigger.
-- `POST /internal/backfill-salary` – salary backfill worker trigger.
-- `POST /internal/tasks/{task_id}/cancel` – safely cancel running async tasks.
+- `POST /internal/tasks/{task_name}` – async worker triggers (Cloud Tasks).
+- `POST /internal/tasks/{task_name}/execute` – Cloud Tasks execution handlers.
 
 ### 9. Infrastructure layer
 

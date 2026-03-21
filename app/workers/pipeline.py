@@ -10,6 +10,7 @@ from app.workers.availability import run_availability_pipeline
 from app.workers.lifecycle import run_lifecycle_pipeline
 from app.workers.market_metrics import run_market_metrics_worker
 from app.workers.maintenance import run_maintenance_pipeline
+from app.workers.frontend_exporter import run_frontend_export
 
 logger = logging.getLogger("openjobseu.pipeline")
 
@@ -26,6 +27,7 @@ PIPELINE_STEPS_MAINTENANCE = [
     ("availability", "run_availability_pipeline"),
     ("market_metrics", "run_market_metrics_worker"),
     ("maintenance", "run_maintenance_pipeline"),
+    ("frontend_export", "run_frontend_export"),
 ]
 
 

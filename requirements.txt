@@ -12,3 +12,4 @@ itsdangerous>=2.1.2
 starlette~=0.37.2
 alembic>=1.13.0
 google-auth>=2.0
+google-cloud-storage>=2.14.0

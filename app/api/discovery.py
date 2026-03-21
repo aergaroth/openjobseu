@@ -15,54 +15,51 @@ from app.workers.discovery.dorking import run_dorking_discovery
 
 logger = logging.getLogger("openjobseu.runtime")
 
-discovery_router = APIRouter(
-    prefix="/discovery",
-    tags=["internal-discovery"],
-    dependencies=[Depends(require_internal_or_user_api_access)],
-)
+discovery_ui_router = APIRouter(prefix="/discovery", tags=["internal-discovery-ui"])
+discovery_ops_router = APIRouter(prefix="/discovery", tags=["internal-discovery-ops"])
 
 
-@discovery_router.get("/audit")
+@discovery_ui_router.get("/audit")
 def discovery_audit(q: str | None = Query(None, description="Fuzzy search across company names")):
     results = get_discovered_company_ats(q=q, limit=100)
     return {"count": len(results), "results": results}
 
 
-@discovery_router.get("/candidates")
+@discovery_ui_router.get("/candidates")
 def discovery_candidates(q: str | None = Query(None, description="Fuzzy search across company names")):
     results = get_discovery_candidates(q=q, limit=50)
     return {"count": len(results), "results": results}
 
 
-@discovery_router.post("/careers")
+@discovery_ops_router.post("/careers")
 def run_careers():
     metrics = run_careers_discovery()
     return {"pipeline": "discovery", "phase": "careers_discovery", "metrics": metrics}
 
 
-@discovery_router.post("/guess")
+@discovery_ops_router.post("/guess")
 def run_guessing():
     metrics = run_ats_guessing()
     return {"pipeline": "discovery", "phase": "ats_guessing", "metrics": metrics}
 
 
-@discovery_router.post("/ats-reverse")
+@discovery_ops_router.post("/ats-reverse")
 def run_ats_reverse():
     metrics = run_ats_reverse_discovery()
     return {"pipeline": "discovery", "phase": "ats_reverse", "metrics": metrics}
 
 
-@discovery_router.post("/dorking")
+@discovery_ops_router.post("/dorking")
 def run_dorking():
     metrics = run_dorking_discovery()
     return {"pipeline": "discovery", "phase": "dorking", "metrics": metrics}
 
 
-@discovery_router.post("/run")
+@discovery_ops_router.post("/run")
 def run_discovery():
     return run_discovery_pipeline()
 
 
-@discovery_router.post("/company-sources")
+@discovery_ops_router.post("/company-sources")
 def run_company_sources():
     return run_company_source_discovery()

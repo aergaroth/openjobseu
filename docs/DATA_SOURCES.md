@@ -48,6 +48,7 @@ Ingestion worker:
 Post-ingestion workers:
 - run availability checks
 - apply lifecycle transitions
+- export static JSON feed to Cloud Storage
 
 ---
 

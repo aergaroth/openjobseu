@@ -14,9 +14,10 @@ Order (`app/workers/pipeline.py`):
 2. `run_lifecycle_pipeline` (`app/workers/lifecycle.py`)
 3. `run_availability_pipeline` (`app/workers/availability.py`)
 4. `run_market_metrics_worker` (`app/workers/market_metrics.py`)
+5. `run_frontend_export` (`app/workers/frontend_exporter.py`)
 
 Flow:
-`ATS adapters -> normalize + policy -> DB upsert -> lifecycle/availability -> daily metrics`
+`ATS adapters -> normalize + policy -> DB upsert -> lifecycle/availability -> daily metrics -> GCS Feed Export`
 
 ### B. Discovery pipeline (isolated)
 Entrypoint: `app/workers/discovery/pipeline.py`
@@ -77,14 +78,18 @@ Goal:
   - Reads: `jobs`, `job_sources`
   - Writes: `market_daily_stats`, `market_daily_stats_segments`
 
+- **Frontend exporter** (`app/workers/frontend_exporter.py`)
+  - Reads: `jobs`
+  - Writes: `feed.json` and static frontend files to GCS bucket
+
 ### Discovery workers
 - `run_careers_discovery` (`app/workers/discovery/careers_crawler.py`)
 - `run_ats_guessing` (`app/workers/discovery/ats_guessing.py`)
 
 ### Utility/backfill workers (internal ops)
-- compliance backfill: `POST /internal/backfill-compliance`
-- salary backfill: `POST /internal/backfill-salary`
-- department backfill: `POST /internal/backfill-department`
+- compliance backfill: `POST /internal/tasks/backfill-compliance`
+- salary backfill: `POST /internal/tasks/backfill-salary`
+- discovery trigger: `POST /internal/tasks/discovery`
 
 ---
 
@@ -94,7 +99,7 @@ Goal:
 - `GET /health` – liveness
 - `GET /ready` – readiness
 - `GET /jobs` – job list (filters)
-- `GET /jobs/feed` – job feed (visible jobs, compliance threshold)
+- `GET /feed.json` – zero-compute static job feed (served directly from GCS)
 - `GET /jobs/stats/compliance-7d` – compliance 7d aggregates
 
 - `POST /internal/tick` – runs runtime pipeline

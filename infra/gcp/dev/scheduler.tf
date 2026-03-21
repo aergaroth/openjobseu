@@ -24,7 +24,7 @@ resource "google_cloud_tasks_queue" "tick_pipeline" {
 resource "google_cloud_scheduler_job" "tick_ingestion" {
   name      = "openjobseu-tick-ingestion"
   region    = var.scheduler_region
-  schedule  = "*/15 * * * *" # every 15 minutes
+  schedule  = "0 * * * *" # co godzinę (np. 12:00, 13:00)
   time_zone = "UTC"
   attempt_deadline = "30s"
 
@@ -33,7 +33,7 @@ resource "google_cloud_scheduler_job" "tick_ingestion" {
     uri         = "${google_cloud_run_v2_service.this.uri}/internal/tick?group=ingestion"
 
     headers = {
-      Content-Type      = "application/json"
+      Content-Type = "application/json"
     }
 
     oidc_token {
@@ -45,7 +45,7 @@ resource "google_cloud_scheduler_job" "tick_ingestion" {
 resource "google_cloud_scheduler_job" "dorking_discovery" {
   name      = "openjobseu-dorking"
   region    = var.scheduler_region
-  schedule  = "0 3 * * *" # at 03:00 AM every day (off-peak)
+  schedule  = "0 2 * * *" # o 02:00 w nocy każdego dnia
   time_zone = "UTC"
 
   http_target {
@@ -53,7 +53,7 @@ resource "google_cloud_scheduler_job" "dorking_discovery" {
     uri         = "${google_cloud_run_v2_service.this.uri}/internal/tasks/dorking"
 
     headers = {
-      Content-Type      = "application/json"
+      Content-Type = "application/json"
     }
 
     oidc_token {
@@ -65,7 +65,7 @@ resource "google_cloud_scheduler_job" "dorking_discovery" {
 resource "google_cloud_scheduler_job" "tick_maintenance" {
   name      = "openjobseu-tick-maintenance"
   region    = var.scheduler_region
-  schedule  = "0 * * * *" # at minute 0 past every hour
+  schedule  = "0 4 * * *" # o 04:00 rano każdego dnia
   time_zone = "UTC"
   attempt_deadline = "30s"
 
@@ -74,7 +74,7 @@ resource "google_cloud_scheduler_job" "tick_maintenance" {
     uri         = "${google_cloud_run_v2_service.this.uri}/internal/tick?group=maintenance"
 
     headers = {
-      Content-Type      = "application/json"
+      Content-Type = "application/json"
     }
 
     oidc_token {
@@ -86,7 +86,7 @@ resource "google_cloud_scheduler_job" "tick_maintenance" {
 resource "google_cloud_scheduler_job" "discovery" {
   name      = "openjobseu-discovery"
   region    = var.scheduler_region
-  schedule  = "0 */6 * * *" # at minute 0 past every 6th hour
+  schedule  = "0 6 * * *" # o 06:00 rano każdego dnia
   time_zone = "UTC"
 
   http_target {
@@ -94,7 +94,7 @@ resource "google_cloud_scheduler_job" "discovery" {
     uri         = "${google_cloud_run_v2_service.this.uri}/internal/discovery/run"
 
     headers = {
-      Content-Type      = "application/json"
+      Content-Type = "application/json"
     }
 
     oidc_token {

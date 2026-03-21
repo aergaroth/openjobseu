@@ -9,9 +9,9 @@ variable "region" {
   default     = "europe-north1"
 }
 
-variable "api_region" {
+variable "queue_region" {
   type        = string
-  description = "API key"
+  description = "Region for Cloud Tasks queue"
   default     = "europe-west1"
 }
 

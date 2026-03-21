@@ -1,7 +1,5 @@
 import logging
-import time
 import pytest
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -11,154 +9,46 @@ import app.api.tasks as tasks_api
 client = TestClient(app)
 
 
-@pytest.fixture(autouse=True)
-def clear_async_tasks():
-    """Clear the ASYNC_TASKS registry before each test to ensure isolation."""
-    tasks_api.ASYNC_TASKS.clear()
-    yield
-
-
 def test_trigger_invalid_task():
     response = client.post("/internal/tasks/invalid-task-name")
     assert response.status_code == 404
     assert response.json()["detail"] == "Task not found"
 
 
-def test_get_invalid_task_status():
-    response = client.get("/internal/tasks/invalid-task-id")
-    assert response.status_code == 404
-    assert response.json()["detail"] == "Task not found"
-
-
-def test_task_execution_and_log_capture(monkeypatch):
+def test_task_execution_local_fallback(monkeypatch):
+    """
+    Skoro w środowisku testowym brakuje zmiennych konfiguracyjnych dla Cloud Tasks,
+    endpoint powinnien obsłużyć żądanie synchronicznie jako fallback.
+    """
     def mock_discovery():
-        logger = logging.getLogger("openjobseu.discovery")
-        logger.info("mocked discovery running")
         return {"mocked": "result"}
 
-    monkeypatch.setattr(tasks_api, "run_discovery_pipeline", mock_discovery)
+    # Podmieniamy referencję do funkcji bezpośrednio w słowniku inicjowanym przy starcie modułu
+    monkeypatch.setitem(tasks_api.TASK_MAP, "discovery", mock_discovery)
 
     post_response = client.post("/internal/tasks/discovery")
     assert post_response.status_code == 200
     post_data = post_response.json()
+    
     assert post_data["task"] == "discovery"
-    assert post_data["status"] == "pending"
-    task_id = post_data["task_id"]
-
-    # TestClient in FastAPI runs BackgroundTasks sequentially right after
-    # responding to the HTTP request. Therefore, the task is already completed here.
-    get_response = client.get(f"/internal/tasks/{task_id}")
-    assert get_response.status_code == 200
-    get_data = get_response.json()
-
-    assert get_data["status"] == "completed"
-    assert get_data["result"] == {"mocked": "result"}
-    assert "mocked discovery running" in get_data["logs"]
-    assert "log_deque" not in get_data
-    assert "finished_at" in get_data
+    assert post_data["status"] == "completed"
+    assert "task_id" in post_data
+    assert post_data["result"] == {"mocked": "result"}
 
 
-def test_task_failure_handling(monkeypatch):
-    def mock_failing_task():
-        logger = logging.getLogger("openjobseu.guess")
-        logger.info("about to fail")
-        raise ValueError("simulated error")
-
-    monkeypatch.setattr(tasks_api, "run_ats_guessing", mock_failing_task)
-
-    post_response = client.post("/internal/tasks/guess")
-    assert post_response.status_code == 200
-    task_id = post_response.json()["task_id"]
-
-    get_response = client.get(f"/internal/tasks/{task_id}")
-    assert get_response.status_code == 200
-    get_data = get_response.json()
-
-    assert get_data["status"] == "failed"
-    assert get_data["error"] == "simulated error"
-    assert "about to fail" in get_data["logs"]
-    assert "log_deque" not in get_data
-    assert "finished_at" in get_data
-
-
-def test_task_log_truncation(monkeypatch):
-    def mock_chatty_task():
-        logger = logging.getLogger("openjobseu.chatty")
-        for i in range(250):
-            logger.info(f"log line {i}")
-        return True
-
-    monkeypatch.setattr(tasks_api, "run_careers_discovery", mock_chatty_task)
-    task_id = client.post("/internal/tasks/careers").json()["task_id"]
-    logs = client.get(f"/internal/tasks/{task_id}").json()["logs"]
-
-    assert "... [TRUNCATED] ..." in logs
-    assert "log line 0" not in logs
-    assert "log line 50" in logs
-    assert "log line 249" in logs
-    assert len(logs.split("\n")) == 201  # 200 elements inside deque + 1 element representing the truncation header
-
-
-def test_cleanup_old_tasks():
-    now = time.time()
+def test_cloud_tasks_enqueuing_behavior(monkeypatch):
+    monkeypatch.setattr(tasks_api, "is_tick_queue_configured", lambda: True)
     
-    tasks_api.ASYNC_TASKS["t1"] = {"status": "completed", "finished_at": now - 100}
-    tasks_api.ASYNC_TASKS["t2"] = {"status": "completed", "finished_at": now - 700}
-    tasks_api.ASYNC_TASKS["t3"] = {"status": "failed", "finished_at": now - 800}
-    tasks_api.ASYNC_TASKS["t4"] = {"status": "running"}  # Should not be deleted even if old
+    def mock_create_tick_task(task_id, handler_url, payload, headers):
+        assert handler_url.endswith("/internal/tasks/discovery/execute")
+        assert payload["incremental"] is True
+        return {"name": "projects/xyz/locations/xyz/queues/xyz/tasks/xyz"}
+        
+    monkeypatch.setattr(tasks_api, "create_tick_task", mock_create_tick_task)
     
-    tasks_api._cleanup_old_tasks(retention_seconds=600)
+    response = client.post("/internal/tasks/discovery?incremental=true")
+    assert response.status_code == 202
     
-    assert "t1" in tasks_api.ASYNC_TASKS
-    assert "t2" not in tasks_api.ASYNC_TASKS
-    assert "t3" not in tasks_api.ASYNC_TASKS
-    assert "t4" in tasks_api.ASYNC_TASKS
-
-
-def test_prevent_concurrent_tasks():
-    tasks_api.ASYNC_TASKS["dummy_id"] = {
-        "task": "backfill-salary",
-        "status": "running"
-    }
-    
-    response = client.post("/internal/tasks/backfill-salary")
-    assert response.status_code == 409
-    assert response.json()["detail"] == "Task backfill-salary is already running"
-
-
-def test_tasks_endpoints_are_protected_by_auth():
-    def mock_unauthorized():
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    app.dependency_overrides[require_internal_or_user_api_access] = mock_unauthorized
-
-    try:
-        post_response = client.post("/internal/tasks/discovery")
-        assert post_response.status_code == 401
-        assert post_response.json()["detail"] == "Not authenticated"
-
-        get_response = client.get("/internal/tasks/dummy-id")
-        assert get_response.status_code == 401
-        assert get_response.json()["detail"] == "Not authenticated"
-    finally:
-        app.dependency_overrides.clear()
-
-
-def test_trigger_dorking_task(monkeypatch):
-    def mock_dorking():
-        logger = logging.getLogger("openjobseu.dorking")
-        logger.info("dorking discovery executed in background")
-        return {"status": "ok", "discovered_slugs": 5}
-
-    monkeypatch.setattr(tasks_api, "run_dorking_discovery", mock_dorking)
-
-    response = client.post("/internal/tasks/dorking")
-    assert response.status_code == 200
-    task_id = response.json()["task_id"]
-
-    get_response = client.get(f"/internal/tasks/{task_id}")
-    assert get_response.status_code == 200
-    data = get_response.json()
-    assert data["status"] == "completed"
-    assert data["result"] == {"status": "ok", "discovered_slugs": 5}
-    assert "dorking discovery executed in background" in data["logs"]
+    data = response.json()
+    assert data["status"] == "enqueued"
+    assert data["cloud_task_name"] is not None

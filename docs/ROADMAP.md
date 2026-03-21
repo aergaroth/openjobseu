@@ -47,21 +47,25 @@ Non-goals remain unchanged:
 - [x] CI test workflow with PostgreSQL service
 - [x] Runtime-aware logging (text local, JSON in containers)
 - [x] Reorganized ATS adapters into `app/adapters/ats/` structure
+- [x] Cloud Tasks for robust async execution (backfills, discovery)
+- [x] OIDC authentication for M2M communication (Scheduler, Tasks)
+- [x] Modular Monolith routing groups for strict access control
+- [x] Zero-compute public feed generation (GCS static export)
 
 ---
 
 ## Next Priorities
 
 ### P1 – Source strategy
-- [ ] Finalize explicit activation policy for adapters present in code but disabled in registry
+- [x] Finalize explicit activation policy for adapters present in code but disabled in registry
 
 ### P2 – Company data maturity
-- [ ] Add operational workflows for curated `companies` maintenance (ATS slug hygiene, activation lifecycle)
-- [ ] Connect company signal scoring pipeline into production runtime decisions
+- [x] Add operational workflows for curated `companies` maintenance (ATS slug hygiene, activation lifecycle)
+- [x] Connect company signal scoring pipeline into production runtime decisions
 
 ### P3 – DB and migration hardening
-- [ ] Introduce explicit migration tooling (Alembic or equivalent)
-- [ ] Tune indexes for feed/audit/lifecycle query patterns
+- [x] Introduce explicit migration tooling (Alembic or equivalent)
+- [x] Tune indexes for feed/audit/lifecycle query patterns
 - [ ] Add automated post-deploy smoke checks
 
 ### P4 – Observability

@@ -28,14 +28,12 @@ logger = logging.getLogger("openjobseu.runtime")
 audit_ui_router = APIRouter(
     prefix="/audit",
     tags=["internal-audit-ui"],
-    dependencies=[Depends(require_user_login)],
     include_in_schema=False,  # Ukrywa widoki HTML w Swaggerze
 )
 
 audit_api_router = APIRouter(
     prefix="/audit",
     tags=["internal-audit"],
-    dependencies=[Depends(require_user_api_access)],
 )
 
 # Resolve path to project root (from app/api/audit.py -> root)
