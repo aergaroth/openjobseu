@@ -284,17 +284,22 @@ async function loadFilterRegistry() {
   }
 }
 
-async function loadJobs() {
+async function loadJobs(includeCounts = true) {
   const params = paramsFromFilters();
+  params.set("include_counts", includeCounts);
   const response = await fetch(`/internal/audit/jobs?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`audit request failed with status ${response.status}`);
   }
   const data = await response.json();
-  document.getElementById("total-count").textContent = String(data.total || 0);
-  renderCountMap("count-status", data.counts?.status || {});
-  renderCountMap("count-source", data.counts?.source || {});
-  renderCountMap("count-compliance", data.counts?.compliance_status || {});
+
+  if (includeCounts) {
+    document.getElementById("total-count").textContent = String(data.total || 0);
+    renderCountMap("count-status", data.counts?.status || {});
+    renderCountMap("count-source", data.counts?.source || {});
+    renderCountMap("count-compliance", data.counts?.compliance_status || {});
+  }
+
   currentJobs = data.items || [];
   renderJobHeaders();
   renderJobRows(currentJobs);
@@ -361,9 +366,9 @@ async function safeLoadCompanies() {
   }
 }
 
-async function safeLoadJobs() {
+async function safeLoadJobs(includeCounts = true) {
   try {
-    await loadJobs();
+    await loadJobs(includeCounts);
   } catch (error) {
     const body = document.getElementById("rows");
     body.innerHTML = `<tr><td class="error" colspan="13">${esc(error.message)}</td></tr>`;
@@ -784,70 +789,17 @@ async function runInternalAsync(taskName, btn, extraParams = {}) {
       statusHeader.innerHTML = `<span class="task-status-badge pending">pending</span> <span style="font-size: 0.85rem; color: var(--muted);">ID: ${taskId}</span>`;
       const pBar = document.getElementById("task-progress-bar");
       if (pBar) {
-        pBar.className = "progress-bar-fill pending";
+        pBar.className = "progress-bar-fill completed";
       }
       statusGrid.innerHTML = "";
     }
 
-    let attempt = 0;
-    while (true) {
-      attempt++;
-      await new Promise(r => setTimeout(r, 2000));
-      const statusRes = await fetch(`/internal/tasks/${taskId}`);
-      if (!statusRes.ok) throw new Error("Failed to fetch task status");
-      const statusData = await statusRes.json();
+    // Pomyślnie zakolejkowano - praca dzieje się w tle bez ciągłego odpytywania
+    meta.textContent = `Task ${taskName} [${taskId}] enqueued successfully.`;
+    out.textContent = "The task is now running in the background on Cloud Tasks.\nPlease check the GCP Cloud Run / Cloud Tasks logs for detailed output and progress.";
+    if (cancelBtn) cancelBtn.style.display = "none";
+    currentTaskId = null;
 
-      const { logs, result, status, task, error, ...restData } = statusData;
-      
-      let displayStatus = status;
-      if (status === 'running' && restData.cancel_requested) {
-        displayStatus = 'cancelling';
-      }
-      
-      if (statusContainer) {
-        statusContainer.style.display = "block";
-        statusHeader.innerHTML = `<span class="task-status-badge ${esc(displayStatus)}">${esc(displayStatus)}</span> <span style="font-size: 0.85rem; color: var(--muted);">Attempt: ${attempt} &bull; ID: ${taskId}</span>`;
-        
-        const pBar = document.getElementById("task-progress-bar");
-        if (pBar) {
-          pBar.className = `progress-bar-fill ${esc(displayStatus)}`;
-        }
-        
-        let gridHtml = '';
-        if (error) {
-          gridHtml += `<div class="task-stat-card error-card"><strong>Error</strong><span style="font-size: 0.9rem; font-family: monospace;">${esc(error)}</span></div>`;
-        }
-        
-        if (result !== undefined && result !== null) {
-          if (typeof result === 'object') {
-            for (const [k, v] of Object.entries(result)) {
-              if (typeof v === 'object' && v !== null) {
-                const valDisplay = esc(JSON.stringify(v, null, 2));
-                gridHtml += `<div class="task-stat-card" style="grid-column: 1 / -1;"><strong>${esc(k)}</strong><pre class="json-dump" style="margin-top: 8px; max-height: 250px; overflow: auto; font-weight: normal; line-height: 1.4;">${valDisplay}</pre></div>`;
-              } else {
-                gridHtml += `<div class="task-stat-card"><strong>${esc(k)}</strong><span>${esc(String(v))}</span></div>`;
-              }
-            }
-          } else {
-            gridHtml += `<div class="task-stat-card"><strong>Result</strong><span>${esc(String(result))}</span></div>`;
-          }
-        }
-        statusGrid.innerHTML = gridHtml;
-      }
-
-      const { logs: _l, ...pureJson } = statusData;
-      out.dataset.rawJson = JSON.stringify(pureJson, null, 2);
-
-      out.textContent = logs ? logs : "No logs emitted.";
-      out.scrollTop = out.scrollHeight; // Auto-scroll to new logs
-
-      if (["completed", "failed", "cancelled"].includes(statusData.status)) {
-        meta.textContent = `Task ${taskName} [${taskId}] finished in ${attempt} attempts.`;
-        if (cancelBtn) cancelBtn.style.display = "none";
-        currentTaskId = null;
-        break;
-      }
-    }
   } catch (err) {
     meta.textContent = "error";
     out.textContent = String(err);
@@ -868,7 +820,7 @@ if (compTopScrollWrap && compTableWrap) {
 
 function scheduleLoad() {
   if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(safeLoadJobs, 250);
+  debounceTimer = setTimeout(() => safeLoadJobs(true), 250);
 }
 
 for (const id of ids) {
@@ -884,7 +836,7 @@ document.getElementById("prev-btn").addEventListener("click", () => {
   const limit = parseInt(document.getElementById("limit").value || "50", 10);
   let offset = parseInt(offsetEl.value || "0", 10);
   offsetEl.value = Math.max(0, offset - limit);
-  safeLoadJobs();
+  safeLoadJobs(false); // Optymalizacja: pomijamy liczenie
 });
 
 document.getElementById("next-btn").addEventListener("click", () => {
@@ -892,7 +844,7 @@ document.getElementById("next-btn").addEventListener("click", () => {
   const limit = parseInt(document.getElementById("limit").value || "50", 10);
   let offset = parseInt(document.getElementById("offset").value || "0", 10);
   offsetEl.value = offset + limit;
-  safeLoadJobs();
+  safeLoadJobs(false); // Optymalizacja: pomijamy liczenie
 });
 
 // Clear filters binding
@@ -902,7 +854,7 @@ document.getElementById("clear-btn").addEventListener("click", () => {
     if (!el) continue;
     el.value = (id === 'limit') ? "50" : (id === 'offset') ? "0" : "";
   }
-  safeLoadJobs();
+  safeLoadJobs(true);
 });
 
 // Top scrollbar sync

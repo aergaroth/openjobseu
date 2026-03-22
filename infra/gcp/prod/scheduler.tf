@@ -31,7 +31,7 @@ resource "google_cloud_tasks_queue" "tick_pipeline" {
 resource "google_cloud_scheduler_job" "tick_ingestion" {
   name      = "openjobseu-tick-ingestion"
   region    = var.scheduler_region
-  schedule  = "*/15 * * * *" # every 15 minutes
+  schedule  = "*/35 * * * *" # every 35 minutes
   time_zone = "UTC"
   attempt_deadline = "30s"
 

@@ -1,19 +1,15 @@
 (() => {
   const API_BASE = "https://openjobseu-669791171061.europe-north1.run.app";
   const FEED_URL = "/feed.json";
-  const STATS_URL = `${API_BASE}/jobs/stats/compliance-7d`;
 
   const metaEl = document.getElementById("meta");
   const jobsBody = document.querySelector("#jobs-table tbody");
-  const statsMetaEl = document.getElementById("stats-meta");
-  const statsBody = document.querySelector("#stats-table tbody");
 
-  if (!metaEl || !jobsBody || !statsMetaEl || !statsBody) {
+  if (!metaEl || !jobsBody) {
     return;
   }
 
   metaEl.textContent = "Loading feed...";
-  statsMetaEl.textContent = "Loading stats...";
 
   fetch(FEED_URL)
     .then((r) => r.json())
@@ -41,30 +37,5 @@
     })
     .catch(() => {
       metaEl.textContent = "Job feed is temporarily unavailable.";
-    });
-
-  fetch(STATS_URL)
-    .then((r) => r.json())
-    .then((data) => {
-      statsBody.innerHTML = "";
-      const ratio =
-        data.approved_ratio_pct === null
-          ? "N/A"
-          : `${Number(data.approved_ratio_pct).toFixed(2)}%`;
-
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${data.total_jobs}</td>
-        <td>${data.approved}</td>
-        <td>${data.review}</td>
-        <td>${data.rejected}</td>
-        <td>${ratio}</td>
-      `;
-      statsBody.appendChild(tr);
-
-      statsMetaEl.textContent = "Window: last 7 days by first_seen_at.";
-    })
-    .catch(() => {
-      statsMetaEl.textContent = "Stats are temporarily unavailable.";
     });
 })();

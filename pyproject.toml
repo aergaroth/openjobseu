@@ -15,3 +15,6 @@ unfixable = ["F401"]
 # przed zaimportowaniem docelowych modułów z naszej aplikacji.
 "scripts/*.py" = ["E402"]
 "validator/tests/*.py" = ["E402"]
+
+[tool.pytest.ini_options]
+env_files = [".env"]
