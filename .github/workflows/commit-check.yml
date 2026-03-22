@@ -15,7 +15,12 @@ jobs:
         with:
           fetch-depth: 0 # Wymagane, aby pobrać całą historię PR-a
           
-      - name: Validate commits with Commitizen
-        uses: commitizen-tools/commitizen-action@master
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          python-version: "3.13"
+
+      - name: Check commit messages with Commitizen
+        run: |
+          pip install commitizen
+          cz check --rev-range ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
