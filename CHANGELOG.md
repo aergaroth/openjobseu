@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.3.0](https://github.com/aergaroth/openjobseu/compare/v0.2.0...v0.3.0) (2026-03-22)
+
+
+### Features
+
+* decouple Cloud Tasks handlers and implement time-budgeting ([749152b](https://github.com/aergaroth/openjobseu/commit/749152b022fdb8c4ea388bcd847ad1bc75ff5f67))
+
+
+### Bug Fixes
+
+* resolve cron storm, UI FOUC, and CI validation errors ([0f50273](https://github.com/aergaroth/openjobseu/commit/0f50273ef0d77f8965cb29909000ba5ee0286b36))
+
+
+### Documentation
+
+* synchronize architecture, system map and roadmap ([5a33fda](https://github.com/aergaroth/openjobseu/commit/5a33fda1a7b24d280793020ded4263df97b7dc3d))
+
 ## [0.2.0](https://github.com/aergaroth/openjobseu/compare/v0.1.0...v0.2.0) (2026-03-22)
 
 
