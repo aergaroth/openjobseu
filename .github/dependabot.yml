@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(deps)"
+    # Zgrupowanie aktualizacji zmniejsza szum w repozytorium (opcjonalne, ale bardzo wygodne)
+    groups:
+      python-deps:
+        patterns:
+          - "*"

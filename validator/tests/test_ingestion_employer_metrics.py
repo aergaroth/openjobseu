@@ -91,9 +91,7 @@ def test_run_employer_ingestion_reports_standardized_metrics(monkeypatch):
     assert fetch_calls[0]["companies_processed"] == 2
     assert fetch_calls[0]["companies_load_duration_ms"] >= 0
 
-    summary_calls = [
-        call for call in log_calls if call.get("phase") == "ingestion_summary"
-    ]
+    summary_calls = [call for call in log_calls if call.get("phase") == "ingestion_summary"]
     assert len(summary_calls) == 1
     summary = summary_calls[0]
     assert summary["source"] == "employer_ing"

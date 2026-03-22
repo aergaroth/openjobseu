@@ -26,7 +26,7 @@ def backfill_missing_departments() -> int:
     for idx, row in enumerate(companies, 1):
         company = dict(row)
         provider = company.get("provider")
-        
+
         try:
             adapter = get_adapter(provider)
         except ValueError:
@@ -35,7 +35,7 @@ def backfill_missing_departments() -> int:
         try:
             # Force full fetch without time filter (updated_since=None)
             raw_jobs = adapter.fetch(company, updated_since=None)
-            
+
             for raw_job in raw_jobs:
                 normalized = adapter.normalize(raw_job)
                 if not normalized or not normalized.get("department"):
@@ -66,12 +66,15 @@ def backfill_missing_departments() -> int:
                             "specialization": processed.get("specialization"),
                             "source": processed.get("source"),
                             "source_job_id": processed.get("source_job_id"),
-                        }
+                        },
                     )
                     updated_count += result.rowcount
 
         except Exception as e:
-            logger.warning("backfill_department_failed", extra={"company_id": company.get("company_id"), "error": str(e)})
+            logger.warning(
+                "backfill_department_failed",
+                extra={"company_id": company.get("company_id"), "error": str(e)},
+            )
 
         if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
             pct = int((idx / total) * 100)

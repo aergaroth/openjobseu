@@ -31,4 +31,3 @@ EU_ELIGIBLE_GEO_CLASSES: frozenset[GeoClass] = frozenset(
         GeoClass.UK,
     }
 )
-

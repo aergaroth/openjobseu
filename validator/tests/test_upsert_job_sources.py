@@ -30,7 +30,6 @@ def _make_job(
 
 
 def test_upsert_merges_same_fingerprint_from_different_sources():
-
     job_a = _make_job(
         "greenhouse:acme:123",
         source="greenhouse:acme",
@@ -53,13 +52,17 @@ def test_upsert_merges_same_fingerprint_from_different_sources():
         jobs_count = conn.execute(text("SELECT COUNT(*) FROM jobs")).scalar_one()
         assert int(jobs_count) == 1
 
-        rows = conn.execute(
-            text("""
+        rows = (
+            conn.execute(
+                text("""
                 SELECT source, source_job_id, job_id
                 FROM job_sources
                 ORDER BY source ASC
             """)
-        ).mappings().all()
+            )
+            .mappings()
+            .all()
+        )
 
     assert len(rows) == 2
     assert rows[0]["source"] == "greenhouse:acme"
@@ -70,7 +73,6 @@ def test_upsert_merges_same_fingerprint_from_different_sources():
 
 
 def test_upsert_reuses_same_source_mapping():
-
     first = _make_job(
         "lever:other:first",
         source="lever:other",
@@ -90,8 +92,9 @@ def test_upsert_reuses_same_source_mapping():
         upsert_job(first, conn=conn)
         upsert_job(updated, conn=conn)
 
-        row = conn.execute(
-            text("""
+        row = (
+            conn.execute(
+                text("""
                 SELECT
                     j.job_id,
                     j.title,
@@ -103,7 +106,10 @@ def test_upsert_reuses_same_source_mapping():
                 JOIN job_sources js ON js.job_id = j.job_id
                 WHERE js.source = 'lever:other' AND js.source_job_id = '42'
             """)
-        ).mappings().one()
+            )
+            .mappings()
+            .one()
+        )
 
         jobs_count = conn.execute(text("SELECT COUNT(*) FROM jobs")).scalar_one()
         source_rows_count = conn.execute(text("SELECT COUNT(*) FROM job_sources")).scalar_one()

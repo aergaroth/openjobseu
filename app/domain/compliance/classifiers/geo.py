@@ -97,7 +97,7 @@ def _classify_from_remote_scope(scope_l: str) -> dict | None:
 
     if any(_contains_phrase(scope_l, kw) for kw in NON_EU_SCOPE_TITLE_PHRASES):
         found_non_eu = True
-        
+
     if any(_contains_phrase(scope_l, kw) for kw in US_STRONG_SIGNALS):
         found_non_eu = True
 
@@ -105,7 +105,7 @@ def _classify_from_remote_scope(scope_l: str) -> dict | None:
         if token.upper() in US_STATE_CODES:
             found_non_eu = True
             continue
-            
+
         if token in COUNTRY_ALIASES:
             mapped_full_name = COUNTRY_ALIASES[token].lower()
             if mapped_full_name in EU_MEMBER_STATES or mapped_full_name in EOG_COUNTRIES:
@@ -160,7 +160,7 @@ def _classify_from_localization_section(description: str) -> dict | None:
     for country in EU_MEMBER_STATES:
         if _contains_phrase(localization_text, country):
             return {"geo_class": GeoClass.EU_MEMBER_STATE, "reason": country}
-            
+
     for country in EOG_COUNTRIES:
         if _contains_phrase(localization_text, country):
             return {"geo_class": GeoClass.EU_REGION, "reason": country}
@@ -172,7 +172,10 @@ def _classify_from_localization_section(description: str) -> dict | None:
         if _contains_phrase(localization_text, alias):
             mapped_full_name = mapped.lower()
             if mapped_full_name in EU_MEMBER_STATES:
-                return {"geo_class": GeoClass.EU_MEMBER_STATE, "reason": mapped_full_name}
+                return {
+                    "geo_class": GeoClass.EU_MEMBER_STATE,
+                    "reason": mapped_full_name,
+                }
             if mapped_full_name in EOG_COUNTRIES:
                 return {"geo_class": GeoClass.EU_REGION, "reason": mapped_full_name}
 
@@ -190,10 +193,7 @@ def classify_geo(
     remote_scope: str,
 ) -> dict:
     title_l = (title or "").lower()
-    desc_l = (description or "").lower()
     scope_l = (remote_scope or "").lower()
-
-    full_text = f"{title_l} {desc_l} {scope_l}"
 
     # 1 Hard non-EU regions (highest priority)
     for kw in NON_EU_REGION_CUSTOM:

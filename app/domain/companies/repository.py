@@ -1,15 +1,12 @@
 from datetime import datetime
 from uuid import uuid4
-from typing import Iterable
 
 from sqlalchemy import text, bindparam
 
-from storage.db_engine import get_engine
 from .models import Company
 
 
 class CompanyRepository:
-
     # ----------------------------
     # READ
     # ----------------------------
@@ -33,10 +30,7 @@ class CompanyRepository:
 
         rows = conn.execute(query, {"names": lowered}).mappings().all()
 
-        return {
-            row["legal_name"].lower(): Company(**row)
-            for row in rows
-        }
+        return {row["legal_name"].lower(): Company(**row) for row in rows}
 
     # ----------------------------
     # WRITE - BOOTSTRAP
@@ -53,11 +47,7 @@ class CompanyRepository:
 
         now = datetime.utcnow()
 
-        rows = [{
-            "company_id": uuid4(),
-            "legal_name": name,
-            "now": now
-        } for name in names]
+        rows = [{"company_id": uuid4(), "legal_name": name, "now": now} for name in names]
 
         query = text("""
             INSERT INTO companies (
@@ -106,18 +96,21 @@ class CompanyRepository:
 
         now = datetime.utcnow()
 
-        rows = [{
-            "company_id": company.get("company_id", uuid4()),
-            "legal_name": company["legal_name"],
-            "hq_country": company["hq_country"],
-            "eu_entity_verified": company.get("eu_entity_verified", False),
-            "remote_posture": company["remote_posture"],
-            "ats_provider": company.get("ats_provider"),
-            "ats_slug": company.get("ats_slug"),
-            "ats_api_url": company.get("ats_api_url"),
-            "careers_url": company.get("careers_url"),
-            "now": now
-        } for company in companies]
+        rows = [
+            {
+                "company_id": company.get("company_id", uuid4()),
+                "legal_name": company["legal_name"],
+                "hq_country": company["hq_country"],
+                "eu_entity_verified": company.get("eu_entity_verified", False),
+                "remote_posture": company["remote_posture"],
+                "ats_provider": company.get("ats_provider"),
+                "ats_slug": company.get("ats_slug"),
+                "ats_api_url": company.get("ats_api_url"),
+                "careers_url": company.get("careers_url"),
+                "now": now,
+            }
+            for company in companies
+        ]
 
         query = text("""
             INSERT INTO companies (

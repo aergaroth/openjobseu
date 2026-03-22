@@ -44,10 +44,7 @@ def _create_standard_postgres_engine(database_url: str) -> Engine:
         max_overflow=5,
         pool_timeout=30,
         pool_recycle=1800,
-        connect_args={
-            "connect_timeout": 10
-
-        },
+        connect_args={"connect_timeout": 10},
         future=True,
     )
 
@@ -68,8 +65,6 @@ def _resolve_engine() -> Engine:
         if not database_url.startswith("postgresql+psycopg://"):
             raise RuntimeError("DATABASE_URL must use postgresql+psycopg://")
         return _create_standard_postgres_engine(database_url)
-    
-
 
     raise RuntimeError(f"Unsupported DB_MODE: {db_mode}")
 

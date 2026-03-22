@@ -57,7 +57,9 @@ def build_tick_context(
 
     if request is not None:
         scheduler_job_name = scheduler_job_name or _clean(request.headers.get("x-cloudscheduler-jobname"))
-        scheduler_schedule_time = scheduler_schedule_time or _clean(request.headers.get("x-cloudscheduler-scheduletime"))
+        scheduler_schedule_time = scheduler_schedule_time or _clean(
+            request.headers.get("x-cloudscheduler-scheduletime")
+        )
         task_name = task_name or _clean(request.headers.get("x-cloudtasks-taskname"))
 
     context = {

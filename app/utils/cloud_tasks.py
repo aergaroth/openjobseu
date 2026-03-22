@@ -60,11 +60,11 @@ def create_tick_task(
 
     service_account_email = os.getenv("SCHEDULER_SA_EMAIL")
     audience = os.getenv("BASE_URL")
-    
+
     if service_account_email and audience:
         task_payload["httpRequest"]["oidcToken"] = {
             "serviceAccountEmail": service_account_email,
-            "audience": audience
+            "audience": audience,
         }
 
     try:

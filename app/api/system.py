@@ -4,9 +4,10 @@ import os
 import re
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from pydantic import BaseModel, ConfigDict
+from typing import Any
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 
-from app.security.auth import require_internal_or_user_api_access
 
 from app.logging import should_use_text_logs
 from app.utils.cloud_tasks import create_tick_task, is_tick_queue_configured
@@ -32,24 +33,30 @@ system_hybrid_router = APIRouter(tags=["internal-system-hybrid"])
 TICK_SOURCE = "employer_ing"
 
 
-@system_hybrid_router.get("/metrics")
+class BackfillResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: str
+    updated_jobs_count: int
+
+
+@system_hybrid_router.get("/metrics", response_model=dict[str, Any])
 def internal_metrics():
     return get_system_metrics()
 
 
-@system_ops_router.post("/backfill-compliance")
+@system_ops_router.post("/backfill-compliance", response_model=BackfillResponse)
 def backfill_compliance(limit: int = Query(1000, ge=1, le=10000)):
     updated_count = backfill_missing_compliance_classes(limit=limit)
     return {"status": "ok", "updated_jobs_count": updated_count}
 
 
-@system_ops_router.post("/backfill-salary")
+@system_ops_router.post("/backfill-salary", response_model=BackfillResponse)
 def backfill_salary(limit: int = Query(1000, ge=1, le=10000)):
     updated_count = backfill_missing_salary_fields(limit=limit)
     return {"status": "ok", "updated_jobs_count": updated_count}
 
 
-@system_ops_router.post("/backfill-department")
+@system_ops_router.post("/backfill-department", response_model=BackfillResponse)
 def backfill_department():
     updated_count = backfill_missing_departments()
     return {"status": "ok", "updated_jobs_count": updated_count}
@@ -121,13 +128,18 @@ def preview_job_endpoint(provider: str, slug: str, job_id: str | None = None):
     return Response(content="\n".join(output), media_type="text/plain")
 
 
-@system_ops_router.post("/tick")
+@system_ops_router.post("/tick", response_model=dict[str, Any])
 def manual_tick(
     request: Request,
     response_format: str = Query("auto", alias="format", pattern="^(auto|text|json)$"),
     group: str = Query("all", pattern="^(all|ingestion|maintenance)$"),
     incremental: bool = Query(True, description="Enable incremental fetch based on last sync date"),
-    limit: int = Query(100, ge=1, le=1000, description="Limit the number of companies processed in this tick"),
+    limit: int = Query(
+        100,
+        ge=1,
+        le=1000,
+        description="Limit the number of companies processed in this tick",
+    ),
 ):
     return tick(
         request=request,
@@ -138,7 +150,7 @@ def manual_tick(
     )
 
 
-@system_ops_router.post("/tick/execute")
+@system_ops_router.post("/tick/execute", response_model=dict[str, Any])
 async def execute_tick(request: Request):
     body = await request.json()
     group = body.get("group", "all")
@@ -196,13 +208,17 @@ def tick(
     return _execute_tick(
         response_format=response_format,
         force_text=force_text,
-        context={**context, "execution_mode": "sync_request", "trigger_source": "direct_request"},
+        context={
+            **context,
+            "execution_mode": "sync_request",
+            "trigger_source": "direct_request",
+        },
     )
 
 
 def _enqueue_tick(*, request: Request, response_format: str, force_text: bool, context: dict):
     query = urlencode({"group": context["group"]})
-    base_url = os.getenv("BASE_URL", str(request.base_url).rstrip('/'))
+    base_url = os.getenv("BASE_URL", str(request.base_url).rstrip("/"))
     handler_url = f"{base_url}/internal/tick/execute?{query}"
     try:
         task_response = create_tick_task(

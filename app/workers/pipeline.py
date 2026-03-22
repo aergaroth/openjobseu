@@ -5,12 +5,25 @@ from time import perf_counter
 from typing import Any
 
 from app.utils.tick_context import reset_current_tick_context, set_current_tick_context
+
+# Ponownie ładujemy potrzebne funkcje (Ruff wykasował je w poprzednim kroku)
 from app.workers.ingestion.employer import run_employer_ingestion
 from app.workers.availability import run_availability_pipeline
 from app.workers.lifecycle import run_lifecycle_pipeline
 from app.workers.market_metrics import run_market_metrics_worker
 from app.workers.maintenance import run_maintenance_pipeline
 from app.workers.frontend_exporter import run_frontend_export
+
+# Definiujemy __all__, aby poinformować analizatory statyczne (i Ruffa),
+# że te funkcje są częścią publicznego interfejsu tego modułu i muszą w nim pozostać.
+__all__ = [
+    "run_employer_ingestion",
+    "run_availability_pipeline",
+    "run_lifecycle_pipeline",
+    "run_market_metrics_worker",
+    "run_maintenance_pipeline",
+    "run_frontend_export",
+]
 
 logger = logging.getLogger("openjobseu.pipeline")
 

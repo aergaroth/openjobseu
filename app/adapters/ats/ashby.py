@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any
 import logging
 
 from app.adapters.ats.base import ATSAdapter
@@ -14,13 +14,14 @@ from app.utils.cleaning import clean_description
 
 logger = logging.getLogger(__name__)
 
+
 class AshbyAdapter(ATSAdapter):
     dorking_target = "jobs.ashbyhq.com"
     source_name = "ashby"
     active = True
-    
+
     API_URL_TEMPLATE = "https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true"
-    
+
     @staticmethod
     def _resolve_slug(company: dict) -> str:
         slug = str(company.get("ats_slug") or "").strip()
@@ -38,7 +39,7 @@ class AshbyAdapter(ATSAdapter):
         data = self._parse_json(resp, slug)
 
         jobs = data.get("jobs", [])
-        
+
         if not isinstance(jobs, list):
             raise ValueError("Ashby API did not return a jobs list")
 
@@ -54,10 +55,10 @@ class AshbyAdapter(ATSAdapter):
         slug = raw_job.get("_ats_slug")
         if not slug:
             raise ValueError("Missing _ats_slug in raw_job. Ensure fetch() was called.")
-        
+
         raw_id = raw_job.get("id")
         title = (raw_job.get("title") or "").strip()
-        
+
         source_url = raw_job.get("jobUrl")
         if not source_url:
             source_url = f"https://jobs.ashbyhq.com/{slug}/{raw_id}"
@@ -70,17 +71,19 @@ class AshbyAdapter(ATSAdapter):
 
         company_name = slug.replace("-", " ").replace("_", " ").strip().title()
 
-        description = self.build_description(raw_job, [
-            (["descriptionHtml", "descriptionPlain"], None)
-        ])
+        description = self.build_description(raw_job, [(["descriptionHtml", "descriptionPlain"], None)])
 
         if not raw_id or not title or not source_url:
             return None
 
         cleaned_description = clean_description(description, source=self.source_name)
-        
+
         is_remote_location = "remote" in (location or "").lower()
-        is_remote = self.detect_remote(title, location, explicit_flag=(raw_job.get("isRemote") is True or is_remote_location))
+        is_remote = self.detect_remote(
+            title,
+            location,
+            explicit_flag=(raw_job.get("isRemote") is True or is_remote_location),
+        )
 
         normalized_remote_scope = self.normalize_remote_scope(location)
 
@@ -113,7 +116,7 @@ class AshbyAdapter(ATSAdapter):
             raise ValueError("slug cannot be empty for ashby probe")
 
         api_url = self.API_URL_TEMPLATE.format(slug=ats_slug)
-        
+
         resp = self.session.get(api_url, timeout=15)
         resp.raise_for_status()
 
@@ -140,9 +143,14 @@ class AshbyAdapter(ATSAdapter):
 
             title = (job.get("title") or "").lower()
             location = sanitize_location(job.get("location")) or ""
-            
+
             is_remote_location = "remote" in location.lower()
-            if self.detect_remote(title, location, explicit_flag=(job.get("isRemote") is True or is_remote_location), is_probe=True):
+            if self.detect_remote(
+                title,
+                location,
+                explicit_flag=(job.get("isRemote") is True or is_remote_location),
+                is_probe=True,
+            ):
                 remote_hits += 1
 
         return {
@@ -150,5 +158,6 @@ class AshbyAdapter(ATSAdapter):
             "recent_job_at": recent_job_at,
             "remote_hits": remote_hits,
         }
+
 
 register(AshbyAdapter.source_name, AshbyAdapter)

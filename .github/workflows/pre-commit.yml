@@ -1,0 +1,31 @@
+name: pre-commit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          
+      - uses: pre-commit/action@v3.0.1
+        env:
+          SKIP: pytest
+
+      - name: Auto-commit pre-commit fixes
+        if: failure()
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(pre-commit): auto-fix formatting and dependencies"

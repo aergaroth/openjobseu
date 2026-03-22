@@ -72,15 +72,17 @@ def process_company_jobs(
             # Logowanie edge-case'ów z ekstrakcji wynagrodzeń
             parsing_case = job.get("_salary_parsing_case")
             if parsing_case and canonical_job_id:
-                salary_cases_bulk.append({
-                    "job_id": canonical_job_id,
-                    "salary_raw": parsing_case.get("salary_raw"),
-                    "description_fragment": None,
-                    "parser_confidence": parsing_case.get("salary_confidence"),
-                    "extracted_min": parsing_case.get("salary_min"),
-                    "extracted_max": parsing_case.get("salary_max"),
-                    "extracted_currency": parsing_case.get("salary_currency"),
-                })
+                salary_cases_bulk.append(
+                    {
+                        "job_id": canonical_job_id,
+                        "salary_raw": parsing_case.get("salary_raw"),
+                        "description_fragment": None,
+                        "parser_confidence": parsing_case.get("salary_confidence"),
+                        "extracted_min": parsing_case.get("salary_min"),
+                        "extracted_max": parsing_case.get("salary_max"),
+                        "extracted_currency": parsing_case.get("salary_currency"),
+                    }
+                )
 
             if report.get("job_id"):
                 compliance_reports_bulk.append(report)
@@ -98,9 +100,9 @@ def process_company_jobs(
             )
             metrics.observe_skip()
             continue
-            
+
     if compliance_reports_bulk:
         insert_compliance_reports(conn, compliance_reports_bulk)
-        
+
     if salary_cases_bulk:
         insert_salary_parsing_cases(conn, salary_cases_bulk)

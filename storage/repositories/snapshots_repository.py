@@ -45,16 +45,19 @@ def insert_job_snapshot(
         RETURNING snapshot_id;
     """)
 
-    result = conn.execute(stmt, dict(
-        job_id=job_id,
-        job_fingerprint=job_fingerprint,
-        title=title,
-        company_name=company_name,
-        salary_min=salary_min,
-        salary_max=salary_max,
-        salary_currency=salary_currency,
-        remote_class=remote_class,
-        geo_class=geo_class,
-    ))
+    result = conn.execute(
+        stmt,
+        dict(
+            job_id=job_id,
+            job_fingerprint=job_fingerprint,
+            title=title,
+            company_name=company_name,
+            salary_min=salary_min,
+            salary_max=salary_max,
+            salary_currency=salary_currency,
+            remote_class=remote_class,
+            geo_class=geo_class,
+        ),
+    )
     row = result.fetchone()
     return row[0] if row else 0

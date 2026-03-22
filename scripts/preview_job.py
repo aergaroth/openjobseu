@@ -1,5 +1,5 @@
 """
-Fetches a raw job payload from a given ATS provider and simulates the 
+Fetches a raw job payload from a given ATS provider and simulates the
 normalization and compliance processing steps, outputting the result to the console.
 Useful for debugging ATS mappings and compliance engine rules.
 """
@@ -15,6 +15,7 @@ from app.domain.jobs.job_processing import process_ingested_job
 
 logger = logging.getLogger(__name__)
 
+
 def _strip_html(obj):
     if isinstance(obj, dict):
         return {k: _strip_html(v) for k, v in obj.items()}
@@ -24,11 +25,20 @@ def _strip_html(obj):
         return re.sub(r"<[^>]+>", "", obj)
     return obj
 
+
 def main():
     parser = argparse.ArgumentParser(description="Preview a raw job from ATS and run compliance on it.")
-    parser.add_argument("--provider", required=True, help="ATS provider (e.g., greenhouse, lever, workable)")
+    parser.add_argument(
+        "--provider",
+        required=True,
+        help="ATS provider (e.g., greenhouse, lever, workable)",
+    )
     parser.add_argument("--slug", required=True, help="Company ATS slug")
-    parser.add_argument("--job-id", required=False, help="Specific Job ID to inspect (optional). If not provided, shows the first job.")
+    parser.add_argument(
+        "--job-id",
+        required=False,
+        help="Specific Job ID to inspect (optional). If not provided, shows the first job.",
+    )
     args = parser.parse_args()
 
     try:
@@ -38,7 +48,7 @@ def main():
         sys.exit(1)
 
     print(f"Fetching jobs for '{args.slug}' via '{args.provider}'...\n")
-    
+
     try:
         raw_jobs = adapter.fetch({"ats_slug": args.slug})
     except Exception as e:
@@ -53,7 +63,7 @@ def main():
         normalized = adapter.normalize(raw_job)
         if not normalized:
             continue
-        
+
         if args.job_id and normalized.get("source_job_id") != args.job_id:
             continue
 
@@ -66,9 +76,9 @@ def main():
         print("\n" + "=" * 80)
         print("COMPLIANCE & PROCESSING REPORT:")
         processed_job, report = process_ingested_job(normalized, source=f"debug:{args.provider}")
-        
+
         print(json.dumps(report, indent=2, ensure_ascii=False))
-        
+
         print("\nPROCESSED JOB (FINAL):")
         if processed_job:
             processed_job.pop("description", None)  # Omit long description for terminal readability
@@ -78,6 +88,7 @@ def main():
 
         # Kończymy po pokazaniu pierwszego dopasowania (lub pierwszej oferty w ogóle)
         break
+
 
 if __name__ == "__main__":
     main()

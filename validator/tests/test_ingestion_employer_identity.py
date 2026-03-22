@@ -5,7 +5,6 @@ from app.domain.taxonomy.enums import GeoClass, RemoteClass
 from app.domain.jobs.identity import (
     compute_job_fingerprint,
     compute_job_uid,
-    compute_schema_hash,
 )
 from app.workers.ingestion import employer, process_loop
 
@@ -78,7 +77,7 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
         call_order.append("apply_policy")
         assert source == "greenhouse"
         assert job["company_id"] == "company-1"
-        
+
         # Identity is now computed inside process_ingested_job
         # but for this test we'll mock its behavior
         job["job_uid"] = compute_job_uid(
@@ -94,7 +93,7 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
             company_name=job["company_name"],
         )
         # source_schema_hash is set by worker before call
-        
+
         job["_compliance"] = {
             "policy_version": "v9",
             "policy_reason": None,
@@ -107,7 +106,7 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
         job["policy_version"] = "v9"
         job["compliance_status"] = "approved"
         job["compliance_score"] = 100
-        
+
         report = {
             "job_id": None,
             "job_uid": job["job_uid"],
@@ -119,7 +118,7 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
             "final_score": 100,
             "final_status": "approved",
             "decision_vector": [],
-            "policy_reason": None
+            "policy_reason": None,
         }
         return job, report
 
@@ -285,7 +284,9 @@ def test_ingest_company_accepts_uuid_company_identifiers(monkeypatch):
     assert sync_markers == [company_ats_uuid]
 
 
-def test_ingest_company_rejected_job_does_not_insert_compliance_report_without_job_id(monkeypatch):
+def test_ingest_company_rejected_job_does_not_insert_compliance_report_without_job_id(
+    monkeypatch,
+):
     last_sync_at = datetime(2026, 1, 10, 12, 0, tzinfo=timezone.utc)
     company = {
         "company_ats_id": "company-ats-1",

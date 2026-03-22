@@ -1,4 +1,3 @@
-import pytest
 from app.workers.discovery import pipeline
 from app.workers.discovery import ats_reverse
 
@@ -11,6 +10,7 @@ def test_discovery_pipeline_steps_configured():
         "ats_reverse",
         "ats_guessing",
     ]
+
 
 def test_run_discovery_pipeline_handles_step_error(monkeypatch):
     calls = []
@@ -56,21 +56,34 @@ def test_ats_reverse_handles_db_errors(monkeypatch):
     monkeypatch.setattr(
         ats_reverse,
         "probe_ats",
-        lambda p, s: {"jobs_total": 5, "remote_hits": 2, "recent_job_at": None}
+        lambda p, s: {"jobs_total": 5, "remote_hits": 2, "recent_job_at": None},
     )
 
     # Dummy DB Context
-    class DummyConn: pass
+    class DummyConn:
+        pass
+
     class DummyCtx:
-        def __enter__(self): return DummyConn()
-        def __exit__(self, *args): pass
+        def __enter__(self):
+            return DummyConn()
+
+        def __exit__(self, *args):
+            pass
+
     class DummyEngine:
-        def connect(self): return DummyCtx()
-        def begin(self): return DummyCtx()
+        def connect(self):
+            return DummyCtx()
+
+        def begin(self):
+            return DummyCtx()
 
     monkeypatch.setattr(ats_reverse, "get_engine", lambda: DummyEngine())
     monkeypatch.setattr(ats_reverse, "check_ats_exists", lambda *args, **kwargs: False)
-    monkeypatch.setattr(ats_reverse, "get_or_create_placeholder_company", lambda *args, **kwargs: "dummy-uuid")
+    monkeypatch.setattr(
+        ats_reverse,
+        "get_or_create_placeholder_company",
+        lambda *args, **kwargs: "dummy-uuid",
+    )
 
     def mock_insert(conn, **kwargs):
         if kwargs.get("ats_slug") == "fail1":

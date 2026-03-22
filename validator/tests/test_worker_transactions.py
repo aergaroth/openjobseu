@@ -1,7 +1,7 @@
 import ast
 from pathlib import Path
 
-from app.workers import availability, lifecycle
+from app.workers import availability
 
 
 class _NoopTx:
@@ -57,7 +57,14 @@ def test_availability_pipeline_uses_single_transaction_conn(monkeypatch):
 
     def _fake_update(*, updates, conn=None):
         for item in updates:
-            seen.append((item["job_id"], item["availability_status"], bool(item["failure"]), conn))
+            seen.append(
+                (
+                    item["job_id"],
+                    item["availability_status"],
+                    bool(item["failure"]),
+                    conn,
+                )
+            )
 
     monkeypatch.setattr(availability, "update_jobs_availability", _fake_update)
 
@@ -73,7 +80,6 @@ def test_availability_pipeline_uses_single_transaction_conn(monkeypatch):
     assert [item[0] for item in seen] == ["a", "b", "c"]
     assert all(item[3] is not None for item in seen)
     assert len({id(item[3]) for item in seen}) == 1
-
 
 
 def test_worker_write_helpers_are_called_with_explicit_conn_kwarg():

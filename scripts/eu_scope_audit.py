@@ -1,5 +1,5 @@
 """
-Audits the /jobs/feed endpoint to analyze the distribution of geographic 
+Audits the /jobs/feed endpoint to analyze the distribution of geographic
 restrictions and classifications among currently visible jobs.
 """
 
@@ -40,8 +40,9 @@ EU_COUNTRIES = [
     "Iceland",
     "Liechtenstein",
     "Switzerland",
-    "United Kingdom"
+    "United Kingdom",
 ]
+
 
 def classify(job):
     scope = (job.get("remote_scope") or "").lower()

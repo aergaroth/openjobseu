@@ -5,7 +5,6 @@ import re
 import concurrent.futures
 from datetime import datetime, timezone, timedelta
 import time
-from typing import Iterable
 
 from app.workers.discovery.ats_probe import probe_ats
 from storage.db_engine import get_engine
@@ -35,16 +34,16 @@ MAX_SLUG_CANDIDATES = 30
 
 def _generate_slug_candidates(name: str) -> list[str]:
     name_lower = (name or "").lower()
-    
+
     name_clean = re.sub(r"\b(inc|llc|ltd|gmbh|corp|co|limited|group)\b\.?", "", name_lower).strip()
     if not name_clean:
         name_clean = name_lower
 
     base_hyphen = re.sub(r"[^a-z0-9\s_]+", "", name_clean)
     base_hyphen = re.sub(r"[\s_]+", "-", base_hyphen).strip("-")
-    
+
     base_flat = re.sub(r"[^a-z0-9]+", "", name_clean)
-    
+
     bases = []
     if base_hyphen:
         bases.append(base_hyphen)
@@ -58,10 +57,22 @@ def _generate_slug_candidates(name: str) -> list[str]:
     for base in bases:
         if base not in candidates:
             candidates.append(base)
-            
+
     suffixes = [
-        "hq", "inc", "labs", "jobs", "app", "careers",
-        "gmbh", "de", "ltd", "uk", "sas", "fr", "spzoo", "pl"
+        "hq",
+        "inc",
+        "labs",
+        "jobs",
+        "app",
+        "careers",
+        "gmbh",
+        "de",
+        "ltd",
+        "uk",
+        "sas",
+        "fr",
+        "spzoo",
+        "pl",
     ]
 
     for suffix in suffixes:
@@ -71,7 +82,7 @@ def _generate_slug_candidates(name: str) -> list[str]:
             cand1 = f"{base}{suffix}"
             if cand1 not in candidates:
                 candidates.append(cand1)
-                
+
             if len(candidates) >= MAX_SLUG_CANDIDATES:
                 break
             cand2 = f"{base}-{suffix}"
@@ -131,7 +142,7 @@ def run_ats_guessing() -> dict[str, int]:
                     company_id = str(getattr(row, "company_id", row[0] if isinstance(row, tuple) else ""))
                     company_name = getattr(row, "brand_name", None) or getattr(row, "legal_name", None)
                     careers_url = getattr(row, "careers_url", None)
-            
+
                 slug_candidates = _generate_slug_candidates(company_name)
 
                 if not slug_candidates:
@@ -144,15 +155,12 @@ def run_ats_guessing() -> dict[str, int]:
                         break
 
                     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-                        future_to_slug = {
-                            executor.submit(probe_ats, provider, slug): slug
-                            for slug in slug_candidates
-                        }
+                        future_to_slug = {executor.submit(probe_ats, provider, slug): slug for slug in slug_candidates}
 
                         for future in concurrent.futures.as_completed(future_to_slug):
                             slug = future_to_slug[future]
                             metrics["slug_candidates_tested"] += 1
-                            
+
                             try:
                                 probe_result = future.result()
                             except Exception as e:
@@ -168,7 +176,7 @@ def run_ats_guessing() -> dict[str, int]:
                                 jobs_total = int(probe_result.get("jobs_total") or 0)
                             except (ValueError, TypeError):
                                 jobs_total = 0
-                                
+
                             try:
                                 remote_hits = int(probe_result.get("remote_hits") or 0)
                             except (ValueError, TypeError):
@@ -199,33 +207,34 @@ def run_ats_guessing() -> dict[str, int]:
                                 metrics["ats_duplicates"] += 1
 
                             found_ats = True
-                            
+
                             # Anulujemy pozostałe requesty (te w kolejce, aby oszczędzić limit API i zrzucić wątki)
                             for f in future_to_slug:
                                 f.cancel()
-                            
+
                             # Przerywamy iterację as_completed, by przejść do kolejnej firmy (lub wyjść z pętli)
                             break
             except Exception as e:
-                logger.error(f"error processing company in ats_guessing [{company_id}]: {e}", exc_info=True, extra={
-                    "company_id": company_id,
-                    "component": "discovery"
-                })
+                logger.error(
+                    f"error processing company in ats_guessing [{company_id}]: {e}",
+                    exc_info=True,
+                    extra={"company_id": company_id, "component": "discovery"},
+                )
             finally:
                 if company_id:
                     with engine.begin() as conn:
                         update_discovery_last_checked_at(conn, company_id=company_id, phase="ats_guessing")
-                        
+
             if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
                 pct = int((idx / total) * 100)
                 filled = int(20 * idx / total)
                 bar = "█" * filled + "-" * (20 - filled)
                 logger.info(f"ats_guessing progress: [{bar}] {pct}% ({idx}/{total})")
-    except Exception as exc:
+    except Exception:
         logger.error(
             "ats_guessing pipeline failed",
             exc_info=True,
-            extra={"component": "discovery", "phase": "ats_guessing"}
+            extra={"component": "discovery", "phase": "ats_guessing"},
         )
         raise
     finally:

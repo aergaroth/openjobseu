@@ -5,6 +5,7 @@ from typing import Any
 
 _WHITESPACE_RE = re.compile(r"\s+")
 
+
 def normalize(text: Any) -> str:
     text = str(text or "")
     text = text.lower()

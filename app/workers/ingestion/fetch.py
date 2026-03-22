@@ -101,8 +101,6 @@ def fetch_company_jobs(
         try:
             yield from raw_jobs_iter
         except Exception as exc:
-            raise FetchCompanyJobsError(
-                _map_fetch_exception(company, provider, start_time, exc)
-            ) from exc
+            raise FetchCompanyJobsError(_map_fetch_exception(company, provider, start_time, exc)) from exc
 
     return _stream_jobs(), None

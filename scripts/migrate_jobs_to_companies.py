@@ -17,6 +17,7 @@ from sqlalchemy import text
 
 from storage.db_engine import get_engine
 
+
 def normalize_name(name: str) -> str:
     return " ".join(name.strip().split())
 
@@ -34,29 +35,34 @@ def migrate(*, dry_run: bool, company_batch_size: int, job_batch_size: int):
 
     tx = engine.connect() if dry_run else engine.begin()
     with tx as conn:
-        job_names = conn.execute(
-            text("""
+        job_names = (
+            conn.execute(
+                text("""
                 SELECT DISTINCT company_name
                 FROM jobs
                 WHERE company_name IS NOT NULL
                   AND btrim(company_name) <> ''
             """)
-        ).scalars().all()
-        normalized_job_names = sorted(
-            {normalize_name(name) for name in job_names if normalize_name(name)}
+            )
+            .scalars()
+            .all()
         )
+        normalized_job_names = sorted({normalize_name(name) for name in job_names if normalize_name(name)})
 
-        existing = conn.execute(
-            text("""
+        existing = (
+            conn.execute(
+                text("""
                 SELECT company_id, legal_name
                 FROM companies
                 WHERE legal_name IS NOT NULL
                   AND btrim(legal_name) <> ''
             """)
-        ).mappings().all()
+            )
+            .mappings()
+            .all()
+        )
         existing_by_normalized_name = {
-            normalize_name(str(row["legal_name"])).casefold(): row["company_id"]
-            for row in existing
+            normalize_name(str(row["legal_name"])).casefold(): row["company_id"] for row in existing
         }
 
         to_insert: list[dict] = []

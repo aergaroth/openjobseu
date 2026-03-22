@@ -9,7 +9,6 @@ class DummyResponse:
     def json(self):
         return self._payload
 
-
     def raise_for_status(self):
         return None
 

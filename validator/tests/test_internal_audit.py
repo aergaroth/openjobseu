@@ -1,7 +1,6 @@
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-import pytest
 
 # guarantee that the database mode is configured even during module import.
 os.environ.setdefault("DB_MODE", "standard")
@@ -327,12 +326,12 @@ def test_internal_audit_company_stats():
     assert len(items) == 2
     # Teraz wyniki są sortowane po ilości zaakceptowanych (approved) ofert malejąco
     assert [item["legal_name"] for item in items] == [f"{marker}-high", f"{marker}-low"]
-    
+
     assert items[0]["total_jobs"] == 12
     assert items[0]["approved"] == 9
     assert items[0]["rejected"] == 3
     assert items[0]["approved_ratio_pct"] == 75.0
-    
+
     assert items[1]["total_jobs"] == 12
     assert items[1]["approved"] == 3
     assert items[1]["rejected"] == 9
@@ -432,12 +431,12 @@ def test_internal_audit_source_stats_7d():
     items = payload["items"]
     # Teraz wyniki są sortowane po ilości zaakceptowanych ofert malejąco
     assert [item["source"] for item in items] == ["greenhouse:acme", "ashby:test"]
-    
+
     assert items[0]["total_jobs"] == 2
     assert items[0]["approved"] == 2
     assert items[0]["rejected"] == 0
     assert items[0]["approved_ratio_pct"] == 100.0
-    
+
     assert items[1]["total_jobs"] == 4
     assert items[1]["approved"] == 1
     assert items[1]["rejected"] == 3
@@ -495,11 +494,7 @@ def test_internal_discovery_audit_returns_recent_discovered_ats():
     assert "results" in payload
     assert payload["count"] >= 2
 
-    marker_results = [
-        item
-        for item in payload["results"]
-        if str(item.get("company_name", "")).startswith(marker)
-    ]
+    marker_results = [item for item in payload["results"] if str(item.get("company_name", "")).startswith(marker)]
     assert len(marker_results) == 2
 
     assert marker_results[0]["company_name"] == f"{marker}-two"
@@ -571,11 +566,7 @@ def test_internal_discovery_candidates_returns_companies_without_ats():
     assert payload["count"] == len(payload["results"])
     assert len(payload["results"]) <= 50
 
-    marker_results = [
-        row
-        for row in payload["results"]
-        if str(row.get("legal_name", "")).startswith(marker)
-    ]
+    marker_results = [row for row in payload["results"] if str(row.get("legal_name", "")).startswith(marker)]
     assert len(marker_results) == 2
 
     assert marker_results[0]["legal_name"] == f"{marker}-null-checked"
@@ -589,19 +580,20 @@ def test_internal_discovery_candidates_returns_companies_without_ats():
 def test_internal_discovery_run_returns_metrics(monkeypatch):
     fake_result = {
         "status": "ok",
+        "actions": ["discovery_completed"],
         "metrics": {
             "pipeline": "discovery",
             "careers": {"checked": 10, "queued": 4},
             "ats_guessing": {"detected": 3},
-        }
+        },
     }
-    
+
     monkeypatch.setattr(discovery_api, "run_discovery_pipeline", lambda: fake_result)
-    
+
     response = client.post("/internal/discovery/run")
     assert response.status_code == 200
     payload = response.json()
-    
+
     assert payload.get("status") == "ok"
     assert payload.get("metrics", {})["pipeline"] == "discovery"
     assert payload.get("metrics", {})["careers"]["checked"] == 10

@@ -4,7 +4,6 @@ from datetime import datetime
 
 
 class CompanyResolverService:
-
     def __init__(self, repository):
         self.repository = repository
 
@@ -51,11 +50,10 @@ class CompanyResolverService:
             RETURNING company_id
         """)
 
-        result = conn.execute(insert_query, {
-            "company_id": company_id,
-            "legal_name": legal_name,
-            "now": now
-        })
+        result = conn.execute(
+            insert_query,
+            {"company_id": company_id, "legal_name": legal_name, "now": now},
+        )
 
         row = result.first()
         if row:

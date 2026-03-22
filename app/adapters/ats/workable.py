@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any
 import concurrent.futures
 
 from app.adapters.ats.base import ATSAdapter
@@ -15,13 +15,14 @@ from app.utils.cleaning import clean_description
 
 logger = logging.getLogger(__name__)
 
+
 class WorkableAdapter(ATSAdapter):
     dorking_target = "apply.workable.com"
     source_name = "workable"
     active = True
-    
+
     API_URL_TEMPLATE = "https://apply.workable.com/api/v3/accounts/{slug}/jobs"
-    
+
     @staticmethod
     def _resolve_slug(company: dict) -> str:
         slug = str(company.get("ats_slug") or "").strip()
@@ -38,16 +39,16 @@ class WorkableAdapter(ATSAdapter):
             "location": [],
             "department": [],
             "worktype": [],
-            "remote": []
+            "remote": [],
         }
-        
+
         resp = self.session.post(api_url, json=payload, timeout=15)
         resp.raise_for_status()
 
         data = self._parse_json(resp, slug)
 
         jobs = data.get("results", [])
-        
+
         if not isinstance(jobs, list):
             raise ValueError("Workable API did not return a results list")
 
@@ -59,42 +60,49 @@ class WorkableAdapter(ATSAdapter):
             shortcode = job.get("shortcode")
             if not shortcode:
                 return job
-                
+
             try:
                 detail_url = f"{api_url}/{shortcode}"
                 detail_resp = self.session.get(detail_url, timeout=15)
                 detail_resp.raise_for_status()
 
-                detail_job = self._parse_json(detail_resp, slug, context="detail", extra_log_fields={"shortcode": shortcode})
+                detail_job = self._parse_json(
+                    detail_resp,
+                    slug,
+                    context="detail",
+                    extra_log_fields={"shortcode": shortcode},
+                )
 
                 detail_job["_ats_slug"] = slug
                 return detail_job
-            except Exception as e:
+            except Exception:
                 logger.warning(
                     "Workable: failed to fetch job details for slug=%s, shortcode=%s. Falling back to summary.",
-                    slug, shortcode, exc_info=True
+                    slug,
+                    shortcode,
+                    exc_info=True,
                 )
                 job["_ats_slug"] = slug
                 return job
 
         if not jobs:
             return []
-            
-        # Współbieżnie odpytujemy API dla paczki ofert używając maksymalnie 3 wątków 
+
+        # Współbieżnie odpytujemy API dla paczki ofert używając maksymalnie 3 wątków
         # na jedną firmę, aby nie obudzić w systemie Workable limitu Rate Limit (HTTP 429)
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
             full_jobs = list(executor.map(_fetch_detail, jobs))
-            
+
         return full_jobs
 
     def normalize(self, raw_job: dict) -> dict | None:
         slug = raw_job.get("_ats_slug")
         if not slug:
             raise ValueError("Missing _ats_slug in raw_job. Ensure fetch() was called.")
-        
+
         raw_id = raw_job.get("shortcode")
         title = (raw_job.get("title") or "").strip()
-        
+
         source_url = raw_job.get("url")
         if not source_url:
             source_url = f"https://apply.workable.com/{slug}/j/{raw_id}/"
@@ -108,7 +116,7 @@ class WorkableAdapter(ATSAdapter):
             location_parts.append(location_dict.get("region"))
         if location_dict.get("country"):
             location_parts.append(location_dict.get("country"))
-        
+
         location = sanitize_location(", ".join(location_parts))
 
         updated_at = normalize_source_datetime(raw_job.get("published"))
@@ -116,19 +124,26 @@ class WorkableAdapter(ATSAdapter):
 
         company_name = slug.replace("-", " ").replace("_", " ").strip().title()
 
-        description = self.build_description(raw_job, [
-            ("description", None),
-            ("requirements", "Requirements"),
-            ("benefits", "Benefits"),
-        ])
+        description = self.build_description(
+            raw_job,
+            [
+                ("description", None),
+                ("requirements", "Requirements"),
+                ("benefits", "Benefits"),
+            ],
+        )
 
         if not raw_id or not title or not source_url:
             return None
 
         cleaned_description = clean_description(description, source=self.source_name)
-        
+
         is_remote_location = "remote" in (location or "").lower()
-        is_remote = self.detect_remote(title, location, explicit_flag=(raw_job.get("remote") is True or is_remote_location))
+        is_remote = self.detect_remote(
+            title,
+            location,
+            explicit_flag=(raw_job.get("remote") is True or is_remote_location),
+        )
 
         normalized_remote_scope = self.normalize_remote_scope(location)
 
@@ -169,9 +184,9 @@ class WorkableAdapter(ATSAdapter):
             "location": [],
             "department": [],
             "worktype": [],
-            "remote": []
+            "remote": [],
         }
-        
+
         resp = self.session.post(api_url, json=payload, timeout=15)
         resp.raise_for_status()
 
@@ -199,11 +214,16 @@ class WorkableAdapter(ATSAdapter):
             title = (job.get("title") or "").lower()
             location_dict = job.get("location") or {}
             location_value = f"{location_dict.get('city', '')} {location_dict.get('country', '')}"
-            
+
             location = sanitize_location(location_value) or ""
-            
+
             is_remote_location = "remote" in location.lower()
-            if self.detect_remote(title, location, explicit_flag=(job.get("remote") is True or is_remote_location), is_probe=True):
+            if self.detect_remote(
+                title,
+                location,
+                explicit_flag=(job.get("remote") is True or is_remote_location),
+                is_probe=True,
+            ):
                 remote_hits += 1
 
         return {
@@ -211,5 +231,6 @@ class WorkableAdapter(ATSAdapter):
             "recent_job_at": recent_job_at,
             "remote_hits": remote_hits,
         }
+
 
 register(WorkableAdapter.source_name, WorkableAdapter)

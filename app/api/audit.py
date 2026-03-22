@@ -3,10 +3,11 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel, ConfigDict
+from typing import Any
+from fastapi import APIRouter, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse
 
-from app.security.auth import require_user_login, require_user_api_access
 from app.domain.compliance.audit_filter_registry import get_audit_filter_registry
 from storage.repositories.audit_repository import (
     get_audit_company_compliance_stats,
@@ -41,6 +42,48 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 AUDIT_PANEL_PATH = REPO_ROOT / "audit_tool" / "offer_audit_panel.html"
 AUDIT_PANEL_JS_PATH = REPO_ROOT / "audit_tool" / "offer_audit_panel.js"
 AUDIT_PANEL_CSS_PATH = REPO_ROOT / "audit_tool" / "offer_audit_panel.css"
+
+
+class AuditJobsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    total: int
+    limit: int
+    offset: int
+    items: list[dict[str, Any]]
+    counts: dict[str, Any]
+
+
+class AuditCompaniesResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[dict[str, Any]]
+    total: int
+    limit: int
+    offset: int
+
+
+class AuditStatsCompanyResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    min_total_jobs: int
+    items: list[dict[str, Any]]
+
+
+class AuditStatsSourceResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    window: str
+    items: list[dict[str, Any]]
+
+
+class AtsHealthResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    days_threshold: int
+    count: int
+    items: list[dict[str, Any]]
+
+
+class DeactivateAtsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: str
+    company_ats_id: str
 
 
 @lru_cache(maxsize=8)
@@ -96,55 +139,86 @@ def audit_panel_css():
     return Response(content=content, media_type="text/css")
 
 
-@audit_api_router.get("/jobs")
+@audit_api_router.get("/jobs", response_model=AuditJobsResponse)
 def audit_jobs(
-    status: str | None = Query(None), source: str | None = Query(None),
-    company: str | None = Query(None), title: str | None = Query(None),
-    remote_scope: str | None = Query(None), remote_class: str | None = Query(None),
-    geo_class: str | None = Query(None), compliance_status: str | None = Query(None),
+    status: str | None = Query(None),
+    source: str | None = Query(None),
+    company: str | None = Query(None),
+    title: str | None = Query(None),
+    remote_scope: str | None = Query(None),
+    remote_class: str | None = Query(None),
+    geo_class: str | None = Query(None),
+    compliance_status: str | None = Query(None),
     min_compliance_score: int | None = Query(None, ge=0, le=100),
     max_compliance_score: int | None = Query(None, ge=0, le=100),
-    limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
 ):
-    return get_jobs_audit(status=status, source=source, company=company, title=title, remote_scope=remote_scope, remote_class=remote_class, geo_class=geo_class, compliance_status=compliance_status, min_compliance_score=min_compliance_score, max_compliance_score=max_compliance_score, limit=limit, offset=offset)
-
-
-@audit_api_router.get("/companies")
-def audit_companies(
-    q: str | None = Query(None, description="Fuzzy search across legal and brand names"),
-    ats_provider: str | None = Query(None), is_active: bool | None = Query(None),
-    min_score: int | None = Query(None, ge=0), limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0),
-):
-    return get_audit_companies_list(
-        q=q, ats_provider=ats_provider, is_active=is_active, 
-        min_score=min_score, limit=limit, offset=offset
+    return get_jobs_audit(
+        status=status,
+        source=source,
+        company=company,
+        title=title,
+        remote_scope=remote_scope,
+        remote_class=remote_class,
+        geo_class=geo_class,
+        compliance_status=compliance_status,
+        min_compliance_score=min_compliance_score,
+        max_compliance_score=max_compliance_score,
+        limit=limit,
+        offset=offset,
     )
 
 
-@audit_api_router.get("/filters")
+@audit_api_router.get("/companies", response_model=AuditCompaniesResponse)
+def audit_companies(
+    q: str | None = Query(None, description="Fuzzy search across legal and brand names"),
+    ats_provider: str | None = Query(None),
+    is_active: bool | None = Query(None),
+    min_score: int | None = Query(None, ge=0),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    return get_audit_companies_list(
+        q=q,
+        ats_provider=ats_provider,
+        is_active=is_active,
+        min_score=min_score,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@audit_api_router.get("/filters", response_model=dict[str, list[str]])
 def audit_filter_registry():
     payload = get_audit_filter_registry()
     payload["source"] = get_audit_source_filter_values()
     return payload
 
 
-@audit_api_router.get("/stats/company")
+@audit_api_router.get("/stats/company", response_model=AuditStatsCompanyResponse)
 def audit_company_stats(min_total_jobs: int = Query(10, ge=0, le=10000)):
-    return {"min_total_jobs": int(min_total_jobs), "items": get_audit_company_compliance_stats(min_total_jobs=min_total_jobs)}
+    return {
+        "min_total_jobs": int(min_total_jobs),
+        "items": get_audit_company_compliance_stats(min_total_jobs=min_total_jobs),
+    }
 
 
-@audit_api_router.get("/stats/source-7d")
+@audit_api_router.get("/stats/source-7d", response_model=AuditStatsSourceResponse)
 def audit_source_stats_7d():
-    return {"window": "last_7_days", "items": get_audit_source_compliance_stats_last_7d()}
+    return {
+        "window": "last_7_days",
+        "items": get_audit_source_compliance_stats_last_7d(),
+    }
 
 
-@audit_api_router.get("/ats-health")
+@audit_api_router.get("/ats-health", response_model=AtsHealthResponse)
 def audit_ats_health(days_threshold: int = Query(3, ge=1, le=30)):
     results = get_failing_ats_integrations(days_threshold=days_threshold)
     return {"days_threshold": days_threshold, "count": len(results), "items": results}
 
 
-@audit_api_router.post("/ats-deactivate/{company_ats_id}")
+@audit_api_router.post("/ats-deactivate/{company_ats_id}", response_model=DeactivateAtsResponse)
 def api_deactivate_ats(company_ats_id: str):
     with get_engine().begin() as conn:
         deactivate_ats_integration(conn, company_ats_id)
@@ -163,11 +237,18 @@ def api_force_sync_ats(company_ats_id: str):
         adapter = get_adapter(provider)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"No adapter found for provider: {provider}")
-    
-    company_dict = {"ats_slug": ats_integration["ats_slug"], "company_id": ats_integration["company_id"], "legal_name": ats_integration["legal_name"]}
+
+    company_dict = {
+        "ats_slug": ats_integration["ats_slug"],
+        "company_id": ats_integration["company_id"],
+        "legal_name": ats_integration["legal_name"],
+    }
     try:
         raw_jobs = adapter.fetch(company_dict, updated_since=None)
-        return Response(content=f"Force sync successful. Fetched {len(raw_jobs)} jobs.", media_type="text/plain")
+        return Response(
+            content=f"Force sync successful. Fetched {len(raw_jobs)} jobs.",
+            media_type="text/plain",
+        )
     except Exception as e:
         logger.error(f"Force sync failed for {company_ats_id}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Force sync failed: {str(e)}")
@@ -177,6 +258,7 @@ def api_force_sync_ats(company_ats_id: str):
 def run_tick_from_audit():
     # Lazy import to avoid circular dependency
     from app.api.system import tick
+
     result = tick(force_text=True)
     if isinstance(result, Response):
         return result

@@ -20,16 +20,22 @@ def test_generic_html_cleanup():
     assert "**World**" in cleaned
 
 
-@pytest.mark.parametrize("raw_html, expected", [
-    ("Start<p>&nbsp;</p>End", "StartEnd"),
-    ("Start<div><br></div>End", "StartEnd"),
-    ("Start<p>   </p>End", "StartEnd"),
-    ("Start<div><p></p></div>End", "StartEnd"),
-    ("Start<p class='spacer'>\u00A0</p>End", "StartEnd"),  # Tag z klasą i twardą spacją unicode
-    ("Start<div>  <br/>  </div>End", "StartEnd"),          # Spacje wokół br
-    ("Start<p>\n \n</p>End", "StartEnd"),                  # Znaki nowej linii
-    ("Start<span class='empty'></span>End", "StartEnd"),   # Pusty span
-])
+@pytest.mark.parametrize(
+    "raw_html, expected",
+    [
+        ("Start<p>&nbsp;</p>End", "StartEnd"),
+        ("Start<div><br></div>End", "StartEnd"),
+        ("Start<p>   </p>End", "StartEnd"),
+        ("Start<div><p></p></div>End", "StartEnd"),
+        (
+            "Start<p class='spacer'>\u00a0</p>End",
+            "StartEnd",
+        ),  # Tag z klasą i twardą spacją unicode
+        ("Start<div>  <br/>  </div>End", "StartEnd"),  # Spacje wokół br
+        ("Start<p>\n \n</p>End", "StartEnd"),  # Znaki nowej linii
+        ("Start<span class='empty'></span>End", "StartEnd"),  # Pusty span
+    ],
+)
 def test_generic_html_cleanup_removes_empty_tags(raw_html, expected):
     assert clean_description(raw_html, source="greenhouse:acme") == expected
 

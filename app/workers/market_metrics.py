@@ -14,6 +14,7 @@ from storage.repositories.market_segments_repository import (
 
 logger = logging.getLogger("openjobseu.worker.market_metrics")
 
+
 def run_market_metrics_worker() -> dict:
     start_time = time.perf_counter()
     today = datetime.now(timezone.utc).date()
@@ -26,7 +27,7 @@ def run_market_metrics_worker() -> dict:
 
             segment_rows = compute_market_segments(conn, today)
             insert_market_segments(conn, segment_rows)
-            
+
         duration_ms = int((time.perf_counter() - start_time) * 1000)
         metrics = {
             "component": "market_metrics",
@@ -41,8 +42,16 @@ def run_market_metrics_worker() -> dict:
         }
         logger.info("market_metrics_completed", extra=metrics)
         return {"actions": ["market_metrics_updated"], "metrics": metrics}
-        
+
     except Exception as e:
         duration_ms = int((time.perf_counter() - start_time) * 1000)
         logger.error("market_metrics_failed", extra={"error": str(e), "duration_ms": duration_ms})
-        return {"actions": [], "metrics": {"component": "market_metrics", "status": "error", "error": str(e), "duration_ms": duration_ms}}
+        return {
+            "actions": [],
+            "metrics": {
+                "component": "market_metrics",
+                "status": "error",
+                "error": str(e),
+                "duration_ms": duration_ms,
+            },
+        }

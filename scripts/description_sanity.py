@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
 """
-Audits and optionally cleans up job descriptions in the database using 
+Audits and optionally cleans up job descriptions in the database using
 predefined spam or garbage patterns (e.g., leftover tracking markers).
 """
-
 
 import argparse
 import os
 import sys
-import re
-from pathlib import Path
 
 # Zapewnienie dostępu do modułów projektu
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -21,6 +18,7 @@ from storage.db_engine import get_engine
 from app.utils.cleaning import SPAM_PATTERNS
 
 engine = get_engine()
+
 
 def clean_description_text(description: str) -> tuple[str, list[str]]:
     """Zwraca wyczyszczony opis oraz listę zaaplikowanych napraw."""
@@ -44,23 +42,25 @@ def find_suspicious_rows(conn, source: str = None) -> list[dict]:
     if source:
         query += " WHERE source = :source"
         params["source"] = source
-        
+
     rows = conn.execute(text(query), params).mappings().all()
 
     suspicious = []
     for row in rows:
         orig_desc = row["description"] or ""
         cleaned_desc, fixes = clean_description_text(orig_desc)
-        
+
         if fixes:
-            suspicious.append({
-                "job_id": row["job_id"],
-                "source": row["source"],
-                "reasons": fixes,
-                "old_length": len(orig_desc),
-                "new_length": len(cleaned_desc),
-                "cleaned_description": cleaned_desc,
-            })
+            suspicious.append(
+                {
+                    "job_id": row["job_id"],
+                    "source": row["source"],
+                    "reasons": fixes,
+                    "old_length": len(orig_desc),
+                    "new_length": len(cleaned_desc),
+                    "cleaned_description": cleaned_desc,
+                }
+            )
 
     return suspicious
 
@@ -84,7 +84,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Sanity-check and optionally repair spam/garbage in descriptions.")
     parser.add_argument("--source", type=str, help="Filter by specific source (e.g. remoteok)")
     parser.add_argument("--fix", action="store_true", help="Apply safe automatic fixes.")
-    parser.add_argument("--limit", type=int, default=25, help="How many suspicious rows to print (default: 25).")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=25,
+        help="How many suspicious rows to print (default: 25).",
+    )
     args = parser.parse_args()
 
     with engine.connect() as conn:
@@ -92,7 +97,9 @@ def main() -> int:
         print(f"suspicious_rows={len(suspicious)}")
 
         for row in suspicious[: max(args.limit, 0)]:
-            print(f"[{row['source']}] {row['job_id']} | fixes: {', '.join(row['reasons'])} | lengths: {row['old_length']} -> {row['new_length']}")
+            print(
+                f"[{row['source']}] {row['job_id']} | fixes: {', '.join(row['reasons'])} | lengths: {row['old_length']} -> {row['new_length']}"
+            )
 
         if args.fix and suspicious:
             with engine.begin() as begin_conn:
@@ -100,6 +107,7 @@ def main() -> int:
             print(f"fixed_rows={fixed}")
         else:
             print("\nOpcja dry_run_only=1 (uruchom z flagą --fix aby zastosować zmiany do bazy)")
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

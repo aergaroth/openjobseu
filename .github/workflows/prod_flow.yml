@@ -1,11 +1,8 @@
 name: Prod Flow
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "README.md"
-      - "docs/**"
+  release:
+    types: [published]
   pull_request:
     branches: [main]
     paths-ignore:
@@ -47,14 +44,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements*.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Wait for Postgres
         run: |
@@ -71,7 +68,7 @@ jobs:
 
   build-deploy-prod:
     needs: pytest
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -93,10 +90,12 @@ jobs:
         env:
           PROJECT_ID: openjobseu
           SHA: ${{ github.sha }}
+          VERSION: ${{ github.event.release.tag_name || 'latest' }}
         run: |
           IMAGE=europe-north1-docker.pkg.dev/$PROJECT_ID/$PROJECT_ID/$PROJECT_ID
-          docker build -t $IMAGE:$SHA .
+          docker build -t $IMAGE:$SHA -t $IMAGE:$VERSION .
           docker push $IMAGE:$SHA
+          docker push $IMAGE:$VERSION
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -108,7 +107,7 @@ jobs:
           terraform init -input=false
           terraform apply -auto-approve \
             -var="project_id=openjobseu" \
-            -var="image=europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu:${{ github.sha }}" \
+            -var="image=europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu:${{ github.event.release.tag_name || github.sha }}" \
             -var="google_client_id=${{ secrets.PROD_GOOGLE_CLIENT_ID }}" \
             -var="google_client_secret=${{ secrets.PROD_GOOGLE_CLIENT_SECRET }}" \
             -var="session_secret_key=${{ secrets.PROD_SESSION_SECRET_KEY }}" \

@@ -42,15 +42,18 @@ def insert_salary_parsing_case(
         ON CONFLICT DO NOTHING
     """)
 
-    conn.execute(stmt, dict(
-        job_id=job_id,
-        salary_raw=salary_raw,
-        description_fragment=description_fragment,
-        parser_confidence=parser_confidence,
-        extracted_min=extracted_min,
-        extracted_max=extracted_max,
-        extracted_currency=extracted_currency,
-    ))
+    conn.execute(
+        stmt,
+        dict(
+            job_id=job_id,
+            salary_raw=salary_raw,
+            description_fragment=description_fragment,
+            parser_confidence=parser_confidence,
+            extracted_min=extracted_min,
+            extracted_max=extracted_max,
+            extracted_currency=extracted_currency,
+        ),
+    )
 
 
 def insert_salary_parsing_cases(conn: Connection, cases: list[dict]) -> None:

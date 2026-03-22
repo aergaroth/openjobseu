@@ -35,11 +35,7 @@ def fake_init_db():
 def _derive_remote_class(job: dict) -> str:
     compliance = job.get("_compliance")
     if not isinstance(compliance, dict):
-        return (
-            RemoteClass.REMOTE_ONLY.value
-            if bool(job.get("remote_source_flag"))
-            else RemoteClass.UNKNOWN.value
-        )
+        return RemoteClass.REMOTE_ONLY.value if bool(job.get("remote_source_flag")) else RemoteClass.UNKNOWN.value
 
     policy_reason = str(compliance.get("policy_reason") or "").strip().lower()
     remote_model = str(compliance.get("remote_model") or "").strip().lower()

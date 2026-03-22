@@ -1,15 +1,31 @@
-from datetime import datetime, timezone
-from uuid import UUID
-from typing import Optional
-
-from .models import Company
-from .repository import CompanyRepository
-
-
 EU_COUNTRIES = {
-    "PL", "DE", "FR", "ES", "IT", "NL", "SE", "FI", "DK",
-    "IE", "PT", "BE", "AT", "CZ", "SK", "HU", "RO", "BG",
-    "HR", "SI", "LT", "LV", "EE", "LU", "MT", "CY", "GR",
+    "PL",
+    "DE",
+    "FR",
+    "ES",
+    "IT",
+    "NL",
+    "SE",
+    "FI",
+    "DK",
+    "IE",
+    "PT",
+    "BE",
+    "AT",
+    "CZ",
+    "SK",
+    "HU",
+    "RO",
+    "BG",
+    "HR",
+    "SI",
+    "LT",
+    "LV",
+    "EE",
+    "LU",
+    "MT",
+    "CY",
+    "GR",
 }
 
 
@@ -18,6 +34,7 @@ class CompanyScoringRules:
     Defines the point values and thresholds for the company signal scoring algorithm.
     Used centrally to evaluate company quality signals.
     """
+
     REMOTE_ONLY_POINTS = 40
     REMOTE_FRIENDLY_POINTS = 20
 

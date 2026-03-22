@@ -27,11 +27,14 @@ def insert_source_company(conn: Connection, name: str, careers_url: str | None) 
         ON CONFLICT DO NOTHING
         RETURNING company_id
     """)
-    result = conn.execute(stmt, {
-        "uid": uuid.uuid4(),
-        "name": name,
-        "careers_url": careers_url,
-    })
+    result = conn.execute(
+        stmt,
+        {
+            "uid": uuid.uuid4(),
+            "name": name,
+            "careers_url": careers_url,
+        },
+    )
     return result.fetchone() is not None
 
 
@@ -69,7 +72,7 @@ def update_discovery_last_checked_at(conn: Connection, company_id: str, phase: s
 def check_ats_exists(conn: Connection, provider: str, ats_slug: str) -> bool:
     exists = conn.execute(
         text("SELECT 1 FROM company_ats WHERE provider = :provider AND ats_slug = :slug LIMIT 1"),
-        {"provider": provider, "slug": ats_slug}
+        {"provider": provider, "slug": ats_slug},
     ).fetchone()
     return bool(exists)
 
@@ -77,7 +80,7 @@ def check_ats_exists(conn: Connection, provider: str, ats_slug: str) -> bool:
 def get_or_create_placeholder_company(conn: Connection, name: str) -> str:
     existing_company = conn.execute(
         text("SELECT company_id FROM companies WHERE lower(legal_name) = lower(:name) LIMIT 1"),
-        {"name": name}
+        {"name": name},
     ).fetchone()
 
     if existing_company:
@@ -94,7 +97,7 @@ def get_or_create_placeholder_company(conn: Connection, name: str) -> str:
                 :uid, :name, :name, 'ZZ', false, 'UNKNOWN', true, true, NOW(), NOW()
             )
         """),
-        {"uid": company_id, "name": name}
+        {"uid": company_id, "name": name},
     )
     return company_id
 
@@ -136,8 +139,9 @@ def get_discovered_company_ats(q: str | None = None, limit: int = 100) -> list[d
         order_by_sql = "LEAST(c.legal_name <-> :q_exact, c.brand_name <-> :q_exact) ASC, ca.created_at DESC"
 
     with engine.connect() as conn:
-        rows = conn.execute(
-            text(f"""
+        rows = (
+            conn.execute(
+                text(f"""
                 SELECT
                     c.legal_name AS company_name,
                     ca.provider,
@@ -151,8 +155,11 @@ def get_discovered_company_ats(q: str | None = None, limit: int = 100) -> list[d
                 ORDER BY {order_by_sql}
                 LIMIT :limit
             """),
-            params,
-        ).mappings().all()
+                params,
+            )
+            .mappings()
+            .all()
+        )
 
     return [dict(row) for row in rows]
 
@@ -169,8 +176,9 @@ def get_discovery_candidates(q: str | None = None, limit: int = 50) -> list[dict
         order_by_sql = f"LEAST(legal_name <-> :q_exact, brand_name <-> :q_exact) ASC, {order_by_sql}"
 
     with engine.connect() as conn:
-        rows = conn.execute(
-            text(f"""
+        rows = (
+            conn.execute(
+                text(f"""
                 SELECT
                     company_id,
                     legal_name,
@@ -182,17 +190,18 @@ def get_discovery_candidates(q: str | None = None, limit: int = 50) -> list[dict
                 ORDER BY {order_by_sql}
                 LIMIT :limit
             """),
-            params,
-        ).mappings().all()
+                params,
+            )
+            .mappings()
+            .all()
+        )
 
     return [dict(row) for row in rows]
 
 
 def get_existing_brand_names(conn: Connection) -> set[str]:
     """Fetches a set of all non-null brand names in lowercase."""
-    rows = conn.execute(
-        text("SELECT brand_name FROM companies WHERE brand_name IS NOT NULL")
-    ).fetchall()
+    rows = conn.execute(text("SELECT brand_name FROM companies WHERE brand_name IS NOT NULL")).fetchall()
     return {row[0].lower() for row in rows}
 
 

@@ -1,7 +1,8 @@
 import logging
-from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, ConfigDict
+from typing import Any
+from fastapi import APIRouter, Query
 
-from app.security.auth import require_internal_or_user_api_access
 from storage.repositories.discovery_repository import (
     get_discovered_company_ats,
     get_discovery_candidates,
@@ -19,47 +20,71 @@ discovery_ui_router = APIRouter(prefix="/discovery", tags=["internal-discovery-u
 discovery_ops_router = APIRouter(prefix="/discovery", tags=["internal-discovery-ops"])
 
 
-@discovery_ui_router.get("/audit")
-def discovery_audit(q: str | None = Query(None, description="Fuzzy search across company names")):
+class DiscoveryListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    count: int
+    results: list[dict[str, Any]]
+
+
+class DiscoveryPhaseResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    pipeline: str
+    phase: str
+    metrics: dict[str, Any]
+
+
+class DiscoveryRunResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: str
+    metrics: dict[str, Any]
+    actions: list[str]
+
+
+@discovery_ui_router.get("/audit", response_model=DiscoveryListResponse)
+def discovery_audit(
+    q: str | None = Query(None, description="Fuzzy search across company names"),
+):
     results = get_discovered_company_ats(q=q, limit=100)
     return {"count": len(results), "results": results}
 
 
-@discovery_ui_router.get("/candidates")
-def discovery_candidates(q: str | None = Query(None, description="Fuzzy search across company names")):
+@discovery_ui_router.get("/candidates", response_model=DiscoveryListResponse)
+def discovery_candidates(
+    q: str | None = Query(None, description="Fuzzy search across company names"),
+):
     results = get_discovery_candidates(q=q, limit=50)
     return {"count": len(results), "results": results}
 
 
-@discovery_ops_router.post("/careers")
+@discovery_ops_router.post("/careers", response_model=DiscoveryPhaseResponse)
 def run_careers():
     metrics = run_careers_discovery()
     return {"pipeline": "discovery", "phase": "careers_discovery", "metrics": metrics}
 
 
-@discovery_ops_router.post("/guess")
+@discovery_ops_router.post("/guess", response_model=DiscoveryPhaseResponse)
 def run_guessing():
     metrics = run_ats_guessing()
     return {"pipeline": "discovery", "phase": "ats_guessing", "metrics": metrics}
 
 
-@discovery_ops_router.post("/ats-reverse")
+@discovery_ops_router.post("/ats-reverse", response_model=DiscoveryPhaseResponse)
 def run_ats_reverse():
     metrics = run_ats_reverse_discovery()
     return {"pipeline": "discovery", "phase": "ats_reverse", "metrics": metrics}
 
 
-@discovery_ops_router.post("/dorking")
+@discovery_ops_router.post("/dorking", response_model=DiscoveryPhaseResponse)
 def run_dorking():
     metrics = run_dorking_discovery()
     return {"pipeline": "discovery", "phase": "dorking", "metrics": metrics}
 
 
-@discovery_ops_router.post("/run")
+@discovery_ops_router.post("/run", response_model=DiscoveryRunResponse)
 def run_discovery():
     return run_discovery_pipeline()
 
 
-@discovery_ops_router.post("/company-sources")
+@discovery_ops_router.post("/company-sources", response_model=dict[str, Any])
 def run_company_sources():
     return run_company_source_discovery()

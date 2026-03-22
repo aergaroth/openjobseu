@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 import logging
 from sqlalchemy import text
-from app.domain.taxonomy.enums import RemoteClass, GeoClass
 from app.domain.compliance.engine import apply_policy, ENGINE_POLICY_VERSION
 from storage.db_engine import get_engine
 from storage.repositories.compliance_repository import insert_compliance_reports
@@ -9,6 +8,7 @@ from storage.repositories.compliance_repository import insert_compliance_reports
 logger = logging.getLogger("openjobseu.backfill")
 
 BATCH_SIZE = 100
+
 
 def backfill_missing_compliance_classes(limit: int = 1000) -> int:
     engine = get_engine()
@@ -32,7 +32,14 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
 
     rows = []
     with engine.connect() as conn:
-        rows = conn.execute(query, {"limit": limit, "current_policy_version": ENGINE_POLICY_VERSION.value}).mappings().all()
+        rows = (
+            conn.execute(
+                query,
+                {"limit": limit, "current_policy_version": ENGINE_POLICY_VERSION.value},
+            )
+            .mappings()
+            .all()
+        )
 
     total_found = len(rows)
     logger.info(f"Found {total_found} jobs to backfill")
@@ -44,7 +51,7 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
     updated = 0
 
     for i in range(0, total_found, BATCH_SIZE):
-        batch = rows[i:i + BATCH_SIZE]
+        batch = rows[i : i + BATCH_SIZE]
         job_updates = []
         report_entries = []
 
@@ -60,10 +67,10 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
 
                 # Zabezpieczenie przed rzucaniem AttributeError dla odrzuconych ofert (None)
                 compliance_payload = (job_with_compliance or job_input).get("_compliance", {})
-                
+
                 compliance_status = compliance_payload.get("compliance_status")
                 compliance_score = compliance_payload.get("compliance_score")
-                
+
                 # Fallback zapobiegający zostaniu oferty ze statusem NULL (usunięcie "martwych dusz" z kolejki)
                 if not compliance_status:
                     compliance_status = "review"
@@ -79,30 +86,34 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
                 policy_version_val = policy_version.value if hasattr(policy_version, "value") else policy_version
                 decision_trace = compliance_payload.get("decision_trace")
 
-                job_updates.append({
-                    "job_id": job_id,
-                    "remote_class": remote_class_val,
-                    "geo_class": geo_class_val,
-                    "compliance_status": compliance_status,
-                    "compliance_score": compliance_score,
-                    "policy_version": policy_version_val,
-                    "updated_at": datetime.now(timezone.utc)
-                })
+                job_updates.append(
+                    {
+                        "job_id": job_id,
+                        "remote_class": remote_class_val,
+                        "geo_class": geo_class_val,
+                        "compliance_status": compliance_status,
+                        "compliance_score": compliance_score,
+                        "policy_version": policy_version_val,
+                        "updated_at": datetime.now(timezone.utc),
+                    }
+                )
 
-                report_entries.append({
-                    "job_id": job_id,
-                    "job_uid": job_uid,
-                    "policy_version": policy_version_val,
-                    "remote_class": remote_class_val,
-                    "geo_class": geo_class_val,
-                    "hard_geo_flag": bool(compliance_payload.get("policy_reason") == "geo_restriction_hard"),
-                    "base_score": compliance_score,
-                    "penalties": None,
-                    "bonuses": None,
-                    "final_score": compliance_score,
-                    "final_status": compliance_status,
-                    "decision_vector": decision_trace
-                })
+                report_entries.append(
+                    {
+                        "job_id": job_id,
+                        "job_uid": job_uid,
+                        "policy_version": policy_version_val,
+                        "remote_class": remote_class_val,
+                        "geo_class": geo_class_val,
+                        "hard_geo_flag": bool(compliance_payload.get("policy_reason") == "geo_restriction_hard"),
+                        "base_score": compliance_score,
+                        "penalties": None,
+                        "bonuses": None,
+                        "final_score": compliance_score,
+                        "final_status": compliance_status,
+                        "decision_vector": decision_trace,
+                    }
+                )
 
             except Exception as e:
                 logger.error(f"Failed to process job {job_id}: {e}")
@@ -123,7 +134,7 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
                                 updated_at = :updated_at
                             WHERE job_id = :job_id
                         """),
-                        job_updates
+                        job_updates,
                     )
 
                     if report_entries:

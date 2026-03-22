@@ -1,5 +1,4 @@
 import uuid
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
@@ -20,7 +19,7 @@ def _insert_company(conn, name: str):
                 :id, :name, :name, 'PL', 'UNKNOWN', true, 0, 0, NOW(), NOW()
             )
         """),
-        {"id": str(uuid.uuid4()), "name": name}
+        {"id": str(uuid.uuid4()), "name": name},
     )
 
 
@@ -33,7 +32,7 @@ def test_list_companies_pagination_structure():
     response = client.get("/companies?limit=2&offset=1")
     assert response.status_code == 200
     data = response.json()
-    
+
     assert "cache-control" in response.headers
     assert "max-age=60" in response.headers["cache-control"]
 

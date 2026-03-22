@@ -5,11 +5,11 @@ from sqlalchemy.engine import Connection
 from storage.db_engine import get_engine
 from storage.common import _derive_source_fields, _require_open_conn
 from app.domain.jobs.identity import compute_job_fingerprint, compute_job_uid
-from app.domain.jobs.canonical_identity import compute_canonical_job_id
 from app.domain.money.salary_parser import extract_salary
 from .snapshots_repository import insert_job_snapshot
 
 logger = logging.getLogger(__name__)
+
 
 def _build_get_jobs_query(
     status: str | None = None,
@@ -166,9 +166,8 @@ def get_jobs_paginated(
     total = int(total_row[0]) if total_row else 0
     return [dict(row) for row in rows], total
 
-def _find_job_id_by_source_mapping(
-    conn: Connection, *, source: str, source_job_id: str
-) -> str | None:
+
+def _find_job_id_by_source_mapping(conn: Connection, *, source: str, source_job_id: str) -> str | None:
     row = conn.execute(
         text("""
             SELECT job_id
@@ -197,6 +196,7 @@ def _find_job_id_by_source_mapping(
         return str(legacy_row[0])
 
     return None
+
 
 def _find_job_id_by_fingerprint(conn: Connection, *, job_fingerprint: str) -> str | None:
     row = conn.execute(
@@ -237,6 +237,7 @@ def _resolve_canonical_job_id(
         return by_source_mapping
 
     return incoming_job_id
+
 
 def _upsert_job_source_mapping_in_conn(
     conn: Connection,
@@ -294,6 +295,7 @@ def _upsert_job_source_mapping_in_conn(
         },
     )
 
+
 def _upsert_job_in_conn(
     conn: Connection,
     *,
@@ -335,8 +337,9 @@ def _upsert_job_in_conn(
     )
 
     # Detect fingerprint change and snapshot previous state
-    existing_job = conn.execute(
-        text("""
+    existing_job = (
+        conn.execute(
+            text("""
             SELECT
                 job_fingerprint,
                 title,
@@ -349,8 +352,11 @@ def _upsert_job_in_conn(
             FROM jobs
             WHERE job_id = :job_id
         """),
-        {"job_id": canonical_job_id},
-    ).mappings().fetchone()
+            {"job_id": canonical_job_id},
+        )
+        .mappings()
+        .fetchone()
+    )
 
     if existing_job:
         existing_fingerprint = existing_job["job_fingerprint"]
@@ -361,9 +367,9 @@ def _upsert_job_in_conn(
         new_salary_currency = job.get("salary_currency")
 
         salary_changed = (
-            existing_job.get("salary_min") != new_salary_min or
-            existing_job.get("salary_max") != new_salary_max or
-            existing_job.get("salary_currency") != new_salary_currency
+            existing_job.get("salary_min") != new_salary_min
+            or existing_job.get("salary_max") != new_salary_max
+            or existing_job.get("salary_currency") != new_salary_currency
         )
         title_changed = existing_job.get("title") != job.get("title")
 
@@ -389,7 +395,7 @@ def _upsert_job_in_conn(
                     "fingerprint": new_fingerprint,
                     "salary_changed": salary_changed,
                     "title_changed": title_changed,
-                }
+                },
             )
 
     conn.execute(
@@ -558,6 +564,7 @@ def _upsert_job_in_conn(
     )
 
     return canonical_job_id
+
 
 def upsert_job(job: dict, conn: Connection | None = None, *, company_id: str | None = None) -> str:
     now = datetime.now(timezone.utc)

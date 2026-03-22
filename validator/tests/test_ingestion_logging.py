@@ -9,16 +9,12 @@ def test_fetch_phase_logs_on_debug(monkeypatch):
     monkeypatch.setattr(
         log_helpers.logger,
         "debug",
-        lambda message, extra=None: debug_calls.append(
-            {"message": message, "extra": extra or {}}
-        ),
+        lambda message, extra=None: debug_calls.append({"message": message, "extra": extra or {}}),
     )
     monkeypatch.setattr(
         log_helpers.logger,
         "info",
-        lambda message, extra=None: info_calls.append(
-            {"message": message, "extra": extra or {}}
-        ),
+        lambda message, extra=None: info_calls.append({"message": message, "extra": extra or {}}),
     )
 
     log_helpers.log_ingestion(
@@ -47,16 +43,12 @@ def test_ingestion_summary_logs_on_info(monkeypatch):
     monkeypatch.setattr(
         log_helpers.logger,
         "debug",
-        lambda message, extra=None: debug_calls.append(
-            {"message": message, "extra": extra or {}}
-        ),
+        lambda message, extra=None: debug_calls.append({"message": message, "extra": extra or {}}),
     )
     monkeypatch.setattr(
         log_helpers.logger,
         "info",
-        lambda message, extra=None: info_calls.append(
-            {"message": message, "extra": extra or {}}
-        ),
+        lambda message, extra=None: info_calls.append({"message": message, "extra": extra or {}}),
     )
 
     log_helpers.log_ingestion(

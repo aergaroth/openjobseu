@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from fastapi import APIRouter, Query, Response
 from datetime import datetime, timezone
 
@@ -18,6 +18,7 @@ def _utc_now_iso() -> str:
 
 
 class JobItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     job_id: str
     source: str
     source_url: str
@@ -28,20 +29,26 @@ class JobItem(BaseModel):
     first_seen_at: datetime
     last_seen_at: Optional[datetime] = None
 
+
 class PaginatedJobsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     items: List[JobItem]
     total: int
     limit: int
     offset: int
 
+
 class FeedMeta(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     generated_at: str
     count: int
     status: str
     limit: int
     version: str
 
+
 class FeedJobItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     id: str
     title: str
     company: str
@@ -51,11 +58,15 @@ class FeedJobItem(BaseModel):
     first_seen_at: datetime
     status: str
 
+
 class FeedResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     meta: FeedMeta
     jobs: List[FeedJobItem]
 
+
 class ComplianceStatsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     window: str
     total_jobs: int
     approved: int

@@ -13,7 +13,12 @@ class TestRunEmployerIngestion(unittest.TestCase):
     @patch("app.workers.ingestion.employer.log_ingestion")
     @patch("app.workers.ingestion.employer.perf_counter", side_effect=list(range(1, 100)))
     def test_run_employer_ingestion_happy_path(
-        self, mock_perf_counter, mock_log_ingestion, mock_ingest_company, mock_load_companies, mock_get_engine
+        self,
+        mock_perf_counter,
+        mock_log_ingestion,
+        mock_ingest_company,
+        mock_load_companies,
+        mock_get_engine,
     ):
         # Arrange
         mock_companies = [{"id": 1}, {"id": 2}]
@@ -25,7 +30,10 @@ class TestRunEmployerIngestion(unittest.TestCase):
             "accepted": 7,
             "skipped": 1,
             "rejected_policy_count": 1,
-            "rejected_by_reason": {RemoteClass.NON_REMOTE.value: 1, "geo_restriction": 0},
+            "rejected_by_reason": {
+                RemoteClass.NON_REMOTE.value: 1,
+                "geo_restriction": 0,
+            },
             "remote_model_counts": {
                 RemoteClass.REMOTE_ONLY.value: 2,
                 "remote_but_geo_restricted": 1,
@@ -40,7 +48,10 @@ class TestRunEmployerIngestion(unittest.TestCase):
             "accepted": 4,
             "skipped": 0,
             "rejected_policy_count": 1,
-            "rejected_by_reason": {RemoteClass.NON_REMOTE.value: 0, "geo_restriction": 1},
+            "rejected_by_reason": {
+                RemoteClass.NON_REMOTE.value: 0,
+                "geo_restriction": 1,
+            },
             "remote_model_counts": {
                 RemoteClass.REMOTE_ONLY.value: 3,
                 "remote_but_geo_restricted": 0,
@@ -87,7 +98,12 @@ class TestRunEmployerIngestion(unittest.TestCase):
     @patch("app.workers.ingestion.employer.log_ingestion")
     @patch("app.workers.ingestion.employer.perf_counter", side_effect=list(range(1, 100)))
     def test_run_employer_ingestion_with_failures(
-        self, mock_perf_counter, mock_log_ingestion, mock_ingest_company, mock_load_companies, mock_get_engine
+        self,
+        mock_perf_counter,
+        mock_log_ingestion,
+        mock_ingest_company,
+        mock_load_companies,
+        mock_get_engine,
     ):
         # Arrange
         mock_companies = [{"id": 1}, {"id": 2}, {"id": 3}]
@@ -99,7 +115,10 @@ class TestRunEmployerIngestion(unittest.TestCase):
             "accepted": 7,
             "skipped": 1,
             "rejected_policy_count": 1,
-            "rejected_by_reason": {RemoteClass.NON_REMOTE.value: 1, "geo_restriction": 0},
+            "rejected_by_reason": {
+                RemoteClass.NON_REMOTE.value: 1,
+                "geo_restriction": 0,
+            },
             "remote_model_counts": {
                 RemoteClass.REMOTE_ONLY.value: 2,
                 "remote_but_geo_restricted": 1,
@@ -133,7 +152,12 @@ class TestRunEmployerIngestion(unittest.TestCase):
     @patch("app.workers.ingestion.employer.log_ingestion")
     @patch("app.workers.ingestion.employer.perf_counter", side_effect=list(range(1, 100)))
     def test_run_employer_ingestion_no_companies(
-        self, mock_perf_counter, mock_log_ingestion, mock_ingest_company, mock_load_companies, mock_get_engine
+        self,
+        mock_perf_counter,
+        mock_log_ingestion,
+        mock_ingest_company,
+        mock_load_companies,
+        mock_get_engine,
     ):
         # Arrange
         mock_load_companies.return_value = []
@@ -153,7 +177,12 @@ class TestRunEmployerIngestion(unittest.TestCase):
     @patch("app.workers.ingestion.employer.log_ingestion")
     @patch("app.workers.ingestion.employer.perf_counter", side_effect=list(range(1, 1000)))
     def test_run_employer_ingestion_stress_with_thread_pool_failures(
-        self, mock_perf_counter, mock_log_ingestion, mock_ingest_company, mock_load_companies, mock_get_engine
+        self,
+        mock_perf_counter,
+        mock_log_ingestion,
+        mock_ingest_company,
+        mock_load_companies,
+        mock_get_engine,
     ):
         # Arrange: Przygotowujemy 50 firm
         num_companies = 50
@@ -187,8 +216,9 @@ class TestRunEmployerIngestion(unittest.TestCase):
         metrics = result["metrics"]
         self.assertEqual(metrics["status"], "ok")
         self.assertEqual(metrics["companies_processed"], 50)
-        self.assertEqual(metrics["companies_failed"], 30) # 20 twardych wybuchów + 10 błędów dict
-        self.assertEqual(metrics["accepted_jobs"], 100) # 20 firm * 5 ofert = 100
+        self.assertEqual(metrics["companies_failed"], 30)  # 20 twardych wybuchów + 10 błędów dict
+        self.assertEqual(metrics["accepted_jobs"], 100)  # 20 firm * 5 ofert = 100
+
 
 class TestIngestCompany(unittest.TestCase):
     @patch("app.workers.ingestion.employer.get_adapter")
@@ -197,10 +227,19 @@ class TestIngestCompany(unittest.TestCase):
     @patch("app.workers.ingestion.employer.process_company_jobs")
     @patch("app.workers.ingestion.employer.mark_ats_synced")
     def test_ingest_company_happy_path(
-        self, mock_mark_synced, mock_process, mock_get_engine, mock_fetch, mock_get_adapter
+        self,
+        mock_mark_synced,
+        mock_process,
+        mock_get_engine,
+        mock_fetch,
+        mock_get_adapter,
     ):
         # Arrange
-        company = {"ats_provider": "test_provider", "company_id": "c1", "company_ats_id": "ats1"}
+        company = {
+            "ats_provider": "test_provider",
+            "company_id": "c1",
+            "company_ats_id": "ats1",
+        }
         mock_adapter = MagicMock()
         mock_get_adapter.return_value = mock_adapter
         raw_jobs = [{"id": "job1"}]
@@ -224,7 +263,10 @@ class TestIngestCompany(unittest.TestCase):
         self.assertNotIn("error", result)
         self.assertEqual(result["fetched"], 1)
 
-    @patch("app.workers.ingestion.employer.get_adapter", side_effect=ValueError("bad adapter"))
+    @patch(
+        "app.workers.ingestion.employer.get_adapter",
+        side_effect=ValueError("bad adapter"),
+    )
     def test_ingest_company_unsupported_adapter(self, mock_get_adapter):
         # Arrange
         company = {"ats_provider": "bad_provider"}
@@ -252,14 +294,17 @@ class TestIngestCompany(unittest.TestCase):
         self.assertEqual(result["fetched"], 0)
 
     @patch("app.workers.ingestion.employer.get_adapter")
-    @patch("app.workers.ingestion.employer.fetch_company_jobs", return_value=(None, "fetch_failed"))
+    @patch(
+        "app.workers.ingestion.employer.fetch_company_jobs",
+        return_value=(None, "fetch_failed"),
+    )
     @patch("app.workers.ingestion.employer.get_engine")
     @patch("app.workers.ingestion.employer.mark_ats_synced")
     def test_ingest_company_fetch_error(self, mock_mark_synced, mock_get_engine, mock_fetch, mock_get_adapter):
         # Arrange
         company = {"ats_provider": "test_provider", "company_ats_id": "ats1"}
         mock_get_adapter.return_value = MagicMock()
-        
+
         mock_conn = MagicMock()
         mock_get_engine.return_value.begin.return_value.__enter__.return_value = mock_conn
 
@@ -300,9 +345,18 @@ class TestIngestCompany(unittest.TestCase):
     @patch("app.workers.ingestion.employer.process_company_jobs")
     @patch("app.workers.ingestion.employer.mark_ats_synced")
     def test_ingest_company_processes_jobs_in_batches(
-        self, mock_mark_synced, mock_process, mock_get_engine, mock_fetch, mock_get_adapter
+        self,
+        mock_mark_synced,
+        mock_process,
+        mock_get_engine,
+        mock_fetch,
+        mock_get_adapter,
     ):
-        company = {"ats_provider": "test_provider", "company_id": "c1", "company_ats_id": "ats1"}
+        company = {
+            "ats_provider": "test_provider",
+            "company_id": "c1",
+            "company_ats_id": "ats1",
+        }
         mock_get_adapter.return_value = MagicMock()
         raw_jobs = [{"id": f"job-{i}"} for i in range(201)]
         mock_fetch.return_value = (iter(raw_jobs), None)
@@ -338,9 +392,18 @@ class TestIngestCompany(unittest.TestCase):
     @patch("app.workers.ingestion.employer.process_company_jobs")
     @patch("app.workers.ingestion.employer.mark_ats_synced")
     def test_ingest_company_returns_partial_metrics_when_fetch_fails_mid_stream(
-        self, mock_mark_synced, mock_process, mock_get_engine, mock_fetch, mock_get_adapter
+        self,
+        mock_mark_synced,
+        mock_process,
+        mock_get_engine,
+        mock_fetch,
+        mock_get_adapter,
     ):
-        company = {"ats_provider": "test_provider", "company_id": "c1", "company_ats_id": "ats1"}
+        company = {
+            "ats_provider": "test_provider",
+            "company_id": "c1",
+            "company_ats_id": "ats1",
+        }
         mock_get_adapter.return_value = MagicMock()
 
         def raw_jobs():

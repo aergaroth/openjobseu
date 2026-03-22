@@ -3,12 +3,13 @@ import re
 
 
 SPAM_PATTERNS = {
-    "mention_word": re.compile(r"(?i)please mention the word\s+[a-z0-9]+\s+(?:when applying|in your application)[^\n]*\n?"),
+    "mention_word": re.compile(
+        r"(?i)please mention the word\s+[a-z0-9]+\s+(?:when applying|in your application)[^\n]*\n?"
+    ),
     "beta_spam": re.compile(r"(?i)(?:this is a\s+)?beta feature to avoid spam[^\n]*\n?"),
     "rmt_tag": re.compile(r"RMTg[a-zA-Z0-9+/]+={0,2}\s*\n?"),
     "tracking_pixel": re.compile(r"(?i)<img[^>]+src=[\"'][^\"']*tracking[^\"']*[\"'][^>]*>"),
 }
-
 
 
 def fix_encoding(text: str) -> str:
@@ -55,7 +56,12 @@ def clean_html(text: str) -> str:
     text = re.sub(r"</(b|strong)\s*>", "**", text, flags=re.IGNORECASE)
     text = re.sub(r"<(i|em|u)[^>]*>", "_", text, flags=re.IGNORECASE)
     text = re.sub(r"</(i|em|u)\s*>", "_", text, flags=re.IGNORECASE)
-    text = re.sub(r"<a[^>]+href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", r"[\2](\1)", text, flags=re.IGNORECASE | re.DOTALL)
+    text = re.sub(
+        r"<a[^>]+href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>",
+        r"[\2](\1)",
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
     text = re.sub(r"</div\s*>", "\n", text, flags=re.IGNORECASE)
     text = re.sub(r"<[^>]+>", "", text)
     text = html.unescape(text)
@@ -91,6 +97,7 @@ def normalize_remote_scope(value: str | None) -> str:
     }
 
     return replacements.get(value, value)
+
 
 def clean_description(text: str, source: str) -> str:
     if not text:

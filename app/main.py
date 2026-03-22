@@ -38,7 +38,7 @@ def _run_db_bootstrap_once() -> None:
     with engine.connect() as conn:
         jobs_exist = conn.execute(text("SELECT to_regclass('public.jobs')")).scalar_one_or_none()
         alembic_exists = conn.execute(text("SELECT to_regclass('public.alembic_version')")).scalar_one_or_none()
-        
+
         if jobs_exist and not alembic_exists:
             logger.info("Legacy database schema detected. Auto-stamping Alembic baseline.")
             command.stamp(alembic_cfg, "56f2bf3724cd")
@@ -115,7 +115,13 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_methods=["GET", "OPTIONS"],
-    allow_headers=["Accept", "Accept-Language", "Content-Language", "Content-Type", "Authorization"],
+    allow_headers=[
+        "Accept",
+        "Accept-Language",
+        "Content-Language",
+        "Content-Type",
+        "Authorization",
+    ],
 )
 
 app.include_router(auth_router)
@@ -130,11 +136,12 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    
+
     if os.environ.get("APP_RUNTIME") != "local":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        
+
     return response
+
 
 @app.middleware("http")
 async def readiness_gate(request: Request, call_next):

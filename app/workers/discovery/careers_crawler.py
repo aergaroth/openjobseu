@@ -4,7 +4,7 @@ import logging
 import re
 import time
 from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, Iterable
+from typing import Any, Dict
 
 import requests
 import urllib3
@@ -28,7 +28,10 @@ QUALITY_MIN_JOBS = 1
 QUALITY_MIN_REMOTE_HITS = 1
 QUALITY_MAX_AGE_DAYS = 120
 PROVIDER_PATTERNS: Dict[str, re.Pattern] = {
-    "greenhouse": re.compile(r"boards\.greenhouse\.io/(?:embed/job_board\?for=)?([a-zA-Z0-9_-]+)", re.IGNORECASE),
+    "greenhouse": re.compile(
+        r"boards\.greenhouse\.io/(?:embed/job_board\?for=)?([a-zA-Z0-9_-]+)",
+        re.IGNORECASE,
+    ),
     "lever": re.compile(r"jobs\.lever\.co/([a-zA-Z0-9_-]+)", re.IGNORECASE),
     "workable": re.compile(r"apply\.workable\.com/([a-zA-Z0-9_-]+)", re.IGNORECASE),
     "ashby": re.compile(r"jobs\.ashbyhq\.com/([a-zA-Z0-9_-]+)", re.IGNORECASE),
@@ -109,14 +112,14 @@ def _fetch_careers_page(url: str) -> requests.Response | None:
     try:
         response = requests.get(url, timeout=15, allow_redirects=True, verify=False, stream=True)
         response.raise_for_status()
-        
+
         content = b""
         for chunk in response.iter_content(chunk_size=8192):
             content += chunk
             if len(content) > 5 * 1024 * 1024:  # Sztywny limit wielkości do 5MB dla stron HTML
                 logger.warning("careers page too large, truncating to 5MB", extra={"url": url})
                 break
-                
+
         response._content = content  # Bezpieczny "hack", aby response.text i kodowanie zadziałały dla reszty skryptu
         return response
     except Exception as exc:
@@ -156,7 +159,9 @@ def _extract_candidate_links(html: str, base_url: str) -> list[str]:
     return links[:MAX_SECONDARY_LINKS]
 
 
-def _detect_provider_from_redirects(response: requests.Response) -> tuple[str, str] | None:
+def _detect_provider_from_redirects(
+    response: requests.Response,
+) -> tuple[str, str] | None:
     urls = [r.url for r in response.history] + [response.url]
 
     for url in urls:
@@ -177,7 +182,7 @@ def _detect_provider_with_shallow_crawl(final_url: str, html: str) -> tuple[str,
         response = _fetch_careers_page(link)
         if not response:
             continue
-        
+
         next_url = response.url
         next_html = response.text
         detection = _detect_provider_from_fetch(next_url, next_html)
@@ -222,7 +227,7 @@ def run_careers_discovery() -> Dict[str, int]:
                 else:
                     company_id = str(getattr(row, "company_id", row[0] if isinstance(row, tuple) else ""))
                     careers_url = getattr(row, "careers_url", None)
-                    
+
                 if not careers_url:
                     continue
 
@@ -245,7 +250,11 @@ def run_careers_discovery() -> Dict[str, int]:
                 if not _is_valid_slug(slug):
                     logger.info(
                         "discovery_slug_rejected",
-                        extra={"component": "discovery", "phase": "careers_discovery", "slug": slug},
+                        extra={
+                            "component": "discovery",
+                            "phase": "careers_discovery",
+                            "slug": slug,
+                        },
                     )
                     continue
                 metrics["ats_detected"] += 1
@@ -259,14 +268,18 @@ def run_careers_discovery() -> Dict[str, int]:
                     jobs_total = int(probe_result.get("jobs_total") or 0)
                 except (ValueError, TypeError):
                     jobs_total = 0
-                    
+
                 try:
                     remote_hits = int(probe_result.get("remote_hits") or 0)
                 except (ValueError, TypeError):
                     remote_hits = 0
                 recent_job_at = probe_result.get("recent_job_at")
 
-                if jobs_total < QUALITY_MIN_JOBS or remote_hits < QUALITY_MIN_REMOTE_HITS or not _is_recent(recent_job_at):
+                if (
+                    jobs_total < QUALITY_MIN_JOBS
+                    or remote_hits < QUALITY_MIN_REMOTE_HITS
+                    or not _is_recent(recent_job_at)
+                ):
                     metrics["ats_skipped_quality"] += 1
                     continue
 
@@ -284,25 +297,26 @@ def run_careers_discovery() -> Dict[str, int]:
                 else:
                     metrics["ats_duplicates"] += 1
             except Exception as e:
-                logger.error(f"error processing company in careers_crawler [{company_id}]: {e}", exc_info=True, extra={
-                    "company_id": company_id,
-                    "component": "discovery"
-                })
+                logger.error(
+                    f"error processing company in careers_crawler [{company_id}]: {e}",
+                    exc_info=True,
+                    extra={"company_id": company_id, "component": "discovery"},
+                )
             finally:
                 if company_id:
                     with engine.begin() as conn:
                         update_discovery_last_checked_at(conn, company_id=company_id, phase="careers")
-                        
+
             if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
                 pct = int((idx / total) * 100)
                 filled = int(20 * idx / total)
                 bar = "█" * filled + "-" * (20 - filled)
                 logger.info(f"careers_crawler progress: [{bar}] {pct}% ({idx}/{total})")
-    except Exception as exc:
+    except Exception:
         logger.error(
             "careers_crawler pipeline failed",
             exc_info=True,
-            extra={"component": "discovery", "phase": "careers_discovery"}
+            extra={"component": "discovery", "phase": "careers_discovery"},
         )
         raise
     finally:

@@ -5,13 +5,13 @@ Revises: 09fad31be552
 Create Date: 2026-03-17 19:41:21.482385+00:00
 
 """
+
 from alembic import op
-import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '9c1eddd701c6'
-down_revision = '09fad31be552'
+revision = "9c1eddd701c6"
+down_revision = "09fad31be552"
 branch_labels = None
 depends_on = None
 
@@ -41,6 +41,7 @@ def upgrade() -> None:
 
     # 4. Usunięcie zduplikowanego indeksu z tabeli jobs (zostaje ten z 001)
     op.execute("DROP INDEX IF EXISTS idx_jobs_company;")
+
 
 def downgrade() -> None:
     # Przywracanie struktury na wypadek wycofania migracji

@@ -1,11 +1,10 @@
 from datetime import datetime, timedelta, timezone
-from app.workers.discovery.careers_crawler import ( 
+from app.workers.discovery.careers_crawler import (
     QUALITY_MAX_AGE_DAYS,
     QUALITY_MIN_JOBS,
     QUALITY_MIN_REMOTE_HITS,
     _is_recent,
 )
-from app.workers.discovery.careers_crawler import _is_recent
 
 
 def test_is_recent_within_threshold():
