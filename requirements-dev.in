@@ -8,3 +8,4 @@ pytest-mock>=3.0.0
 respx>=0.22.0
 responses>=0.25.0
 pre-commit>=3.7.0
+commitizen>=3.20.0
