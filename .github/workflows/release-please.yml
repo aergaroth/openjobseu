@@ -3,7 +3,7 @@ name: Release Please
 on:
   push:
     branches:
-      - main
+      - develop
 
 permissions:
   contents: write
@@ -18,4 +18,5 @@ jobs:
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}  
           release-type: python
+          target-branch: develop
           
