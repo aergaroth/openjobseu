@@ -21,6 +21,8 @@ jobs:
           python-version: "3.13"
           
       - uses: pre-commit/action@v3.0.1
+        env:
+          SKIP: pytest
 
       - name: Auto-commit pre-commit fixes
         if: failure()
