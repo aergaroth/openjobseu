@@ -53,7 +53,7 @@ resource "google_cloud_scheduler_job" "tick_ingestion" {
 resource "google_cloud_scheduler_job" "dorking_discovery" {
   name      = "openjobseu-dorking"
   region    = var.scheduler_region
-  schedule  = "0 2 * * *" # o 02:00 w nocy każdego dnia
+  schedule  = "15 2 * * *" # o 02:15 w nocy każdego dnia
   time_zone = "UTC"
 
   http_target {
@@ -74,7 +74,7 @@ resource "google_cloud_scheduler_job" "dorking_discovery" {
 resource "google_cloud_scheduler_job" "tick_maintenance" {
   name      = "openjobseu-tick-maintenance"
   region    = var.scheduler_region
-  schedule  = "0 4 * * *" # o 04:00 rano każdego dnia
+  schedule  = "5 4 * * *" # o 04:05 rano każdego dnia
   time_zone = "UTC"
   attempt_deadline = "30s"
 
@@ -96,7 +96,7 @@ resource "google_cloud_scheduler_job" "tick_maintenance" {
 resource "google_cloud_scheduler_job" "discovery" {
   name      = "openjobseu-discovery"
   region    = var.scheduler_region
-  schedule  = "0 6 * * *" # o 06:00 rano każdego dnia
+  schedule  = "10 6 * * *" # o 06:10 rano każdego dnia
   time_zone = "UTC"
 
   http_target {

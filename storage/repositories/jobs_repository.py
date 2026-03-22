@@ -66,7 +66,11 @@ def _build_get_jobs_query(
 
     if min_compliance_score is not None:
         param_counter += 1
-        clauses.append(f"COALESCE(compliance_score, 0) >= :p{param_counter}")
+        if int(min_compliance_score) <= 0:
+            clauses.append(f"COALESCE(compliance_score, 0) >= :p{param_counter}")
+        else:
+            # Optymalizacja: omijamy COALESCE dla wartości dodatnich, aby umożliwić skanowanie po indeksie
+            clauses.append(f"compliance_score >= :p{param_counter}")
         params[f"p{param_counter}"] = int(min_compliance_score)
 
     where_clause = ""

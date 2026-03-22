@@ -2,7 +2,7 @@ import json
 import logging
 import mimetypes
 import os
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from storage.repositories.jobs_repository import get_jobs
@@ -21,7 +21,7 @@ FRONTEND_DIR = REPO_ROOT / "frontend"
 
 def _json_serial(obj):
     """Wsparcie serializacji obiektów nienatywnych (np. datetime) dla json.dumps()"""
-    if isinstance(obj, datetime):
+    if isinstance(obj, (datetime, date)):
         return obj.isoformat().replace("+00:00", "Z")
     raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
@@ -69,7 +69,7 @@ def run_frontend_export() -> dict:
 
         payload = {
             "meta": {
-                "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "generated_at": datetime.now(timezone.utc),
                 "count": len(jobs),
                 "status": "visible",
                 "limit": FEED_LIMIT,
@@ -81,7 +81,7 @@ def run_frontend_export() -> dict:
         feed_blob = bucket.blob("feed.json")
         feed_blob.cache_control = "public, max-age=300"
         feed_blob.upload_from_string(
-            json.dumps(payload, ensure_ascii=False, default=_json_serial),
+            json.dumps(payload, ensure_ascii=False, default=_json_serial, separators=(",", ":")),
             content_type="application/json",
         )
         uploaded_files += 1

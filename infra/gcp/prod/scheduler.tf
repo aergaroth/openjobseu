@@ -53,7 +53,7 @@ resource "google_cloud_scheduler_job" "tick_ingestion" {
 resource "google_cloud_scheduler_job" "dorking_discovery" {
   name      = "openjobseu-dorking"
   region    = var.scheduler_region
-  schedule  = "0 3 * * *" # at 03:00 AM every day (off-peak)
+  schedule  = "20 3 * * *" # at 03:20 AM every day (off-peak, staggered)
   time_zone = "UTC"
 
   http_target {
@@ -74,7 +74,7 @@ resource "google_cloud_scheduler_job" "dorking_discovery" {
 resource "google_cloud_scheduler_job" "tick_maintenance" {
   name      = "openjobseu-tick-maintenance"
   region    = var.scheduler_region
-  schedule  = "0 * * * *" # at minute 0 past every hour
+  schedule  = "5 * * * *" # at minute 5 past every hour (staggered)
   time_zone = "UTC"
   attempt_deadline = "30s"
 
@@ -96,7 +96,7 @@ resource "google_cloud_scheduler_job" "tick_maintenance" {
 resource "google_cloud_scheduler_job" "discovery" {
   name      = "openjobseu-discovery"
   region    = var.scheduler_region
-  schedule  = "0 */6 * * *" # at minute 0 past every 6th hour
+  schedule  = "10 */6 * * *" # at minute 10 past every 6th hour (staggered)
   time_zone = "UTC"
 
   http_target {
