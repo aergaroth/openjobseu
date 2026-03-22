@@ -2,25 +2,8 @@ ci:
   autofix_commit_msg: "chore(pre-commit): auto fixes from pre-commit.ci"
   autoupdate_commit_msg: "chore(pre-commit): pre-commit autoupdate"
   autoupdate_schedule: weekly
-  skip:
-    - pip-compile # Bot nie ma dostępu do sieci. Pominie zależności, ale naprawi kod (Ruff)
 
 repos:
-  - repo: https://github.com/jazzband/pip-tools
-    rev: v7.5.3  # wersja naprawiająca kompatybilność z pip >= 24.1
-    hooks:
-      # 1. Sprawdzanie głównego pliku produkcyjnego
-      - id: pip-compile
-        name: pip-compile (requirements.in)
-        files: ^requirements\.in$
-        args: ["requirements.in"]
-        
-      # 2. Sprawdzanie pliku deweloperskiego
-      - id: pip-compile
-        name: pip-compile (requirements-dev.in)
-        files: ^requirements-dev\.in$
-        args: ["requirements-dev.in"]
-        
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.7
     hooks:

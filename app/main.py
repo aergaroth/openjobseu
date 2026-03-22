@@ -7,6 +7,7 @@ import os
 from fastapi import FastAPI, Request, Response, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import ResponseValidationError
 from starlette.middleware.sessions import SessionMiddleware
 
 from sqlalchemy import text
@@ -128,6 +129,12 @@ app.include_router(auth_router)
 app.include_router(internal_router)
 app.include_router(jobs_router)
 app.include_router(companies_router)
+
+
+@app.exception_handler(ResponseValidationError)
+async def validation_exception_handler(request: Request, exc: ResponseValidationError):
+    logger.error("Response Validation Error on %s %s", request.method, request.url.path, extra={"errors": exc.errors()})
+    raise exc
 
 
 @app.middleware("http")
