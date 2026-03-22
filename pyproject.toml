@@ -1,6 +1,6 @@
 [project]
 name = "openjobseu"
-version = "0.1.0"
+version = "0.2.0"
 
 [tool.ruff]
 line-length = 120
