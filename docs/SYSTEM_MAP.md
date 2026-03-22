@@ -109,8 +109,8 @@ Goal:
 - `GET /internal/audit/stats/company` – compliance ratio per company
 - `GET /internal/audit/stats/source-7d` – compliance ratio per source (7d)
 - `POST /internal/audit/tick-dev` – tick dev/debug
-- `POST /internal/backfill-compliance` – worker backfill compliance
-- `POST /internal/backfill-salary` – worker backfill salary
+- `POST /internal/tasks/{task_name}` – async worker triggers (Cloud Tasks).
+- `POST /internal/tasks/{task_name}/execute` – strictly M2M Cloud Tasks execution handlers.
 
 ---
 

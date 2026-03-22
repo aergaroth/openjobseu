@@ -80,7 +80,7 @@ Compliance policy is applied during ingestion before persistence.
 ## Post-Ingestion Workers
 
 `run_post_ingestion()` executes:
-- availability checks (`app/workers/availability.py`)
+- availability checks (`app/workers/availability.py` - uses adaptive time-budgeting to maximize throughput)
 - lifecycle transitions (`app/workers/lifecycle.py`)
 - daily market metrics (`app/workers/market_metrics.py`)
 - static frontend and feed JSON generation to Cloud Storage (`app/workers/frontend_exporter.py`)
@@ -95,9 +95,9 @@ Lifecycle states in runtime:
 Public endpoints:
 - `GET /health`
 - `GET /ready`
-- `GET /jobs`
+- `GET /jobs` (fast fuzzy search excluding heavy description text)
 - `GET /feed.json` (Served directly by GCS Edge cache, bypassing Cloud Run)
-- `GET /jobs/stats/compliance-7d`
+- `GET /jobs/stats/compliance-7d` (Deprecated from public UI, used primarily for API access)
 
 Feed behavior (`feed.json` contract):
 - visible jobs only (`new`, `active`)
@@ -113,14 +113,15 @@ Internal endpoints:
 - `GET /internal/audit/stats/source-7d`
 - `POST /internal/audit/tick-dev`
 - `POST /internal/backfill-compliance`
-- `POST /internal/tasks/{task_name}` (Delegates async processes to Cloud Tasks)
-- `POST /internal/tasks/{task_name}/execute` (Cloud Tasks handler)
+- `POST /internal/tasks/{task_name}` (Delegates async processes to Cloud Tasks via Hybrid Router)
+- `POST /internal/tasks/{task_name}/execute` (Strictly Machine-to-Machine Cloud Tasks handler with OIDC `audience` validation)
 - `POST /internal/discovery/careers`
 - `POST /internal/discovery/guess`
 - `POST /internal/discovery/run`
 
 Audit panel data shape:
 - `/internal/audit/filters` returns canonical filter lists and dynamic `source` values from DB
+- `/internal/audit/jobs` uses high-performance `GROUPING SETS` for instant metadata aggregations
 - `/internal/audit/stats/company` provides aggregated compliance ratio by `companies.legal_name` (`HAVING COUNT(*) > 10` by default)
 - `/internal/audit/stats/source-7d` provides aggregated compliance ratio by source for rows with `first_seen_at` in last 7 days
 
