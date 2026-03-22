@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0](https://github.com/aergaroth/openjobseu/compare/v0.1.0...v0.2.0) (2026-03-22)
+
+
+### Features
+
+* add commit message validation workflow using Commitizen ([27113c9](https://github.com/aergaroth/openjobseu/commit/27113c93e373c2bca08059a047f46bd22460e0f4))
+
+
+### Bug Fixes
+
+* update commit-check workflow to validate commit messages using Commitizen ([ec4c5fa](https://github.com/aergaroth/openjobseu/commit/ec4c5fa0562597426d7a38f6182af5a2b08ed1fb))
+
 ## 0.1.0 (2026-03-22)
 
 
