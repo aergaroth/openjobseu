@@ -22,7 +22,12 @@ import app.workers.ingestion.employer as employer_worker
 
 logger = logging.getLogger("openjobseu.runtime")
 
-tasks_router = APIRouter(
+tasks_trigger_router = APIRouter(
+    prefix="/tasks",
+    tags=["internal-tasks"],
+)
+
+tasks_execute_router = APIRouter(
     prefix="/tasks",
     tags=["internal-tasks"],
 )
@@ -93,7 +98,7 @@ TASK_MAP = {
 }
 
 
-@tasks_router.post("/{task_name}", response_model=TaskTriggerResponse)
+@tasks_trigger_router.post("/{task_name}", response_model=TaskTriggerResponse)
 def trigger_async_task(
     task_name: str,
     request: Request,
@@ -158,7 +163,7 @@ def trigger_async_task(
     }
 
 
-@tasks_router.post("/{task_name}/execute", response_model=TaskExecuteResponse)
+@tasks_execute_router.post("/{task_name}/execute", response_model=TaskExecuteResponse)
 async def execute_task(task_name: str, request: Request):
     if task_name not in TASK_MAP:
         raise HTTPException(status_code=404, detail="Task not found")

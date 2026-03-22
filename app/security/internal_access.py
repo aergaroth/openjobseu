@@ -36,8 +36,12 @@ def require_internal_access(request: Request):
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
         try:
-            # Verify token signature and expiration without requiring a specific audience
-            id_info = id_token.verify_oauth2_token(token, requests.Request(), audience=None)
+            expected_audience = os.getenv("BASE_URL")
+            if not expected_audience:
+                raise ValueError("BASE_URL environment variable is missing. Cannot verify OIDC audience.")
+
+            # Verify token signature and expiration requiring a specific audience
+            id_info = id_token.verify_oauth2_token(token, requests.Request(), audience=expected_audience)
 
             # Check if token belongs to an authorized service account or admin email
             email = id_info.get("email")

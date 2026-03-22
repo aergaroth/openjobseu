@@ -49,6 +49,27 @@ def test_all_internal_routes_are_protected_structurally():
     assert not unprotected_routes, f"Znaleziono niezabezpieczone endpointy wewnętrzne: {unprotected_routes}"
 
 
+def test_execute_endpoints_are_strictly_internal():
+    """
+    Weryfikuje, czy endpointy wykonawcze Cloud Tasks (.../execute) są rygorystycznie
+    zabezpieczone TYLKO dla ruchu maszynowego (OIDC), blokując dostęp z poziomu przeglądarki.
+    """
+    invalid_execute_routes = []
+
+    for route in app.routes:
+        if isinstance(route, APIRoute) and route.path.endswith("/execute"):
+            deps = [dep.dependency for dep in route.dependencies]
+
+            # Endpoint execute musi mieć require_internal_access i NIE MOŻE mieć hybrydy/sesji
+            if require_internal_access not in deps or require_internal_or_user_api_access in deps:
+                methods = ",".join(route.methods or set())
+                invalid_execute_routes.append(f"{methods} {route.path}")
+
+    assert not invalid_execute_routes, (
+        f"Endpointy execute są dostępne dla zwykłych sesji użytkowników: {invalid_execute_routes}"
+    )
+
+
 def test_internal_endpoints_functional_auth_rejection():
     """
     Funkcjonalny test wyrywkowy. Zastępuje mechanizm weryfikacji wymuszeniem błędu HTTP 401.
@@ -85,12 +106,13 @@ def test_require_internal_access_with_valid_oidc(monkeypatch):
 
     # 1. Zmockuj weryfikację tokenu przez bibliotekę Google
     def mock_verify_oauth2_token(token, request, audience=None):
-        if token == "valid-mock-token":
+        if token == "valid-mock-token" and audience == "https://test-run.app":
             return {"email": "scheduler-internal@example.com"}
         raise ValueError("Invalid token signature")
 
     monkeypatch.setattr(id_token, "verify_oauth2_token", mock_verify_oauth2_token)
     monkeypatch.setenv("SCHEDULER_SA_EMAIL", "scheduler-internal@example.com")
+    monkeypatch.setenv("BASE_URL", "https://test-run.app")
 
     # 2. Skonstruuj fałszywy obiekt żądania (pochodzący spoza localhost/testclient)
     scope = {
@@ -108,11 +130,13 @@ def test_require_internal_access_unauthorized_email_oidc(monkeypatch):
     """Testuje czy poprawny token, ale nieuprawniony e-mail zostanie odrzucony."""
 
     def mock_verify_oauth2_token(token, request, audience=None):
+        assert audience == "https://test-run.app"
         return {"email": "hacker@evil.com"}
 
     monkeypatch.setattr(id_token, "verify_oauth2_token", mock_verify_oauth2_token)
     monkeypatch.setenv("SCHEDULER_SA_EMAIL", "scheduler-internal@example.com")
     monkeypatch.setenv("ALLOWED_AUTH_EMAIL", "admin@example.com")
+    monkeypatch.setenv("BASE_URL", "https://test-run.app")
 
     scope = {
         "type": "http",

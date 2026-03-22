@@ -1,8 +1,8 @@
 name: Prod Flow
 
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
     paths-ignore:
@@ -13,6 +13,7 @@ on:
 env:
   DB_MODE: standard
   DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/testdb
+  APP_RUNTIME: local
 
 jobs:
   pytest:
@@ -40,18 +41,13 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Cache pip
-        uses: actions/cache@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements*.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          enable-cache: true
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-dev.txt
+        run: uv pip install --system -r requirements.txt -r requirements-dev.txt
 
       - name: Wait for Postgres
         run: |
@@ -66,9 +62,27 @@ jobs:
       - name: Run tests
         run: pytest -q
 
-  build-deploy-prod:
+  release-please:
     needs: pytest
-    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}  
+          release-type: python
+          target-branch: main
+
+  build-deploy-prod:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -90,7 +104,7 @@ jobs:
         env:
           PROJECT_ID: openjobseu
           SHA: ${{ github.sha }}
-          VERSION: ${{ github.event.release.tag_name || 'latest' }}
+          VERSION: ${{ needs.release-please.outputs.tag_name || 'latest' }}
         run: |
           IMAGE=europe-north1-docker.pkg.dev/$PROJECT_ID/$PROJECT_ID/$PROJECT_ID
           docker build -t $IMAGE:$SHA -t $IMAGE:$VERSION .
@@ -107,7 +121,7 @@ jobs:
           terraform init -input=false
           terraform apply -auto-approve \
             -var="project_id=openjobseu" \
-            -var="image=europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu:${{ github.event.release.tag_name || github.sha }}" \
+            -var="image=europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu:${{ needs.release-please.outputs.tag_name || github.sha }}" \
             -var="google_client_id=${{ secrets.PROD_GOOGLE_CLIENT_ID }}" \
             -var="google_client_secret=${{ secrets.PROD_GOOGLE_CLIENT_SECRET }}" \
             -var="session_secret_key=${{ secrets.PROD_SESSION_SECRET_KEY }}" \

@@ -53,7 +53,10 @@ def test_internal_access_valid_oidc_token(mock_verify, monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == {"message": "Success"}
-    mock_verify.assert_called_once()
+
+    # Upewniamy się, że aplikacja przekazała odpowiedni "audience" do walidatora
+    args, kwargs = mock_verify.call_args
+    assert kwargs.get("audience") == "https://dev-openjobseu-123.europe-north1.run.app"
 
 
 @patch("app.security.internal_access.id_token.verify_oauth2_token")

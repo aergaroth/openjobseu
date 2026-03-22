@@ -40,6 +40,7 @@ Non-goals remain unchanged:
 - [x] Internal audit panel and filterable audit API
 - [x] Internal audit aggregate stats endpoints (`/internal/audit/stats/company`, `/internal/audit/stats/source-7d`)
 - [x] Audit filter registry extended with dynamic source dropdown values
+- [x] UI/UX decoupling from API (100% static frontend export)
 
 ### Ops
 - [x] Cloud Run deployment via Terraform (`infra/gcp/dev`, `infra/gcp/prod`)
@@ -50,7 +51,9 @@ Non-goals remain unchanged:
 - [x] Cloud Tasks for robust async execution (backfills, discovery)
 - [x] OIDC authentication for M2M communication (Scheduler, Tasks)
 - [x] Modular Monolith routing groups for strict access control
+- [x] Strict OIDC audience validation for Cloud Tasks execution
 - [x] Zero-compute public feed generation (GCS static export)
+- [x] Adaptive time-budgeting for serverless workers
 
 ---
 
@@ -65,7 +68,7 @@ Non-goals remain unchanged:
 
 ### P3 – DB and migration hardening
 - [x] Introduce explicit migration tooling (Alembic or equivalent)
-- [x] Tune indexes for feed/audit/lifecycle query patterns
+- [x] Tune indexes for feed/audit/lifecycle query patterns (e.g., covering compound indexes, `GROUPING SETS`)
 - [ ] Add automated post-deploy smoke checks
 
 ### P4 – Observability

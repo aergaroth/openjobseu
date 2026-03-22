@@ -55,7 +55,7 @@ Expired jobs are not deleted immediately and may be retained for audit or analyt
 
 The process is a two-step pipeline:
 
-1.  **Availability Check**: The `availability` worker periodically fetches jobs and checks their `source_url`. It records the outcome in the `availability_status` column without changing the main `status`.
+1.  **Availability Check**: The `availability` worker periodically fetches jobs and checks their `source_url`. It records the outcome in the `availability_status` column without changing the main `status`. *(Runs using adaptive time-budgeting to maximize throughput without hitting serverless timeouts).*
 
 2.  **Lifecycle Transition**: The `lifecycle` worker runs as a separate process. It applies a set of rules in SQL to update the main `status` for all jobs in the database based on their current state, timestamps, and `availability_status`.
 

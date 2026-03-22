@@ -101,6 +101,7 @@ def get_jobs_audit(
     max_compliance_score: int | None = None,
     limit: int = 50,
     offset: int = 0,
+    include_counts: bool = True,
 ) -> dict:
     clauses, params = _build_jobs_audit_filter_clauses(
         status=status,
@@ -139,7 +140,8 @@ def get_jobs_audit(
                     compliance_status,
                     compliance_score,
                     first_seen_at,
-                    last_seen_at
+                    last_seen_at,
+                    source_department
                 FROM jobs
                 {where_clause}
                 ORDER BY COALESCE(last_seen_at, '1970-01-01T00:00:00+00:00') DESC
@@ -161,84 +163,74 @@ def get_jobs_audit(
             params,
         ).fetchone()
 
-        status_rows = (
-            conn.execute(
-                text(f"""
-                SELECT COALESCE(status, 'null') AS label, COUNT(*) AS count
-                FROM jobs
-                {where_clause}
-                GROUP BY COALESCE(status, 'null')
-                ORDER BY count DESC, label ASC
-            """),
-                params,
-            )
-            .mappings()
-            .all()
-        )
+        status_counts = {}
+        source_counts = {}
+        compliance_counts = {}
+        remote_class_counts = {}
+        geo_class_counts = {}
 
-        source_rows = (
-            conn.execute(
-                text(f"""
+        if include_counts:
+            # Optymalizacja: Agregujemy 4 kolumny w jednym skanie tabeli używając GROUPING SETS
+            grouping_query = f"""
                 SELECT
-                    COALESCE(js.source, 'null') AS label,
-                    COUNT(DISTINCT jobs.job_id) AS count
+                    GROUPING(status) AS g_status,
+                    GROUPING(compliance_status) AS g_comp,
+                    GROUPING(remote_class) AS g_rem,
+                    GROUPING(geo_class) AS g_geo,
+                    COALESCE(status, 'null') AS status,
+                    COALESCE(compliance_status, 'null') AS compliance_status,
+                    COALESCE(remote_class, 'null') AS remote_class,
+                    COALESCE(geo_class, 'null') AS geo_class,
+                    COUNT(*) AS count
                 FROM jobs
-                LEFT JOIN job_sources js
-                    ON js.job_id = jobs.job_id
                 {where_clause}
-                GROUP BY COALESCE(js.source, 'null')
-                ORDER BY count DESC, label ASC
-            """),
-                params,
-            )
-            .mappings()
-            .all()
-        )
+                GROUP BY GROUPING SETS (
+                    (status),
+                    (compliance_status),
+                    (remote_class),
+                    (geo_class)
+                )
+            """
+            aggs = conn.execute(text(grouping_query), params).mappings().all()
+            for r in aggs:
+                # Odczytujemy sub-totals dla konkretnej grupy na podstawie bitów funkcji GROUPING()
+                if r["g_status"] == 0:
+                    status_counts[str(r["status"])] = r["count"]
+                elif r["g_comp"] == 0:
+                    compliance_counts[str(r["compliance_status"])] = r["count"]
+                elif r["g_rem"] == 0:
+                    remote_class_counts[str(r["remote_class"])] = r["count"]
+                elif r["g_geo"] == 0:
+                    geo_class_counts[str(r["geo_class"])] = r["count"]
 
-        compliance_rows = (
-            conn.execute(
-                text(f"""
-                SELECT COALESCE(compliance_status, 'null') AS label, COUNT(*) AS count
-                FROM jobs
-                {where_clause}
-                GROUP BY COALESCE(compliance_status, 'null')
-                ORDER BY count DESC, label ASC
-            """),
-                params,
-            )
-            .mappings()
-            .all()
-        )
+            # Zwracamy słowniki posortowane malejąco po wartości i rosnąco alfabetycznie po kluczu
+            def _sort_counts(d: dict) -> dict:
+                return dict(sorted(d.items(), key=lambda item: (-item[1], item[0])))
 
-        remote_class_rows = (
-            conn.execute(
-                text(f"""
-                SELECT COALESCE(remote_class, 'null') AS label, COUNT(*) AS count
-                FROM jobs
-                {where_clause}
-                GROUP BY COALESCE(remote_class, 'null')
-                ORDER BY count DESC, label ASC
-            """),
-                params,
-            )
-            .mappings()
-            .all()
-        )
+            status_counts = _sort_counts(status_counts)
+            compliance_counts = _sort_counts(compliance_counts)
+            remote_class_counts = _sort_counts(remote_class_counts)
+            geo_class_counts = _sort_counts(geo_class_counts)
 
-        geo_class_rows = (
-            conn.execute(
-                text(f"""
-                SELECT COALESCE(geo_class, 'null') AS label, COUNT(*) AS count
-                FROM jobs
-                {where_clause}
-                GROUP BY COALESCE(geo_class, 'null')
-                ORDER BY count DESC, label ASC
-            """),
-                params,
+            # Źródła sprawdzamy osobnym złączeniem, by nie dublować wierszy w bazowym `jobs` dla ofert wielo-źródłowych
+            source_rows = (
+                conn.execute(
+                    text(f"""
+                    SELECT
+                        COALESCE(js.source, 'null') AS label,
+                        COUNT(DISTINCT jobs.job_id) AS count
+                    FROM jobs
+                    LEFT JOIN job_sources js ON js.job_id = jobs.job_id
+                    {where_clause}
+                    GROUP BY COALESCE(js.source, 'null')
+                    ORDER BY count DESC, label ASC
+                """),
+                    params,
+                )
+                .mappings()
+                .all()
             )
-            .mappings()
-            .all()
-        )
+            source_counts = _rows_to_count_map(source_rows)
 
     return {
         "total": int(total_row[0]) if total_row else 0,
@@ -246,11 +238,11 @@ def get_jobs_audit(
         "offset": int(offset),
         "items": [dict(row) for row in jobs_rows],
         "counts": {
-            "status": _rows_to_count_map(status_rows),
-            "source": _rows_to_count_map(source_rows),
-            "compliance_status": _rows_to_count_map(compliance_rows),
-            "remote_class": _rows_to_count_map(remote_class_rows),
-            "geo_class": _rows_to_count_map(geo_class_rows),
+            "status": status_counts,
+            "source": source_counts,
+            "compliance_status": compliance_counts,
+            "remote_class": remote_class_counts,
+            "geo_class": geo_class_counts,
         },
     }
 

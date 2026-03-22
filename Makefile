@@ -2,17 +2,17 @@
 
 # Reguły plikowe: uruchamiają pip-compile TYLKO gdy plik .in jest nowszy od .txt
 requirements.txt: requirements.in
-	pip-compile requirements.in
+	uv pip compile requirements.in -o requirements.txt
 
 requirements-dev.txt: requirements-dev.in
-	pip-compile requirements-dev.in
+	uv pip compile requirements-dev.in -o requirements-dev.txt
 
 # Kompiluje oba pliki .in do postaci .txt (odpala się tylko przy rzeczywistych zmianach)
 compile: requirements.txt requirements-dev.txt
 
 # Synchronizuje wirtualne środowisko z wygenerowanymi plikami .txt
 sync:
-	pip-sync requirements.txt requirements-dev.txt
+	uv pip sync requirements.txt requirements-dev.txt
 
 # Wykonuje kompilację, a następnie od razu synchronizuje środowisko
 deps: compile sync

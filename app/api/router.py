@@ -9,7 +9,7 @@ from app.security.internal_access import require_internal_access
 
 from app.api.audit import audit_ui_router, audit_api_router
 from app.api.discovery import discovery_ui_router, discovery_ops_router
-from app.api.tasks import tasks_router
+from app.api.tasks import tasks_trigger_router, tasks_execute_router
 from app.api.system import system_ops_router, system_hybrid_router
 
 router = APIRouter(prefix="/internal")
@@ -27,11 +27,12 @@ admin_api.include_router(discovery_ui_router)
 ops_api = APIRouter(dependencies=[Depends(require_internal_access)])
 ops_api.include_router(system_ops_router)
 ops_api.include_router(discovery_ops_router)
+ops_api.include_router(tasks_execute_router)
 
 # 4. Hybrid API - Używane zarówno przez Admin Panel jak i maszyny operacyjne
 hybrid_api = APIRouter(dependencies=[Depends(require_internal_or_user_api_access)])
 hybrid_api.include_router(system_hybrid_router)
-hybrid_api.include_router(tasks_router)
+hybrid_api.include_router(tasks_trigger_router)
 
 router.include_router(admin_ui)
 router.include_router(admin_api)

@@ -3,7 +3,6 @@ import re
 import io
 import zipfile
 import requests
-import urllib3
 import time
 
 from storage.db_engine import get_engine
@@ -15,8 +14,6 @@ from storage.repositories.discovery_repository import (
 # Re-exports for compatibility with endpoints  internal.py
 
 logger = logging.getLogger("openjobseu.discovery")
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 CAREERS_PATHS = [
     "/careers",
@@ -109,10 +106,13 @@ def run_company_source_discovery():
             for url in candidate_urls:
                 try:
                     # Use a HEAD request for efficiency to find the first working URL
-                    response = requests.head(url, timeout=3, allow_redirects=True, verify=False)
+                    response = requests.head(url, timeout=3, allow_redirects=True)
                     if response.ok:
                         careers_url = response.url  # Use the final URL after redirects
                         break
+                except requests.exceptions.SSLError as e:
+                    logger.debug("SSL verification failed for discovery URL %s: %s", url, e)
+                    continue
                 except requests.RequestException:
                     continue
 
