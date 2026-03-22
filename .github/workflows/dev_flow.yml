@@ -18,6 +18,7 @@ on:
 env:
   DB_MODE: standard
   DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/testdb
+  APP_RUNTIME: local
 
 jobs:
   pytest:
