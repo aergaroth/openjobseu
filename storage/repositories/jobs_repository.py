@@ -58,7 +58,7 @@ def _build_get_jobs_query(
         params[f"p{param_counter}"] = remote_scope
 
     if q:
-        clauses.append("(title ILIKE :q_like OR company_name ILIKE :q_like OR description ILIKE :q_like)")
+        clauses.append("(title ILIKE :q_like OR company_name ILIKE :q_like)")
         params["q_like"] = f"%{q}%"
         params["q_exact"] = q
         # Opis celowo omijamy w LEAST(). Dystans trigramowy dla długich tekstów jest bliski 1.0, co psuje ranking.

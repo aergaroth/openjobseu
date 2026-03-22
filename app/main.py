@@ -94,12 +94,18 @@ app = FastAPI(
 
 configure_oauth(app)
 
+session_secret = os.environ.get("SESSION_SECRET_KEY")
+if not session_secret:
+    if os.environ.get("APP_RUNTIME") == "local":
+        session_secret = "a-very-secret-key-for-dev"
+    else:
+        raise RuntimeError(
+            "SESSION_SECRET_KEY environment variable is missing. Refusing to start in non-local runtime."
+        )
 
 app.add_middleware(
     SessionMiddleware,
-    # WARNING: This default key is for development/testing purposes only.
-    # In a production environment, you must set the SESSION_SECRET_KEY environment variable.
-    secret_key=os.environ.get("SESSION_SECRET_KEY", "a-very-secret-key-for-dev"),
+    secret_key=session_secret,
     https_only=os.environ.get("APP_RUNTIME") != "local",
     same_site="lax",
 )

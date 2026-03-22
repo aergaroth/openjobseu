@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
 from datetime import datetime, timezone
 import logging
 import requests
+import os
 import time
 from storage.db_engine import get_engine
 from storage.repositories.availability_repository import (
@@ -153,8 +154,12 @@ def run_availability_pipeline() -> dict:
     # init_db()  # initialized at app startup in app/main.py
 
     start_time = time.perf_counter()
-    jobs = get_jobs_for_verification(limit=20)
     now = datetime.now(timezone.utc)
+
+    # Adaptacyjny time-budget: upewniamy się, że nie przekroczymy timeoutu Cloud Run (np. 30s).
+    # Domyślnie przeznaczamy max 15 sekund na odpytywanie serwerów dla tego konkretnego workera.
+    max_execution_time = float(os.environ.get("AVAILABILITY_TIME_BUDGET_SEC", 15.0))
+    chunk_size = int(os.environ.get("AVAILABILITY_CHUNK_SIZE", 50))
 
     summary = {
         "checked": 0,
@@ -162,26 +167,38 @@ def run_availability_pipeline() -> dict:
         "expired": 0,
         "unreachable": 0,
     }
-    statuses = _check_availability_for_jobs(jobs)
-    updates: list[dict] = []
-    for job, status in zip(jobs, statuses):
-        summary["checked"] += 1
-        summary[status] += 1
 
-        updates.append(
-            {
-                "job_id": job["job_id"],
-                "availability_status": status,
-                "verified_at": now,
-                "failure": status == "unreachable",
-                "updated_at": now,
-            }
-        )
+    db_engine = get_engine()
 
-    if updates:
-        db_engine = get_engine()
-        with db_engine.begin() as conn:
-            update_jobs_availability(updates=updates, conn=conn)
+    while time.perf_counter() - start_time < max_execution_time:
+        jobs = get_jobs_for_verification(limit=chunk_size)
+        if not jobs:
+            break  # Brak ofert wymagających weryfikacji w bazie
+
+        statuses = _check_availability_for_jobs(jobs)
+        updates: list[dict] = []
+        for job, status in zip(jobs, statuses):
+            summary["checked"] += 1
+            summary[status] += 1
+
+            updates.append(
+                {
+                    "job_id": job["job_id"],
+                    "availability_status": status,
+                    "verified_at": now,
+                    "failure": status == "unreachable",
+                    "updated_at": now,
+                }
+            )
+
+        if updates:
+            with db_engine.begin() as conn:
+                # Zapis zaktualizuje "last_verified_at",
+                # więc to zapobiegnie pobraniu tych samych ofert w następnej pętli
+                update_jobs_availability(updates=updates, conn=conn)
+
+        if len(jobs) < chunk_size:
+            break  # Pobraliśmy mniej niż limit, kolejka jest pusta
 
     summary["status"] = "ok"
     summary["duration_ms"] = int((time.perf_counter() - start_time) * 1000)

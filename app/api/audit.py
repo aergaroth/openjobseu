@@ -153,6 +153,7 @@ def audit_jobs(
     max_compliance_score: int | None = Query(None, ge=0, le=100),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    include_counts: bool = Query(True, description="Compute aggregate metrics"),
 ):
     return get_jobs_audit(
         status=status,
@@ -167,6 +168,7 @@ def audit_jobs(
         max_compliance_score=max_compliance_score,
         limit=limit,
         offset=offset,
+        include_counts=include_counts,
     )
 
 
