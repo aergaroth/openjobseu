@@ -2,14 +2,12 @@ name: Dev Flow
 
 on:
   push:
-    branches-ignore:
-      - main
+    branches: [develop]
     paths-ignore:
       - "README.md"
       - "docs/**"
   pull_request:
-    branches-ignore:
-      - main
+    branches: [develop]
     paths-ignore:
       - "README.md"
       - "docs/**"
@@ -46,18 +44,13 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Cache pip
-        uses: actions/cache@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements*.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          enable-cache: true
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-dev.txt
+        run: uv pip install --system -r requirements.txt -r requirements-dev.txt
 
       - name: Wait for Postgres
         run: |
@@ -74,7 +67,7 @@ jobs:
 
   build-deploy-dev:
     needs: pytest
-    if: github.ref == 'refs/heads/develop' || github.event_name == 'pull_request'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/develop') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
