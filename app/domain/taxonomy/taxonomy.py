@@ -25,7 +25,19 @@ _RAW_FAMILY_RULES = [
     (["marketing", "growth", "seo", "content"], JobFamily.MARKETING),
     (["sales", "account executive", "business development"], JobFamily.SALES),
     (["finance", "accounting", "financial"], JobFamily.FINANCE),
-    (["developer", "development", "engineer", "engineering", "software", "backend", "frontend", "fullstack"], JobFamily.SOFTWARE_DEVELOPMENT),
+    (
+        [
+            "developer",
+            "development",
+            "engineer",
+            "engineering",
+            "software",
+            "backend",
+            "frontend",
+            "fullstack",
+        ],
+        JobFamily.SOFTWARE_DEVELOPMENT,
+    ),
     (["data scientist", "data"], JobFamily.DATA_SCIENCE),
     (["design"], JobFamily.DESIGN),
 ]
@@ -63,7 +75,10 @@ _RAW_ROLE_RULES_BY_FAMILY = {
 
 _RAW_SPECIALIZATION_RULES = [
     (["devsecops"], Specialization.DEVSECOPS),
-    (["devops", "kubernetes", "terraform", "aws", "gcp", "azure"], Specialization.DEVOPS),
+    (
+        ["devops", "kubernetes", "terraform", "aws", "gcp", "azure"],
+        Specialization.DEVOPS,
+    ),
     (["site reliability", "sre"], Specialization.SRE),
     (["platform", "infrastructure", "cloud"], Specialization.PLATFORM),
     (["backend"], Specialization.BACKEND),
@@ -82,9 +97,7 @@ _RAW_SENIORITY_RULES = [
 ]
 
 FAMILY_RULES_COMPILED = _compile_rules(_RAW_FAMILY_RULES)
-ROLE_RULES_BY_FAMILY_COMPILED = {
-    k: _compile_rules(v) for k, v in _RAW_ROLE_RULES_BY_FAMILY.items()
-}
+ROLE_RULES_BY_FAMILY_COMPILED = {k: _compile_rules(v) for k, v in _RAW_ROLE_RULES_BY_FAMILY.items()}
 SPECIALIZATION_RULES_COMPILED = _compile_rules(_RAW_SPECIALIZATION_RULES)
 SENIORITY_RULES_COMPILED = _compile_rules(_RAW_SENIORITY_RULES)
 
@@ -99,17 +112,13 @@ def _normalize_title(title: str) -> str:
     replacements = {
         "site reliability engineer": "sre",
         "site reliability": "sre",
-
         "platform engineer": "platform",
         "platform engineering": "platform",
-
         "cloud engineer": "cloud",
         "cloud infrastructure": "cloud",
         "infrastructure engineer": "infrastructure",
-
         "dev sec ops": "devsecops",
         "dev-sec-ops": "devsecops",
-
         "full stack": "fullstack",
         "front end": "frontend",
         "back end": "backend",
@@ -119,6 +128,7 @@ def _normalize_title(title: str) -> str:
         title = title.replace(src, dst)
 
     return title
+
 
 def _classify_specialization(title_lower: str) -> Specialization:
     title_lower = _normalize_title(title_lower)
@@ -157,6 +167,7 @@ def _classify_seniority(title_lower: str) -> Seniority:
 # ------------------------------
 # PUBLIC API
 # ------------------------------
+
 
 def classify_taxonomy(
     title: str,
@@ -210,7 +221,7 @@ def classify_taxonomy(
 
     if spec == Specialization.UNKNOWN:
         spec = _classify_specialization(title_lower)
-    
+
     return {
         "job_family": family.value,
         "job_role": role.value,

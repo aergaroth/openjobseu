@@ -11,6 +11,7 @@ TRACKING_QUERY_PARAMS = {
     "mc_eid",
 }
 
+
 def sanitize_url(raw_url: Any) -> str | None:
     if not isinstance(raw_url, str):
         return None
@@ -31,15 +32,15 @@ def sanitize_url(raw_url: Any) -> str | None:
         filtered_query.append((key, val))
 
     clean_query = urlencode(filtered_query, doseq=True)
-    return urlunsplit(
-        (parsed.scheme.lower(), parsed.netloc.lower(), parsed.path, clean_query, "")
-    )
+    return urlunsplit((parsed.scheme.lower(), parsed.netloc.lower(), parsed.path, clean_query, ""))
+
 
 def sanitize_location(raw_location: Any) -> str | None:
     if not isinstance(raw_location, str):
         return None
     cleaned = " ".join(raw_location.split())
     return cleaned or None
+
 
 def _parse_datetime_string(value: str) -> datetime | None:
     try:
@@ -51,6 +52,7 @@ def _parse_datetime_string(value: str) -> datetime | None:
         return parsedate_to_datetime(value)
     except (TypeError, ValueError, IndexError):
         return None
+
 
 def normalize_source_datetime(raw_value: Any) -> str | None:
     if raw_value in (None, ""):
@@ -84,6 +86,7 @@ def normalize_source_datetime(raw_value: Any) -> str | None:
         dt = dt.replace(tzinfo=timezone.utc)
 
     return dt.astimezone(timezone.utc).isoformat()
+
 
 def to_utc_datetime(raw_value: Any) -> datetime | None:
     normalized = normalize_source_datetime(raw_value)

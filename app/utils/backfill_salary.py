@@ -8,6 +8,7 @@ logger = logging.getLogger("openjobseu.backfill")
 
 BATCH_SIZE = 100
 
+
 def backfill_missing_salary_fields(limit: int = 1000) -> int:
     """
     Backfill missing salary fields by re-parsing description and title.
@@ -40,7 +41,7 @@ def backfill_missing_salary_fields(limit: int = 1000) -> int:
     updated = 0
 
     for i in range(0, total_found, BATCH_SIZE):
-        batch = rows[i:i + BATCH_SIZE]
+        batch = rows[i : i + BATCH_SIZE]
         job_updates = []
 
         for row in batch:
@@ -50,19 +51,31 @@ def backfill_missing_salary_fields(limit: int = 1000) -> int:
 
             try:
                 salary_info = extract_salary(description, title=title)
-                
-                if salary_info and (salary_info.get("salary_min") is not None or salary_info.get("salary_max") is not None):
-                    job_updates.append({
-                        "job_id": job_id,
-                        "salary_min": int(salary_info["salary_min"]) if salary_info.get("salary_min") is not None else None,
-                        "salary_max": int(salary_info["salary_max"]) if salary_info.get("salary_max") is not None else None,
-                        "salary_currency": salary_info.get("salary_currency"),
-                        "salary_period": salary_info.get("salary_period"),
-                        "salary_source": salary_info.get("salary_source"),
-                        "salary_min_eur": int(salary_info["salary_min_eur"]) if salary_info.get("salary_min_eur") is not None else None,
-                        "salary_max_eur": int(salary_info["salary_max_eur"]) if salary_info.get("salary_max_eur") is not None else None,
-                        "updated_at": datetime.now(timezone.utc)
-                    })
+
+                if salary_info and (
+                    salary_info.get("salary_min") is not None or salary_info.get("salary_max") is not None
+                ):
+                    job_updates.append(
+                        {
+                            "job_id": job_id,
+                            "salary_min": int(salary_info["salary_min"])
+                            if salary_info.get("salary_min") is not None
+                            else None,
+                            "salary_max": int(salary_info["salary_max"])
+                            if salary_info.get("salary_max") is not None
+                            else None,
+                            "salary_currency": salary_info.get("salary_currency"),
+                            "salary_period": salary_info.get("salary_period"),
+                            "salary_source": salary_info.get("salary_source"),
+                            "salary_min_eur": int(salary_info["salary_min_eur"])
+                            if salary_info.get("salary_min_eur") is not None
+                            else None,
+                            "salary_max_eur": int(salary_info["salary_max_eur"])
+                            if salary_info.get("salary_max_eur") is not None
+                            else None,
+                            "updated_at": datetime.now(timezone.utc),
+                        }
+                    )
             except Exception as e:
                 logger.error(f"Failed to extract salary for job {job_id}: {e}")
                 continue
@@ -84,7 +97,7 @@ def backfill_missing_salary_fields(limit: int = 1000) -> int:
                                 updated_at = :updated_at
                             WHERE job_id = :job_id
                         """),
-                        job_updates
+                        job_updates,
                     )
                 updated += len(job_updates)
             except Exception as e:

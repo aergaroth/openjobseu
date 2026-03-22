@@ -24,8 +24,8 @@ SALARY_KEYWORDS = [
     "per hour",
     "remuneration",
     "package",
-    "wynagrodzenie", # Polish for remuneration
-    "widełki", # Polish for range
+    "wynagrodzenie",  # Polish for remuneration
+    "widełki",  # Polish for range
 ]
 
 NEGATIVE_CONTEXT = [
@@ -38,19 +38,18 @@ NEGATIVE_CONTEXT = [
 ]
 
 FUNDING_CONTEXT_PATTERNS = [
-    re.compile(r"\d+\s?M", re.IGNORECASE), # 50M, 5M
+    re.compile(r"\d+\s?M", re.IGNORECASE),  # 50M, 5M
     re.compile(r"\d+\s?million", re.IGNORECASE),
     re.compile(r"\d+\s?billion", re.IGNORECASE),
 ]
 
 SALARY_KEYWORDS_PATTERN = re.compile(
-    r"\b(?:" + "|".join(re.escape(kw) for kw in SALARY_KEYWORDS) + r")\b",
-    re.IGNORECASE
+    r"\b(?:" + "|".join(re.escape(kw) for kw in SALARY_KEYWORDS) + r")\b", re.IGNORECASE
 )
 
 NEGATIVE_CONTEXT_PATTERN = re.compile(
     r"\b(?:" + "|".join(re.escape(kw) for kw in NEGATIVE_CONTEXT) + r")\b",
-    re.IGNORECASE
+    re.IGNORECASE,
 )
 
 CURRENCY_CONTEXT_PATTERN = re.compile(r"[€$£]|\b(?:eur|usd|gbp|pln|zł)\b")
@@ -58,13 +57,57 @@ CURRENCY_CONTEXT_PATTERN = re.compile(r"[€$£]|\b(?:eur|usd|gbp|pln|zł)\b")
 _CP = r"(?:[€$£]|\b(?:usd|eur|gbp|pln|zł)\b)"
 
 SALARY_REGEX_PATTERNS = [
-    (re.compile(_CP + r"?\s*(\d{1,3}(?:[.,]\d{1,2})?)\s*(?:[kK])?\s*[-–—]\s*" + _CP + r"?\s*(\d{1,3}(?:[.,]\d{1,2})?)\s*[kK]\b\s*" + _CP + r"?"), 1000, True, "k_range"), 
-    (re.compile(_CP + r"?\s*(\d[\d\s,]{1,})\s*" + _CP + r"?\s*[-–—]\s*" + _CP + r"?\s*(\d[\d\s,]{1,})\s*" + _CP + r"?"), 1, True, "spaced_thousands_range"),
-    (re.compile(r"(\d[\d\s,]{1,})\s*" + _CP + r"\s+(\d[\d\s,]{1,})"), 1, True, "currency_separated_range"),
-    (re.compile(r"(\d[\d\s,]{1,})\s*(?:[-–—]\s*(\d[\d\s,]{1,}))?\s*" + _CP + r"?\s?/?\s?(?:per\s+)?(hour|hr|day|month|year|annum|yr)\b"), 1, True, "hourly_rate"),
-    (re.compile(_CP + r"?\s*(\d{1,3}(?:[.,]\d{1,2})?)\s*[kK]\b\s*" + _CP + r"?"), 1000, False, "k_single"),
-    (re.compile(_CP + r"?\s*(\d[\d\s,]{1,})\b\s*" + _CP + r"?"), 1, False, "spaced_thousands_single"),
+    (
+        re.compile(
+            _CP
+            + r"?\s*(\d{1,3}(?:[.,]\d{1,2})?)\s*(?:[kK])?\s*[-–—]\s*"
+            + _CP
+            + r"?\s*(\d{1,3}(?:[.,]\d{1,2})?)\s*[kK]\b\s*"
+            + _CP
+            + r"?"
+        ),
+        1000,
+        True,
+        "k_range",
+    ),
+    (
+        re.compile(
+            _CP + r"?\s*(\d[\d\s,]{1,})\s*" + _CP + r"?\s*[-–—]\s*" + _CP + r"?\s*(\d[\d\s,]{1,})\s*" + _CP + r"?"
+        ),
+        1,
+        True,
+        "spaced_thousands_range",
+    ),
+    (
+        re.compile(r"(\d[\d\s,]{1,})\s*" + _CP + r"\s+(\d[\d\s,]{1,})"),
+        1,
+        True,
+        "currency_separated_range",
+    ),
+    (
+        re.compile(
+            r"(\d[\d\s,]{1,})\s*(?:[-–—]\s*(\d[\d\s,]{1,}))?\s*"
+            + _CP
+            + r"?\s?/?\s?(?:per\s+)?(hour|hr|day|month|year|annum|yr)\b"
+        ),
+        1,
+        True,
+        "hourly_rate",
+    ),
+    (
+        re.compile(_CP + r"?\s*(\d{1,3}(?:[.,]\d{1,2})?)\s*[kK]\b\s*" + _CP + r"?"),
+        1000,
+        False,
+        "k_single",
+    ),
+    (
+        re.compile(_CP + r"?\s*(\d[\d\s,]{1,})\b\s*" + _CP + r"?"),
+        1,
+        False,
+        "spaced_thousands_single",
+    ),
 ]
+
 
 @dataclass
 class SalaryMatch:
@@ -79,6 +122,7 @@ class SalaryMatch:
     salary_confidence: int = 0
     pattern_name: Optional[str] = None
 
+
 def normalize_amount(value_str: str) -> int:
     """
     Normalizes a salary string by removing spaces and converting to int.
@@ -87,25 +131,27 @@ def normalize_amount(value_str: str) -> int:
     """
     return int(value_str.replace(" ", "").replace(",", ""))
 
+
 def detect_period_local(text: str, currency: Optional[str] = None) -> str:
     """
     Detects salary period (hour, day, month, year) within a given text window.
     Default is 'year', but can be 'month' for specific currencies like PLN.
     """
-    if re.search(r'\b(hour|hourly|hr)\b', text, re.IGNORECASE):
+    if re.search(r"\b(hour|hourly|hr)\b", text, re.IGNORECASE):
         return "hour"
-    if re.search(r'\b(day|daily)\b', text, re.IGNORECASE):
+    if re.search(r"\b(day|daily)\b", text, re.IGNORECASE):
         return "day"
-    if re.search(r'\b(month|monthly)\b', text, re.IGNORECASE):
+    if re.search(r"\b(month|monthly)\b", text, re.IGNORECASE):
         return "month"
-    if re.search(r'\b(year|annually|annum|yr)\b', text, re.IGNORECASE):
+    if re.search(r"\b(year|annually|annum|yr)\b", text, re.IGNORECASE):
         return "year"
-    
+
     # Heuristic: For some currencies, 'month' is a safer default if unspecified.
     if currency and currency.upper() == "PLN":
         return "month"
 
     return "year"
+
 
 def is_reasonable_salary(min_val: float, max_val: float, period: str, currency: Optional[str] = None) -> bool:
     """
@@ -131,7 +177,7 @@ def is_reasonable_salary(min_val: float, max_val: float, period: str, currency: 
     elif period == "hour":
         multiplier = 2000.0  # approx working hours per year
     elif period == "day":
-        multiplier = 250.0 # approx working days per year
+        multiplier = 250.0  # approx working days per year
 
     yearly_min = (min_val_eur or 0) * multiplier
     yearly_max = (max_val_eur or 0) * multiplier
@@ -142,6 +188,7 @@ def is_reasonable_salary(min_val: float, max_val: float, period: str, currency: 
 
     return True
 
+
 def is_funding_context(text: str) -> bool:
     """
     Checks if the given text contains patterns indicative of funding amounts (e.g., $50M, 100 million).
@@ -150,6 +197,7 @@ def is_funding_context(text: str) -> bool:
         if pattern.search(text):
             return True
     return False
+
 
 def calculate_confidence(salary_match: SalaryMatch, text_window: str, full_text: str) -> int:
     """
@@ -160,7 +208,11 @@ def calculate_confidence(salary_match: SalaryMatch, text_window: str, full_text:
     if salary_match.salary_currency:
         confidence += 40
     # +30 if range detected
-    if salary_match.salary_min is not None and salary_match.salary_max is not None and salary_match.salary_min != salary_match.salary_max:
+    if (
+        salary_match.salary_min is not None
+        and salary_match.salary_max is not None
+        and salary_match.salary_min != salary_match.salary_max
+    ):
         confidence += 30
     # +50 if salary keyword nearby (in the window)
     if SALARY_KEYWORDS_PATTERN.search(text_window):
@@ -175,32 +227,33 @@ def calculate_confidence(salary_match: SalaryMatch, text_window: str, full_text:
 
     return confidence
 
+
 def find_salary_windows(text: str, window_size: int = 120) -> List[str]:
     """
     Identifies potential salary-related windows in the text based on keywords and currency symbols.
     Merges overlapping windows to avoid redundant parsing.
     """
     found_keywords_indices = []
-    
+
     for match in SALARY_KEYWORDS_PATTERN.finditer(text):
         found_keywords_indices.append(match.start())
-            
+
     for match in CURRENCY_CONTEXT_PATTERN.finditer(text):
         found_keywords_indices.append(match.start())
-    
+
     if not found_keywords_indices:
         return []
 
     found_keywords_indices.sort()
-    
+
     merged_windows = []
     current_start = -1
     current_end = -1
-    
+
     for idx in found_keywords_indices:
         start = max(0, idx - window_size)
         end = min(len(text), idx + window_size)
-        
+
         if current_start == -1:
             current_start = start
             current_end = end
@@ -210,20 +263,21 @@ def find_salary_windows(text: str, window_size: int = 120) -> List[str]:
             merged_windows.append(text[current_start:current_end])
             current_start = start
             current_end = end
-            
+
     if current_start != -1:
         merged_windows.append(text[current_start:current_end])
-    
+
     return merged_windows
+
 
 def _parse_salary_match(match_text: str, full_text: str) -> Optional[SalaryMatch]:
     """
     Parses a matched salary fragment using various regex patterns.
     """
     salary_match = SalaryMatch(salary_raw=match_text)
-    
+
     for pattern, multiplier, is_range, pattern_name in SALARY_REGEX_PATTERNS:
-        match = pattern.search(match_text) 
+        match = pattern.search(match_text)
         if match:
             try:
                 val1_str = match.group(1).replace(" ", "")
@@ -233,7 +287,7 @@ def _parse_salary_match(match_text: str, full_text: str) -> Optional[SalaryMatch
                 else:
                     val1_str = val1_str.replace(",", "")
                     val1 = float(val1_str) * multiplier
-                
+
                 if is_range:
                     val2_str = match.group(2)
                     if val2_str:
@@ -251,12 +305,16 @@ def _parse_salary_match(match_text: str, full_text: str) -> Optional[SalaryMatch
                         salary_match.salary_max = val1
                 else:
                     salary_match.salary_min = val1
-                    salary_match.salary_max = val1 
-                
+                    salary_match.salary_max = val1
+
                 salary_match.pattern_name = pattern_name
                 salary_match.salary_raw = match.group(0)
-                
-                salary_match.salary_currency = detect_currency(salary_match.salary_raw) or detect_currency(match_text) or detect_currency(full_text)
+
+                salary_match.salary_currency = (
+                    detect_currency(salary_match.salary_raw)
+                    or detect_currency(match_text)
+                    or detect_currency(full_text)
+                )
 
                 if pattern_name == "hourly_rate":
                     period_str = match.groups()[-1]
@@ -268,16 +326,15 @@ def _parse_salary_match(match_text: str, full_text: str) -> Optional[SalaryMatch
                         else:
                             salary_match.salary_period = period_str
                 else:
-                    salary_match.salary_period = detect_period_local(
-                        match_text, salary_match.salary_currency
-                    )
+                    salary_match.salary_period = detect_period_local(match_text, salary_match.salary_currency)
 
                 return salary_match
             except ValueError as e:
                 logger.debug(f"ValueError during salary parsing: {e} for {match.group(0)}")
                 continue
-    
+
     return None
+
 
 def is_valid_salary_context(text: str, start: int, end: int) -> bool:
     """
@@ -302,6 +359,7 @@ def is_valid_salary_context(text: str, start: int, end: int) -> bool:
 
     return False
 
+
 def extract_salary(description: str, title: Optional[str] = None) -> Dict[str, any] | None:
     """
     Main function to extract salary information from job description and title.
@@ -310,13 +368,13 @@ def extract_salary(description: str, title: Optional[str] = None) -> Dict[str, a
         return None
 
     full_text = f"{title or ''} {description or ''}".lower()
-    
+
     salary_windows = find_salary_windows(full_text)
 
     best_match: Optional[SalaryMatch] = None
 
     for window in salary_windows:
-        parsed_match = _parse_salary_match(window, full_text) 
+        parsed_match = _parse_salary_match(window, full_text)
 
         if parsed_match:
             match_idx = full_text.find(parsed_match.salary_raw.lower()) if parsed_match.salary_raw else -1
@@ -332,7 +390,12 @@ def extract_salary(description: str, title: Optional[str] = None) -> Dict[str, a
                 logger.debug(f"Salary rejected due to low confidence: {parsed_match}")
                 continue
 
-            if not is_reasonable_salary(parsed_match.salary_min or 0, parsed_match.salary_max or 0, parsed_match.salary_period or "year", parsed_match.salary_currency):
+            if not is_reasonable_salary(
+                parsed_match.salary_min or 0,
+                parsed_match.salary_max or 0,
+                parsed_match.salary_period or "year",
+                parsed_match.salary_currency,
+            ):
                 logger.debug(f"Salary rejected by sanity check: {parsed_match}")
                 continue
 

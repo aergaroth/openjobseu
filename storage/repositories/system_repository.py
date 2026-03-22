@@ -1,6 +1,7 @@
 from sqlalchemy import text
 from storage.db_engine import get_engine
 
+
 def get_system_metrics() -> dict:
     engine = get_engine()
     query = """

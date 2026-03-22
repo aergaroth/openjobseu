@@ -1,5 +1,5 @@
 """
-Evaluates a specific Greenhouse board token to determine if it is a strong 
+Evaluates a specific Greenhouse board token to determine if it is a strong
 candidate for ingestion by analyzing the volume of remote and EU-eligible jobs.
 """
 
@@ -37,13 +37,33 @@ EU_EXPLICIT = [
 ]
 
 EU_COUNTRIES = [
-    "germany", "france", "poland", "spain", "italy",
-    "netherlands", "belgium", "austria", "sweden",
-    "denmark", "finland", "czech", "portugal",
-    "ireland", "estonia", "latvia", "lithuania",
-    "romania", "hungary", "slovenia", "slovakia",
-    "croatia", "greece", "cyprus", "malta",
-    "luxembourg", "bulgaria",
+    "germany",
+    "france",
+    "poland",
+    "spain",
+    "italy",
+    "netherlands",
+    "belgium",
+    "austria",
+    "sweden",
+    "denmark",
+    "finland",
+    "czech",
+    "portugal",
+    "ireland",
+    "estonia",
+    "latvia",
+    "lithuania",
+    "romania",
+    "hungary",
+    "slovenia",
+    "slovakia",
+    "croatia",
+    "greece",
+    "cyprus",
+    "malta",
+    "luxembourg",
+    "bulgaria",
 ]
 
 UK_MARKERS = [

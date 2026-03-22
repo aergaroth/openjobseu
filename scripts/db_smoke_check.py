@@ -1,14 +1,14 @@
 """
-Performs a basic smoke test against the local application instance and database 
+Performs a basic smoke test against the local application instance and database
 to ensure jobs are being correctly ingested, deduplicated, and served via the API.
 """
 
 from pathlib import Path
+
 current_path = Path(__file__).resolve().parent
 print(current_path)
 
 import requests
-from collections import Counter
 
 BASE_URL = "http://127.0.0.1:8000"
 

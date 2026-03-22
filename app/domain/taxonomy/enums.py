@@ -1,11 +1,13 @@
 from enum import Enum
 
+
 class RemoteClass(str, Enum):
     REMOTE_ONLY = "remote_only"
     REMOTE_REGION_LOCKED = "remote_region_locked"
     REMOTE_OPTIONAL = "remote_optional"
     NON_REMOTE = "non_remote"
     UNKNOWN = "unknown"
+
 
 class GeoClass(str, Enum):
     EU_MEMBER_STATE = "eu_member_state"
@@ -15,10 +17,12 @@ class GeoClass(str, Enum):
     NON_EU = "non_eu"
     UNKNOWN = "unknown"
 
+
 class ComplianceStatus(str, Enum):
     APPROVED = "approved"
     REVIEW = "review"
     REJECTED = "rejected"
+
 
 class JobFamily(str, Enum):
     SOFTWARE_DEVELOPMENT = "software_development"
@@ -31,6 +35,7 @@ class JobFamily(str, Enum):
     FINANCE = "finance"
     OPERATIONS = "operations"
     UNKNOWN = "unknown"
+
 
 class JobRole(str, Enum):
     ENGINEER = "engineer"
@@ -45,6 +50,7 @@ class JobRole(str, Enum):
     OPERATIONS_MANAGER = "operations_manager"
     UNKNOWN = "unknown"
 
+
 class Seniority(str, Enum):
     ENTRY_LEVEL = "entry_level"
     JUNIOR = "junior"
@@ -54,6 +60,7 @@ class Seniority(str, Enum):
     MANAGER = "manager"
     EXECUTIVE = "executive"
     UNKNOWN = "unknown"
+
 
 class Specialization(str, Enum):
     BACKEND = "backend"
@@ -67,4 +74,3 @@ class Specialization(str, Enum):
     MACHINE_LEARNING = "machine_learning"
     MOBILE = "mobile"
     UNKNOWN = "unknown"
-

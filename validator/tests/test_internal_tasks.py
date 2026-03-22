@@ -1,10 +1,6 @@
-import os
-import logging
-import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.security.auth import require_internal_or_user_api_access
 import app.api.tasks as tasks_api
 
 client = TestClient(app)
@@ -21,6 +17,7 @@ def test_task_execution_local_fallback(monkeypatch):
     Skoro w środowisku testowym brakuje zmiennych konfiguracyjnych dla Cloud Tasks,
     endpoint powinnien obsłużyć żądanie synchronicznie jako fallback.
     """
+
     def mock_discovery():
         return {"mocked": "result"}
 
@@ -30,7 +27,7 @@ def test_task_execution_local_fallback(monkeypatch):
     post_response = client.post("/internal/tasks/discovery")
     assert post_response.status_code == 200
     post_data = post_response.json()
-    
+
     assert post_data["task"] == "discovery"
     assert post_data["status"] == "completed"
     assert "task_id" in post_data
@@ -39,17 +36,17 @@ def test_task_execution_local_fallback(monkeypatch):
 
 def test_cloud_tasks_enqueuing_behavior(monkeypatch):
     monkeypatch.setattr(tasks_api, "is_tick_queue_configured", lambda: True)
-    
+
     def mock_create_tick_task(task_id, handler_url, payload, headers):
         assert handler_url.endswith("/internal/tasks/discovery/execute")
         assert payload["incremental"] is True
         return {"name": "projects/xyz/locations/xyz/queues/xyz/tasks/xyz"}
-        
+
     monkeypatch.setattr(tasks_api, "create_tick_task", mock_create_tick_task)
-    
+
     response = client.post("/internal/tasks/discovery?incremental=true")
     assert response.status_code == 202
-    
+
     data = response.json()
     assert data["status"] == "enqueued"
     assert data["cloud_task_name"] is not None
@@ -60,14 +57,14 @@ def test_cloud_tasks_enqueuing_error_handling(monkeypatch):
     Testuje zachowanie API w przypadku niedostępności lub awarii usługi Google Cloud Tasks.
     """
     monkeypatch.setattr(tasks_api, "is_tick_queue_configured", lambda: True)
-    
+
     def mock_create_tick_task_fail(*args, **kwargs):
         # Symulujemy błąd zgłoszony przez bibliotekę requests (np. timeout lub 503 z GCP)
         raise RuntimeError("GCP API Connection Timeout")
-        
+
     monkeypatch.setattr(tasks_api, "create_tick_task", mock_create_tick_task_fail)
-    
+
     response = client.post("/internal/tasks/discovery?incremental=true")
-    
+
     assert response.status_code == 500
     assert response.json()["detail"] == "Failed to enqueue task in Cloud Tasks"

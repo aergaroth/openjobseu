@@ -1,16 +1,16 @@
 """baseline
 
 Revision ID: 56f2bf3724cd
-Revises: 
+Revises:
 Create Date: 2026-03-15 19:30:43.392750+00:00
 
 """
+
 from alembic import op
-import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '56f2bf3724cd'
+revision = "56f2bf3724cd"
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -794,7 +794,6 @@ ALTER TABLE companies ADD COLUMN IF NOT EXISTS total_jobs_count INTEGER NOT NULL
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS rejected_jobs_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS last_active_job_at TIMESTAMP WITH TIME ZONE;
     """)
-
 
 
 def downgrade() -> None:

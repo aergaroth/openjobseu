@@ -1,10 +1,12 @@
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
+
 def get_ats_integration_by_id(conn: Connection, company_ats_id: str) -> dict | None:
     """Load a single ATS integration by its ID."""
-    row = conn.execute(
-        text("""
+    row = (
+        conn.execute(
+            text("""
             SELECT
                 ca.company_ats_id,
                 ca.company_id,
@@ -18,15 +20,19 @@ def get_ats_integration_by_id(conn: Connection, company_ats_id: str) -> dict | N
             JOIN companies c ON c.company_id = ca.company_id
             WHERE ca.company_ats_id = :company_ats_id
         """),
-        {"company_ats_id": company_ats_id},
-    ).mappings().fetchone()
+            {"company_ats_id": company_ats_id},
+        )
+        .mappings()
+        .fetchone()
+    )
     return dict(row) if row else None
 
 
 def load_active_ats_companies(conn: Connection, limit: int = 100) -> list[dict]:
     """Load active ATS configurations for companies."""
-    rows = conn.execute(
-        text("""
+    rows = (
+        conn.execute(
+            text("""
             SELECT
                 ca.company_ats_id,
                 ca.company_id,
@@ -45,10 +51,14 @@ def load_active_ats_companies(conn: Connection, limit: int = 100) -> list[dict]:
             ORDER BY ca.updated_at ASC NULLS FIRST
             LIMIT :limit
         """),
-        {"limit": limit}
-    ).mappings().all()
+            {"limit": limit},
+        )
+        .mappings()
+        .all()
+    )
 
     return [dict(row) for row in rows]
+
 
 def mark_ats_synced(conn: Connection, company_ats_id: str | None, success: bool = True) -> None:
     """Update the last sync timestamp for an ATS configuration."""
@@ -75,6 +85,7 @@ def mark_ats_synced(conn: Connection, company_ats_id: str | None, success: bool 
             """),
             {"company_ats_id": str(company_ats_id)},
         )
+
 
 def deactivate_ats_integration(conn: Connection, company_ats_id: str) -> None:
     """Mark an ATS integration as inactive."""

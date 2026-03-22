@@ -165,9 +165,7 @@ def test_geo_v3_ignores_two_letter_aliases_in_localization_fallback():
 
 
 def test_geo_v3_marks_remote_us_scope_as_non_eu_even_with_poland_in_description():
-    description = (
-        "You will also serve as our Poland market lead and shape Poland market strategy."
-    )
+    description = "You will also serve as our Poland market lead and shape Poland market strategy."
     title = "Talent Brand Creative & Campaigns Lead"
     remote_scope = "Remote - US: Select locations"
 

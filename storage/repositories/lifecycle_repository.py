@@ -34,7 +34,7 @@ def expire_jobs_due_to_lifecycle() -> int:
                     FROM target_jobs
                     WHERE jobs.job_id = target_jobs.job_id
                 """),
-                {"batch_size": batch_size}
+                {"batch_size": batch_size},
             )
             total_updated += result.rowcount
             if result.rowcount == 0:
@@ -71,7 +71,7 @@ def stale_active_jobs_due_to_lifecycle() -> int:
                     FROM target_jobs
                     WHERE jobs.job_id = target_jobs.job_id
                 """),
-                {"batch_size": batch_size}
+                {"batch_size": batch_size},
             )
             total_updated += result.rowcount
             if result.rowcount == 0:
@@ -107,7 +107,7 @@ def activate_new_jobs_due_to_lifecycle() -> int:
                     FROM target_jobs
                     WHERE jobs.job_id = target_jobs.job_id
                 """),
-                {"batch_size": batch_size}
+                {"batch_size": batch_size},
             )
             total_updated += result.rowcount
             if result.rowcount == 0:
@@ -144,7 +144,7 @@ def reactivate_stale_jobs_due_to_lifecycle() -> int:
                     FROM target_jobs
                     WHERE jobs.job_id = target_jobs.job_id
                 """),
-                {"batch_size": batch_size}
+                {"batch_size": batch_size},
             )
             total_updated += result.rowcount
             if result.rowcount == 0:

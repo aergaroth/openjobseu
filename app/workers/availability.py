@@ -19,6 +19,7 @@ MAX_AVAILABILITY_WORKERS = 8
 # Inicjalizujemy globalną sesję (współdzieloną w ramach thread poola) z mechanizmem retry i timeout
 _session = TimeoutSession(timeout=DEFAULT_TIMEOUT)
 
+
 def check_job_availability(job: dict, timeout: int = DEFAULT_TIMEOUT, session: requests.Session = _session) -> str:
     """
     Check availability of a single job offer.
@@ -50,7 +51,7 @@ def check_job_availability(job: dict, timeout: int = DEFAULT_TIMEOUT, session: r
                     "url": url,
                     "status_code": status,
                     "duration_ms": duration_ms,
-                }
+                },
             )
             return "expired"
 
@@ -63,7 +64,7 @@ def check_job_availability(job: dict, timeout: int = DEFAULT_TIMEOUT, session: r
                     "url": url,
                     "status_code": status,
                     "duration_ms": duration_ms,
-                }
+                },
             )
             return "unreachable"
 
@@ -78,7 +79,7 @@ def check_job_availability(job: dict, timeout: int = DEFAULT_TIMEOUT, session: r
                 "url": url,
                 "error_type": type(exc).__name__,
                 "duration_ms": duration_ms,
-            }
+            },
         )
         return "unreachable"
 
@@ -94,13 +95,10 @@ def _check_availability_for_jobs(
 
     statuses: list[str] = ["unreachable"] * len(jobs)
     workers = min(MAX_AVAILABILITY_WORKERS, len(jobs))
-    
+
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_to_index = {
-            executor.submit(check_job_availability, job): index
-            for index, job in enumerate(jobs)
-        }
-        
+        future_to_index = {executor.submit(check_job_availability, job): index for index, job in enumerate(jobs)}
+
         try:
             for future in as_completed(future_to_index, timeout=60):
                 try:
@@ -108,7 +106,13 @@ def _check_availability_for_jobs(
                 except Exception:
                     pass
         except TimeoutError:
-            logger.error("availability_pool_timeout", extra={"details": "Thread pool exhausted on hanging requests", "timeout_sec": 60})
+            logger.error(
+                "availability_pool_timeout",
+                extra={
+                    "details": "Thread pool exhausted on hanging requests",
+                    "timeout_sec": 60,
+                },
+            )
             for f in future_to_index:
                 f.cancel()
 
@@ -131,7 +135,6 @@ def run_availability_checks(jobs: list[dict]) -> dict:
 
     statuses = _check_availability_for_jobs(jobs)
     for job, status in zip(jobs, statuses):
-
         summary["checked"] += 1
         summary[status] += 1
 
@@ -140,6 +143,7 @@ def run_availability_checks(jobs: list[dict]) -> dict:
     summary["duration_ms"] = int((time.perf_counter() - start_time) * 1000)
     logger.info("availability checks completed", extra=summary)
     return summary
+
 
 def run_availability_pipeline() -> dict:
     """

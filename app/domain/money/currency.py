@@ -43,6 +43,7 @@ EXCHANGE_RATES = {
     "BGN": 0.51,
 }
 
+
 def detect_currency(text: str) -> str | None:
     """
     Detect currency from text using a marker mapping.
@@ -53,15 +54,16 @@ def detect_currency(text: str) -> str | None:
             return code
     return None
 
+
 def normalize_to_eur(amount: float, currency: str | None) -> float | None:
     """
     Converts an amount to EUR using predefined exchange rates. Returns a float.
     """
     if not amount or not currency:
         return None
-    
+
     rate = EXCHANGE_RATES.get(currency.upper())
     if not rate:
         return None
-    
+
     return amount * rate

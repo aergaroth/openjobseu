@@ -1,4 +1,3 @@
-import pytest
 from sqlalchemy import text
 from fastapi.testclient import TestClient
 from app.main import app
@@ -8,9 +7,10 @@ from app.domain.compliance.engine import ENGINE_POLICY_VERSION
 
 client = TestClient(app)
 
+
 def test_backfill_missing_compliance_classes():
     engine = get_engine()
-    
+
     # 1. Insert jobs with missing/outdated compliance
     with engine.begin() as conn:
         conn.execute(
@@ -45,9 +45,10 @@ def test_backfill_missing_compliance_classes():
         report_count = conn.execute(text("SELECT count(*) FROM compliance_reports")).scalar()
         assert report_count == 3
 
+
 def test_backfill_endpoint():
     engine = get_engine()
-    
+
     # 1. Insert jobs
     with engine.begin() as conn:
         conn.execute(

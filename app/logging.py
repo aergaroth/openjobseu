@@ -68,12 +68,14 @@ class JsonLogFormatter(logging.Formatter):
         try:
             return json.dumps(payload, ensure_ascii=False, default=str)
         except Exception as exc:
-            return json.dumps({
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "severity": "ERROR",
-                "logger": "openjobseu.logging_fallback",
-                "message": f"Log serialization failed: {exc} | Original message: {record.getMessage()}",
-            })
+            return json.dumps(
+                {
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "severity": "ERROR",
+                    "logger": "openjobseu.logging_fallback",
+                    "message": f"Log serialization failed: {exc} | Original message: {record.getMessage()}",
+                }
+            )
 
 
 def extract_record_extras(record: logging.LogRecord) -> dict:

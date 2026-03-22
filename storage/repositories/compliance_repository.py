@@ -7,6 +7,7 @@ from storage.common import _require_open_conn
 
 engine = get_engine()
 
+
 def insert_compliance_report(
     conn: Connection,
     *,
@@ -61,17 +62,16 @@ def insert_compliance_report(
             "bonuses": json.dumps(bonuses, default=str) if bonuses is not None else None,
             "final_score": final_score,
             "final_status": final_status,
-            "decision_vector": json.dumps(decision_vector, default=str)
-            if decision_vector is not None
-            else None,
+            "decision_vector": json.dumps(decision_vector, default=str) if decision_vector is not None else None,
         },
     )
+
 
 def insert_compliance_reports(conn: Connection, reports: list[dict]) -> None:
     """Insert multiple compliance reports in a single bulk operation."""
     if not reports:
         return
-        
+
     for r in reports:
         if r.get("penalties") is not None:
             r["penalties"] = json.dumps(r["penalties"], default=str)
@@ -108,6 +108,7 @@ def insert_compliance_reports(conn: Connection, reports: list[dict]) -> None:
         reports,
     )
 
+
 def count_jobs_missing_compliance() -> int:
     with engine.connect() as conn:
         row = conn.execute(
@@ -118,6 +119,7 @@ def count_jobs_missing_compliance() -> int:
             """)
         ).fetchone()
     return int(row[0]) if row else 0
+
 
 def get_jobs_for_compliance_resolution(
     limit: int = 500,
@@ -139,12 +141,17 @@ def get_jobs_for_compliance_resolution(
     """
 
     with engine.connect() as conn:
-        rows = conn.execute(
-            text(query),
-            {"limit": limit},
-        ).mappings().all()
-    
+        rows = (
+            conn.execute(
+                text(query),
+                {"limit": limit},
+            )
+            .mappings()
+            .all()
+        )
+
     return [dict(row) for row in rows]
+
 
 def update_job_compliance_resolution(
     job_id: str,
@@ -164,6 +171,7 @@ def update_job_compliance_resolution(
         ],
         conn=conn,
     )
+
 
 def update_jobs_compliance_resolution(
     updates: list[dict],

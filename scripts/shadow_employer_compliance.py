@@ -1,12 +1,11 @@
 """
-Runs a shadow evaluation of the compliance engine (geo and remote classifiers) 
-against existing jobs in the database to test changes in policy rules without 
+Runs a shadow evaluation of the compliance engine (geo and remote classifiers)
+against existing jobs in the database to test changes in policy rules without
 persisting the results.
 """
 
 import os
 import sys
-import argparse
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
@@ -17,7 +16,6 @@ from sqlalchemy import text
 
 from storage.db_engine import get_engine
 from app.domain.compliance.classifiers.geo import classify_geo
-from app.domain.compliance.classifiers.remote import classify_remote_model
 
 
 def shadow_resolve(remote_model: str, geo_classification: str) -> tuple[str, int]:
@@ -46,8 +44,9 @@ def main():
     engine = get_engine()
 
     with engine.connect() as conn:
-        rows = conn.execute(
-            text("""
+        rows = (
+            conn.execute(
+                text("""
                 SELECT
                     job_id,
                     title,
@@ -57,7 +56,10 @@ def main():
                 FROM jobs
                 WHERE source LIKE 'greenhouse:%'
             """)
-        ).mappings().all()
+            )
+            .mappings()
+            .all()
+        )
 
     stats = Counter()
 

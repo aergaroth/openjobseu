@@ -37,15 +37,28 @@ def test_pipeline_runs_steps_in_order(monkeypatch):
 
     pipeline.run_pipeline()
 
-    assert order == ["ingestion", "lifecycle", "availability", "market_metrics", "maintenance", "frontend_export"]
-    
+    assert order == [
+        "ingestion",
+        "lifecycle",
+        "availability",
+        "market_metrics",
+        "maintenance",
+        "frontend_export",
+    ]
+
     order.clear()
     pipeline.run_pipeline("ingestion")
     assert order == ["ingestion"]
-    
+
     order.clear()
     pipeline.run_pipeline("maintenance")
-    assert order == ["lifecycle", "availability", "market_metrics", "maintenance", "frontend_export"]
+    assert order == [
+        "lifecycle",
+        "availability",
+        "market_metrics",
+        "maintenance",
+        "frontend_export",
+    ]
 
 
 def test_pipeline_orchestration_full_flow(monkeypatch):
@@ -78,8 +91,14 @@ def test_pipeline_orchestration_full_flow(monkeypatch):
 
     def _fake_maintenance():
         order.append("maintenance")
-        return {"metrics": {"component": "maintenance", "job_stats_updated": 5, "scores_updated": 5}}
-        
+        return {
+            "metrics": {
+                "component": "maintenance",
+                "job_stats_updated": 5,
+                "scores_updated": 5,
+            }
+        }
+
     def _fake_frontend_export():
         order.append("frontend_export")
         return {"metrics": {"component": "frontend_export", "exported_jobs": 100}}
@@ -94,24 +113,25 @@ def test_pipeline_orchestration_full_flow(monkeypatch):
     monkeypatch.setattr(
         pipeline.logger,
         "info",
-        lambda message, extra=None: info_calls.append(
-            {"message": message, "extra": extra or {}}
-        ),
+        lambda message, extra=None: info_calls.append({"message": message, "extra": extra or {}}),
     )
 
     result = pipeline.run_pipeline()
 
-    assert order == ["ingestion", "lifecycle", "availability", "market_metrics", "maintenance", "frontend_export"]
+    assert order == [
+        "ingestion",
+        "lifecycle",
+        "availability",
+        "market_metrics",
+        "maintenance",
+        "frontend_export",
+    ]
     assert result["actions"] == ["employer_ingestion_completed"]
     assert result["metrics"]["ingestion"]["source"] == "employer_ing"
     assert result["metrics"]["availability"]["checked"] == 5
     assert result["metrics"]["market_metrics"]["component"] == "market_metrics"
 
-    finish_calls = [
-        call
-        for call in info_calls
-        if call["extra"].get("phase") == "tick_finished"
-    ]
+    finish_calls = [call for call in info_calls if call["extra"].get("phase") == "tick_finished"]
     assert len(finish_calls) == 1
     finish_log = finish_calls[0]
     assert finish_log["message"] == "tick_finished"

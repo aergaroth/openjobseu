@@ -1,18 +1,19 @@
-import pytest
 import zipfile
 import io
 from unittest.mock import MagicMock
 from app.workers.discovery.company_sources import (
     _guess_careers,
     _fetch_github_remote_companies,
-    run_company_source_discovery
+    run_company_source_discovery,
 )
 import app.workers.discovery.company_sources as cs_module
+
 
 def test_guess_careers():
     urls = _guess_careers("https://example.com/")
     assert "https://example.com/careers" in urls
     assert "https://example.com/jobs" in urls
+
 
 def test_fetch_github_remote_companies(monkeypatch):
     zip_buffer = io.BytesIO()
@@ -32,25 +33,43 @@ def test_fetch_github_remote_companies(monkeypatch):
     assert companies[0]["name"] == "Acme Corp"
     assert companies[0]["url"] == "https://acme.com"
 
-def test_run_company_source_discovery(monkeypatch):
-    monkeypatch.setattr(cs_module, "_fetch_github_remote_companies", lambda: [
-        {"name": "NewCo", "url": "https://newco.com"},
-        {"name": "ExistingCo", "url": "https://existing.com"}
-    ])
 
-    class DummyConn: pass
+def test_run_company_source_discovery(monkeypatch):
+    monkeypatch.setattr(
+        cs_module,
+        "_fetch_github_remote_companies",
+        lambda: [
+            {"name": "NewCo", "url": "https://newco.com"},
+            {"name": "ExistingCo", "url": "https://existing.com"},
+        ],
+    )
+
+    class DummyConn:
+        pass
+
     class DummyCtx:
-        def __enter__(self): return DummyConn()
-        def __exit__(self, *args): pass
+        def __enter__(self):
+            return DummyConn()
+
+        def __exit__(self, *args):
+            pass
+
     class DummyEngine:
-        def connect(self): return DummyCtx()
-        def begin(self): return DummyCtx()
+        def connect(self):
+            return DummyCtx()
+
+        def begin(self):
+            return DummyCtx()
 
     monkeypatch.setattr(cs_module, "get_engine", lambda: DummyEngine())
     monkeypatch.setattr(cs_module, "get_existing_brand_names", lambda conn: {"existingco"})
-    
+
     inserted = []
-    monkeypatch.setattr(cs_module, "insert_source_company", lambda conn, name, careers_url: inserted.append(name) or True)
+    monkeypatch.setattr(
+        cs_module,
+        "insert_source_company",
+        lambda conn, name, careers_url: inserted.append(name) or True,
+    )
 
     mock_head = MagicMock()
     mock_head.ok = True

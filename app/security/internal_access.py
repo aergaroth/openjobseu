@@ -38,14 +38,14 @@ def require_internal_access(request: Request):
         try:
             # Verify token signature and expiration without requiring a specific audience
             id_info = id_token.verify_oauth2_token(token, requests.Request(), audience=None)
-            
+
             # Check if token belongs to an authorized service account or admin email
             email = id_info.get("email")
             allowed_emails = [
                 os.getenv("ALLOWED_AUTH_EMAIL"),
-                os.getenv("SCHEDULER_SA_EMAIL")
+                os.getenv("SCHEDULER_SA_EMAIL"),
             ]
-            
+
             if email and email in allowed_emails:
                 return
             logger.warning("OIDC token contains unauthorized email: %s", email)

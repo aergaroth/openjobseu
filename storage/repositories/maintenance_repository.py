@@ -9,24 +9,28 @@ def update_company_job_stats_bulk() -> int:
     batch_size = 1000
     total_updated = 0
     last_id = "00000000-0000-0000-0000-000000000000"
-    
+
     while True:
         with engine.begin() as conn:
-            batch_rows = conn.execute(text("""
+            batch_rows = conn.execute(
+                text("""
                 SELECT company_id 
                 FROM companies 
                 WHERE company_id > :last_id 
                 ORDER BY company_id 
                 LIMIT :batch_size
-            """), {"last_id": last_id, "batch_size": batch_size}).fetchall()
-            
+            """),
+                {"last_id": last_id, "batch_size": batch_size},
+            ).fetchall()
+
             if not batch_rows:
                 break
-                
+
             company_ids = [str(r[0]) for r in batch_rows]
             company_ids_str = ", ".join(f"'{cid}'" for cid in company_ids)
-            
-            result = conn.execute(text(f"""
+
+            result = conn.execute(
+                text(f"""
                 WITH ac AS (
                     SELECT
                         c2.company_id,
@@ -53,11 +57,12 @@ def update_company_job_stats_bulk() -> int:
                       OR COALESCE(c.total_jobs_count, -1) != COALESCE(ac.total_cnt, 0)
                       OR c.last_active_job_at IS DISTINCT FROM ac.last_active
                   );
-            """))
-            
+            """)
+            )
+
             total_updated += result.rowcount
             last_id = company_ids[-1]
-            
+
     return total_updated
 
 
@@ -66,24 +71,28 @@ def update_company_remote_posture_bulk() -> int:
     batch_size = 1000
     total_updated = 0
     last_id = "00000000-0000-0000-0000-000000000000"
-    
+
     while True:
         with engine.begin() as conn:
-            batch_rows = conn.execute(text("""
+            batch_rows = conn.execute(
+                text("""
                 SELECT company_id 
                 FROM companies 
                 WHERE company_id > :last_id 
                 ORDER BY company_id 
                 LIMIT :batch_size
-            """), {"last_id": last_id, "batch_size": batch_size}).fetchall()
-            
+            """),
+                {"last_id": last_id, "batch_size": batch_size},
+            ).fetchall()
+
             if not batch_rows:
                 break
-                
+
             company_ids = [str(r[0]) for r in batch_rows]
             company_ids_str = ", ".join(f"'{cid}'" for cid in company_ids)
-            
-            result = conn.execute(text(f"""
+
+            result = conn.execute(
+                text(f"""
                 WITH remote_counts AS (
                     SELECT company_id, COUNT(job_id) as remote_jobs_count
                     FROM jobs
@@ -98,11 +107,12 @@ def update_company_remote_posture_bulk() -> int:
                 FROM remote_counts rc
                 WHERE c.company_id = rc.company_id
                   AND c.remote_posture = 'UNKNOWN';
-            """))
-            
+            """)
+            )
+
             total_updated += result.rowcount
             last_id = company_ids[-1]
-            
+
     return total_updated
 
 
@@ -112,24 +122,28 @@ def update_company_signal_scores_bulk() -> int:
     batch_size = 1000
     total_updated = 0
     last_id = "00000000-0000-0000-0000-000000000000"
-    
+
     while True:
         with engine.begin() as conn:
-            batch_rows = conn.execute(text("""
+            batch_rows = conn.execute(
+                text("""
                 SELECT company_id 
                 FROM companies 
                 WHERE company_id > :last_id 
                 ORDER BY company_id 
                 LIMIT :batch_size
-            """), {"last_id": last_id, "batch_size": batch_size}).fetchall()
-            
+            """),
+                {"last_id": last_id, "batch_size": batch_size},
+            ).fetchall()
+
             if not batch_rows:
                 break
-                
+
             company_ids = [str(r[0]) for r in batch_rows]
             company_ids_str = ", ".join(f"'{cid}'" for cid in company_ids)
-            
-            result = conn.execute(text(f"""
+
+            result = conn.execute(
+                text(f"""
                 WITH batch_companies AS (
                     SELECT c.*
                     FROM companies c
@@ -176,9 +190,10 @@ def update_company_signal_scores_bulk() -> int:
                 FROM new_score ns
                 WHERE c.company_id = ns.company_id
                   AND COALESCE(c.signal_score, -1) != COALESCE(ns.score, 0);
-            """))
-            
+            """)
+            )
+
             total_updated += result.rowcount
             last_id = company_ids[-1]
-            
+
     return total_updated

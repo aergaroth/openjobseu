@@ -13,13 +13,12 @@ from app.utils.cleaning import clean_description
 
 logger = logging.getLogger(__name__)
 
+
 class GreenhouseAdapter(ATSAdapter):
     dorking_target = "boards.greenhouse.io"
     source_name = "greenhouse"
     active = True
-    API_URL_TEMPLATE = (
-        "https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs?content=true"
-    )
+    API_URL_TEMPLATE = "https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs?content=true"
 
     @staticmethod
     def _resolve_board_token(company: dict) -> str:
@@ -57,7 +56,7 @@ class GreenhouseAdapter(ATSAdapter):
         board_token = raw_job.get("_ats_board_token")
         if not board_token:
             raise ValueError("Missing _ats_board_token in raw_job. Ensure fetch() was called.")
-        
+
         raw_id = raw_job.get("id")
         title = (raw_job.get("title") or "").strip()
         source_url = sanitize_url(raw_job.get("absolute_url"))
@@ -79,15 +78,13 @@ class GreenhouseAdapter(ATSAdapter):
             or self._fallback_company_name(board_token)
         )
 
-        description = self.build_description(raw_job, [
-            (["content", "description"], None)
-        ])
+        description = self.build_description(raw_job, [(["content", "description"], None)])
 
         if not raw_id or not title or not source_url:
             return None
 
         cleaned_description = clean_description(description, source=self.source_name)
-        
+
         is_remote_location = "remote" in (location or "").lower()
         is_remote = self.detect_remote(title, location, explicit_flag=is_remote_location)
 
@@ -161,7 +158,7 @@ class GreenhouseAdapter(ATSAdapter):
                 location_value = raw_location
 
             location = sanitize_location(location_value) or ""
-            
+
             is_remote_location = "remote" in location.lower()
             if self.detect_remote(title, location, explicit_flag=is_remote_location, is_probe=True):
                 remote_hits += 1
@@ -189,5 +186,6 @@ class GreenhouseAdapter(ATSAdapter):
                 raise ValueError(f"Greenhouse {context} payload does not contain a jobs list")
             return jobs
         raise ValueError(f"Greenhouse {context} API did not return a list or dict payload")
+
 
 register(GreenhouseAdapter.source_name, GreenhouseAdapter)

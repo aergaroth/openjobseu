@@ -1,5 +1,4 @@
 import logging
-import json
 import re
 import io
 import zipfile
@@ -8,12 +7,12 @@ import urllib3
 import time
 
 from storage.db_engine import get_engine
-from storage.repositories.discovery_repository import insert_source_company, get_existing_brand_names
+from storage.repositories.discovery_repository import (
+    insert_source_company,
+    get_existing_brand_names,
+)
 
 # Re-exports for compatibility with endpoints  internal.py
-from app.workers.discovery.ats_guessing import run_ats_guessing
-from app.workers.discovery.careers_crawler import run_careers_discovery
-from app.workers.discovery.ats_probe import probe_ats
 
 logger = logging.getLogger("openjobseu.discovery")
 
@@ -33,6 +32,7 @@ def _guess_careers(homepage: str) -> list[str]:
     homepage = homepage.rstrip("/")
     return [homepage + path for path in CAREERS_PATHS]
 
+
 def _fetch_github_remote_companies():
     """
     Fetches companies from the popular 'remoteintech/remote-jobs' GitHub repository.
@@ -40,29 +40,31 @@ def _fetch_github_remote_companies():
     """
     url = "https://github.com/remoteintech/remote-jobs/archive/refs/heads/main.zip"
     companies = []
-    
+
     try:
         response = requests.get(url, timeout=15, stream=True)
         response.raise_for_status()
-        
+
         content = b""
         for chunk in response.iter_content(chunk_size=8192):
             content += chunk
             if len(content) > 20 * 1024 * 1024:  # Limit do 20MB na ZIP
                 raise ValueError("GitHub repository archive is too large (>20MB)")
-        
+
         with zipfile.ZipFile(io.BytesIO(content)) as z:
             for filename in z.namelist():
                 if "src/companies/" in filename and filename.endswith(".md"):
                     content = z.read(filename).decode("utf-8")
                     name_match = re.search(r'title:\s*["\']?([^"\'\n]+)', content)
                     url_match = re.search(r'website:\s*["\']?([^"\'\n]+)', content)
-                    
+
                     if name_match and url_match:
-                        companies.append({
-                            "name": name_match.group(1).strip(),
-                            "url": url_match.group(1).strip()
-                        })
+                        companies.append(
+                            {
+                                "name": name_match.group(1).strip(),
+                                "url": url_match.group(1).strip(),
+                            }
+                        )
 
     except Exception as e:
         logger.warning("Failed to fetch GitHub remote companies", extra={"error": str(e)})
@@ -126,25 +128,25 @@ def run_company_source_discovery():
                     metrics["companies_inserted"] += 1
                     existing_names.add(name.lower())
             except Exception as exc:
-                logger.error(f"error processing company in company_sources [{name}]: {exc}", exc_info=True)
-                
+                logger.error(
+                    f"error processing company in company_sources [{name}]: {exc}",
+                    exc_info=True,
+                )
+
             if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
                 pct = int((idx / total) * 100)
                 filled = int(20 * idx / total)
                 bar = "█" * filled + "-" * (20 - filled)
                 logger.info(f"company_sources progress: [{bar}] {pct}% ({idx}/{total})")
-    except Exception as exc:
+    except Exception:
         logger.error(
             "company_sources pipeline failed",
             exc_info=True,
-            extra={"component": "discovery", "phase": "company_sources"}
+            extra={"component": "discovery", "phase": "company_sources"},
         )
         raise
     finally:
         metrics["duration_ms"] = int((time.perf_counter() - started) * 1000)
-        logger.info(
-            "company_source_discovery",
-            extra=metrics
-        )
+        logger.info("company_source_discovery", extra=metrics)
 
     return metrics

@@ -4,10 +4,8 @@ import logging
 import os
 import requests
 import time
-import uuid
 from datetime import datetime, timezone, timedelta
 
-from sqlalchemy import text
 
 from app.workers.discovery.ats_probe import probe_ats
 from storage.db_engine import get_engine
@@ -25,19 +23,67 @@ QUALITY_MAX_AGE_DAYS = 120
 
 # Initial dictionary (in the future, slugs can be loaded dynamically, e.g., from a file or permutations of existing names)
 POPULAR_SLUGS = [
-    "stripe", "notion", "figma", "datadog", "shopify",
-    "revolut", "wise", "bolt", "klarna", "n26",
-    "openai", "deepmind", "anthropic", "vercel", "miro",
-    "gitlab", "github", "discord", "canva", "monday",
-    "reddit", "pinterest", "airbnb", "doordash", "uber",
-    "spotify", "lyft", "dropbox", "coinbase", "plaid",
-    "robinhood", "chime", "brex", "ramp", "gusto",
-    "rippling", "deel", "checkr", "fivetran", "gocardless",
+    "stripe",
+    "notion",
+    "figma",
+    "datadog",
+    "shopify",
+    "revolut",
+    "wise",
+    "bolt",
+    "klarna",
+    "n26",
+    "openai",
+    "deepmind",
+    "anthropic",
+    "vercel",
+    "miro",
+    "gitlab",
+    "github",
+    "discord",
+    "canva",
+    "monday",
+    "reddit",
+    "pinterest",
+    "airbnb",
+    "doordash",
+    "uber",
+    "spotify",
+    "lyft",
+    "dropbox",
+    "coinbase",
+    "plaid",
+    "robinhood",
+    "chime",
+    "brex",
+    "ramp",
+    "gusto",
+    "rippling",
+    "deel",
+    "checkr",
+    "fivetran",
+    "gocardless",
     # European startups and scale-ups (often using Ashby/Lever/Greenhouse)
-    "alan", "qonto", "doctolib", "pigment", "payfit",
-    "swile", "vinted", "traderepublic", "bitpanda", "personio",
-    "contentful", "aiven", "pleo", "mollie", "lokalise",
-    "truelayer", "huggingface", "printify", "gorgias", "yousign",
+    "alan",
+    "qonto",
+    "doctolib",
+    "pigment",
+    "payfit",
+    "swile",
+    "vinted",
+    "traderepublic",
+    "bitpanda",
+    "personio",
+    "contentful",
+    "aiven",
+    "pleo",
+    "mollie",
+    "lokalise",
+    "truelayer",
+    "huggingface",
+    "printify",
+    "gorgias",
+    "yousign",
 ]
 
 PROVIDERS_TO_PROBE = [
@@ -49,20 +95,17 @@ PROVIDERS_TO_PROBE = [
 ]
 
 
-
-
-
 def _load_slugs() -> list[str]:
     """Loads slugs from an external URL if configured, falling back to POPULAR_SLUGS."""
     slugs = set(POPULAR_SLUGS)
     url = os.environ.get("ATS_REVERSE_SLUGS_URL")
-    
+
     if url:
         try:
             # stream=True zapobiega wczytaniu wielkiego pliku do RAM
             response = requests.get(url, timeout=10, stream=True)
             response.raise_for_status()
-            
+
             content = b""
             for chunk in response.iter_content(chunk_size=8192):
                 content += chunk
@@ -71,12 +114,12 @@ def _load_slugs() -> list[str]:
 
             text_data = content.decode("utf-8", errors="replace")
             added_count = 0
-            
+
             for line in text_data.splitlines():
                 if added_count >= 5000:  # Zabezpieczenie przed "zadławieniem" pętli workera
                     logger.warning("Max slugs limit reached, truncating parsing.")
                     break
-                    
+
                 clean_slug = line.strip()
                 if clean_slug and not clean_slug.startswith("#"):
                     slugs.add(clean_slug)
@@ -84,7 +127,7 @@ def _load_slugs() -> list[str]:
             logger.info("external_slugs_loaded", extra={"url": url, "total_slugs": len(slugs)})
         except Exception as exc:
             logger.warning("external_slugs_fetch_failed", extra={"url": url, "error": str(exc)})
-            
+
     return sorted(list(slugs))
 
 
@@ -166,31 +209,35 @@ def run_ats_reverse_discovery() -> dict[str, int]:
                             company_id=company_id,
                             provider=provider,
                             ats_slug=slug,
-                            careers_url=None
+                            careers_url=None,
                         )
 
                     if inserted:
                         metrics["ats_inserted"] += 1
                     else:
                         metrics["ats_duplicates"] += 1
-                        
+
                 except Exception as e:
-                    logger.error(f"error processing slug in ats_reverse [{provider}/{slug}]: {e}", exc_info=True, extra={
-                        "provider": provider,
-                        "slug": slug,
-                        "component": "discovery"
-                    })
+                    logger.error(
+                        f"error processing slug in ats_reverse [{provider}/{slug}]: {e}",
+                        exc_info=True,
+                        extra={
+                            "provider": provider,
+                            "slug": slug,
+                            "component": "discovery",
+                        },
+                    )
 
                 if total > 0 and (idx % max(1, total // 10) == 0 or idx == total):
                     pct = int((idx / total) * 100)
                     filled = int(20 * idx / total)
                     bar = "█" * filled + "-" * (20 - filled)
                     logger.info(f"ats_reverse progress: [{bar}] {pct}% ({idx}/{total})")
-    except Exception as exc:
+    except Exception:
         logger.error(
             "ats_reverse pipeline failed",
             exc_info=True,
-            extra={"component": "discovery", "phase": "ats_reverse"}
+            extra={"component": "discovery", "phase": "ats_reverse"},
         )
         raise
     finally:

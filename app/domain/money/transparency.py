@@ -1,4 +1,3 @@
-
 TRANSPARENCY_PHRASES = [
     "salary will be discussed",
     "compensation will be discussed",
@@ -6,6 +5,7 @@ TRANSPARENCY_PHRASES = [
     "compensation discussed during interview",
     "salary determined based on experience",
 ]
+
 
 def detect_salary_transparency(description: str, salary_detected: bool) -> str:
     """

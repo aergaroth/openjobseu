@@ -120,13 +120,15 @@ def ingest_company(company: dict):
                 **tick_context,
             },
         )
-        return _finalize({
-            "fetched": 0,
-            "normalized_count": 0,
-            "accepted": 0,
-            "skipped": 0,
-            "error": "unsupported_ats_provider",
-        })
+        return _finalize(
+            {
+                "fetched": 0,
+                "normalized_count": 0,
+                "accepted": 0,
+                "skipped": 0,
+                "error": "unsupported_ats_provider",
+            }
+        )
 
     if not getattr(adapter, "active", True):
         logger.warning(
@@ -138,26 +140,30 @@ def ingest_company(company: dict):
                 **tick_context,
             },
         )
-        return _finalize({
-            "fetched": 0,
-            "normalized_count": 0,
-            "accepted": 0,
-            "skipped": 0,
-            "error": "inactive_ats_adapter",
-        })
+        return _finalize(
+            {
+                "fetched": 0,
+                "normalized_count": 0,
+                "accepted": 0,
+                "skipped": 0,
+                "error": "inactive_ats_adapter",
+            }
+        )
 
     raw_jobs, error = fetch_company_jobs(company, adapter, updated_since=updated_since)
     if error:
         engine = get_engine()
         with engine.begin() as conn:
             mark_ats_synced(conn, company.get("company_ats_id"), success=False)
-        return _finalize({
-            "fetched": 0,
-            "normalized_count": 0,
-            "accepted": 0,
-            "skipped": 0,
-            "error": error,
-        })
+        return _finalize(
+            {
+                "fetched": 0,
+                "normalized_count": 0,
+                "accepted": 0,
+                "skipped": 0,
+                "error": error,
+            }
+        )
 
     engine = get_engine()
     metrics = IngestionMetrics()
@@ -188,7 +194,7 @@ def ingest_company(company: dict):
         with engine.begin() as conn:
             mark_ats_synced(conn, company.get("company_ats_id"), success=True)
 
-    except Exception as exc:
+    except Exception:
         logger.error(
             "employer ingestion transaction failed",
             exc_info=True,
@@ -199,19 +205,20 @@ def ingest_company(company: dict):
                 **tick_context,
             },
         )
-        return _finalize({
-            "fetched": metrics.fetched,
-            "normalized_count": metrics.normalized,
-            "accepted": metrics.accepted,
-            "skipped": metrics.skipped,
-            "error": "transaction_failed",
-        })
+        return _finalize(
+            {
+                "fetched": metrics.fetched,
+                "normalized_count": metrics.normalized,
+                "accepted": metrics.accepted,
+                "skipped": metrics.skipped,
+                "error": "transaction_failed",
+            }
+        )
 
     return _finalize(metrics.to_result_dict())
 
 
 def run_employer_ingestion() -> dict:
-
     started = perf_counter()
     engine = get_engine()
     companies_load_duration_ms = 0
@@ -290,7 +297,7 @@ def run_employer_ingestion() -> dict:
                         remote_model_counts[key] += int(source_remote_model.get(key, 0) or 0)
                     total_hard_geo_rejected += int(result.get("hard_geo_rejected_count", 0) or 0)
 
-                except Exception as exc:
+                except Exception:
                     company_context = futures[future]
                     logger.error(
                         "employer ingestion thread pool future failed",
@@ -300,7 +307,7 @@ def run_employer_ingestion() -> dict:
                             "ats_provider": company_context.get("ats_provider"),
                             "ats_slug": company_context.get("ats_slug"),
                             **tick_context,
-                        }
+                        },
                     )
                     companies_failed += 1
         except concurrent.futures.TimeoutError:
@@ -313,7 +320,7 @@ def run_employer_ingestion() -> dict:
                 },
             )
         finally:
-            # Niezwykle ważne: wait=False sprawi, że główny wątek (API/Worker) ucieknie 
+            # Niezwykle ważne: wait=False sprawi, że główny wątek (API/Worker) ucieknie
             # i dokończy tick, a cancel_futures przerwie oczekujące zadania w kolejce!
             executor.shutdown(wait=False, cancel_futures=True)
         ingestion_loop_duration_ms = int((perf_counter() - ingestion_loop_started) * 1000)

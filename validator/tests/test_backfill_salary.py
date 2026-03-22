@@ -1,4 +1,3 @@
-import pytest
 from sqlalchemy import text
 from fastapi.testclient import TestClient
 from app.main import app
@@ -7,9 +6,10 @@ from storage.db_engine import get_engine
 
 client = TestClient(app)
 
+
 def test_backfill_missing_salary_fields():
     engine = get_engine()
-    
+
     # 1. Insert jobs with and without salary
     with engine.begin() as conn:
         conn.execute(
@@ -24,14 +24,18 @@ def test_backfill_missing_salary_fields():
 
     # 2. Run backfill
     updated_count = backfill_missing_salary_fields(limit=10)
-    
+
     # Only id1 should be updated (id2 has no salary in description, id3 already has salary)
     assert updated_count == 1
 
     # 3. Verify results
     with engine.connect() as conn:
         # id1 should now have salary
-        row1 = conn.execute(text("SELECT salary_min, salary_max, salary_currency FROM jobs WHERE job_id = 'id1'")).mappings().one()
+        row1 = (
+            conn.execute(text("SELECT salary_min, salary_max, salary_currency FROM jobs WHERE job_id = 'id1'"))
+            .mappings()
+            .one()
+        )
         assert row1["salary_min"] == 100000
         assert row1["salary_max"] == 120000
         assert row1["salary_currency"] == "USD"
@@ -46,9 +50,10 @@ def test_backfill_missing_salary_fields():
         assert row3["salary_min"] == 50000
         assert row3["salary_max"] == 60000
 
+
 def test_backfill_salary_endpoint():
     engine = get_engine()
-    
+
     # 1. Insert job
     with engine.begin() as conn:
         conn.execute(

@@ -40,7 +40,6 @@ def test_jobs_compliance_stats_7d_empty():
 
 
 def test_jobs_compliance_stats_7d_aggregates_recent_rows():
-
     with engine.begin() as conn:
         upsert_job(_make_job("stats:approved_recent"), conn=conn)
         upsert_job(_make_job("stats:review_recent"), conn=conn)

@@ -1,9 +1,9 @@
-import logging
 import os
 from logging.config import fileConfig
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -27,12 +27,13 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 target_metadata = None
 
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
     url = os.environ.get("DATABASE_URL")
     if not url:
         raise ValueError("DATABASE_URL environment variable must be set for offline migrations")
-    
+
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -43,17 +44,17 @@ def run_migrations_offline() -> None:
     with context.begin_transaction():
         context.run_migrations()
 
+
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
     # Connectable is correctly resolved based on DB_MODE (standard vs cloudsql)
     connectable = get_engine()
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
             context.run_migrations()
+
 
 if context.is_offline_mode():
     run_migrations_offline()

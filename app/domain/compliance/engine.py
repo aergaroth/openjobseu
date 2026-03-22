@@ -14,7 +14,7 @@ def _compute_compliance_version() -> str:
     compliance_dir = Path(__file__).parent
 
     hasher = hashlib.md5()
-    
+
     # Sort files to ensure deterministic hashing across different operating systems
     for file_path in sorted(compliance_dir.rglob("*.py")):
         try:
@@ -115,9 +115,7 @@ def apply_policy(job: dict, source: str) -> tuple[dict | None, str | None]:
     if geo_class not in {GeoClass.EU_MEMBER_STATE, GeoClass.EU_EXPLICIT}:
         penalties.append(geo_class.value if hasattr(geo_class, "value") else geo_class)
 
-    trace.append(
-        {"step": "scoring", "score": score, "penalties": penalties, "bonuses": []}
-    )
+    trace.append({"step": "scoring", "score": score, "penalties": penalties, "bonuses": []})
 
     # 6 Resolver trace
     trace.append({"step": "resolver", "status": status})

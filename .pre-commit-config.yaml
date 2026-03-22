@@ -1,0 +1,62 @@
+ci:
+  autofix_commit_msg: "chore(pre-commit): auto fixes from pre-commit.ci"
+  autoupdate_commit_msg: "chore(pre-commit): pre-commit autoupdate"
+  autoupdate_schedule: weekly
+  skip:
+    - pip-compile # Bot nie ma dostępu do sieci. Pominie zależności, ale naprawi kod (Ruff)
+
+repos:
+  - repo: https://github.com/jazzband/pip-tools
+    rev: v7.5.3  # wersja naprawiająca kompatybilność z pip >= 24.1
+    hooks:
+      # 1. Sprawdzanie głównego pliku produkcyjnego
+      - id: pip-compile
+        name: pip-compile (requirements.in)
+        files: ^requirements\.in$
+        args: ["requirements.in"]
+        
+      # 2. Sprawdzanie pliku deweloperskiego
+      - id: pip-compile
+        name: pip-compile (requirements-dev.in)
+        files: ^requirements-dev\.in$
+        args: ["requirements-dev.in"]
+        
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.7
+    hooks:
+      # Uruchamia linter Ruff i automatycznie naprawia błędy tam, gdzie to bezpieczne
+      - id: ruff
+        args: [ --fix, --show-fixes ]
+      # Uruchamia niezwykle szybki formatter zastępujący narzędzie Black
+      - id: ruff-format
+
+  # Oficjalne hooki narzędziowe pre-commit
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-yaml
+      - id: check-json
+
+  # Własne, lokalne hooki dla tego repozytorium
+  - repo: local
+    hooks:
+      - id: check-no-prints
+        name: Check for print() statements
+        entry: python scripts/check_no_prints.py
+        language: python
+        types: [python]
+        # Wykluczamy katalogi ze skryptami jednorazowymi, migracjami i sam skrypt sprawdzający
+        exclude: ^(scripts/|migrations/|tools/|.*/alembic/versions/)
+
+      - id: pytest
+        name: Run unit tests (pytest)
+        entry: pytest -q
+        language: system
+        types: [python]
+        pass_filenames: false
+        
+  # Wymusza poprawne nazewnictwo commitów (np. feat:, fix:, chore:)
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.13.9
+    hooks:
+      - id: commitizen

@@ -4,6 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def google_custom_search(query: str, num_results: int = 10, start: int = 1) -> list[str]:
     """
     Performs a Google Custom Search and returns a list of URLs.
@@ -39,9 +40,9 @@ def google_custom_search(query: str, num_results: int = 10, start: int = 1) -> l
         response = requests.get(base_url, params=params, timeout=15)
         response.raise_for_status()
         search_results = response.json()
-        
-        if 'items' in search_results:
-            return [item.get('link', '') for item in search_results['items']]
+
+        if "items" in search_results:
+            return [item.get("link", "") for item in search_results["items"]]
         else:
             return []
 

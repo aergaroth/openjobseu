@@ -8,8 +8,9 @@ def compute_market_stats(conn: Connection, date: date) -> dict:
     start_time = datetime(date.year, date.month, date.day, tzinfo=timezone.utc)
     end_time = start_time + timedelta(days=1)
 
-    jobs_stats = conn.execute(
-        text("""
+    jobs_stats = (
+        conn.execute(
+            text("""
             SELECT
                 COUNT(*) FILTER (WHERE first_seen_at >= :start_time AND first_seen_at < :end_time) AS jobs_created,
                 COUNT(*) FILTER (WHERE availability_status = 'expired' AND last_seen_at >= :start_time AND last_seen_at < :end_time) AS jobs_expired,
@@ -20,8 +21,11 @@ def compute_market_stats(conn: Connection, date: date) -> dict:
                 AVG(CASE WHEN remote_scope IS NOT NULL THEN 1.0 ELSE 0.0 END) FILTER (WHERE availability_status = 'active') AS remote_ratio
             FROM jobs
         """),
-        {"start_time": start_time, "end_time": end_time},
-    ).mappings().one()
+            {"start_time": start_time, "end_time": end_time},
+        )
+        .mappings()
+        .one()
+    )
 
     avg_job_lifetime = conn.execute(
         text(

@@ -48,10 +48,7 @@ def format_tick_summary(payload: dict) -> str:
     for name, data in per_source.items():
         policy = data.get("policy", {})
         reasons = (
-            policy.get("by_reason")
-            or data.get("policy_rejected_by_reason")
-            or data.get("rejected_by_reason")
-            or {}
+            policy.get("by_reason") or data.get("policy_rejected_by_reason") or data.get("rejected_by_reason") or {}
         )
 
         raw = data.get("raw_count", data.get("fetched_count", 0))

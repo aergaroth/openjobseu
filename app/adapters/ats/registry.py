@@ -6,7 +6,6 @@ def register(provider, adapter_cls):
 
 
 def get_adapter(provider):
-
     key = (provider or "").lower().strip()
 
     adapter_cls = ATS_REGISTRY.get(key)

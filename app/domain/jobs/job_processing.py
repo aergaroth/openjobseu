@@ -1,6 +1,5 @@
-from typing import Dict, Optional, Tuple
+from typing import Optional, Tuple
 
-from app.domain.taxonomy.enums import GeoClass, RemoteClass
 from app.domain.taxonomy.mappers import normalize_geo_class, normalize_remote_class
 from app.domain.taxonomy.taxonomy import classify_taxonomy
 from app.domain.compliance.engine import ENGINE_POLICY_VERSION, apply_policy
@@ -31,7 +30,7 @@ def process_ingested_job(job: dict, source: str) -> Tuple[Optional[dict], dict]:
     Core domain logic for processing a single ingested job.
     Transforms data, applies compliance, taxonomy, salary extraction and scoring.
     Does NOT perform any IO.
-    
+
     Returns:
         tuple: (processed_job_dict or None, compliance_report_dict)
     """
@@ -47,7 +46,7 @@ def process_ingested_job(job: dict, source: str) -> Tuple[Optional[dict], dict]:
 
     if "job_uid" not in job:
         job["job_uid"] = compute_job_uid(company_id=company_id, title=title, location=location)
-        
+
     if "job_fingerprint" not in job:
         job["job_fingerprint"] = compute_job_fingerprint(
             description,
@@ -59,9 +58,9 @@ def process_ingested_job(job: dict, source: str) -> Tuple[Optional[dict], dict]:
 
     # 2. Compliance
     job_after_policy, reason = apply_policy(job, source=source)
-    
+
     compliance_payload = (job_after_policy or job).get("_compliance") or {}
-    
+
     # Prepare compliance report (always returned)
     compliance_report = {
         "job_uid": str(job.get("job_uid")),
@@ -75,12 +74,12 @@ def process_ingested_job(job: dict, source: str) -> Tuple[Optional[dict], dict]:
         "final_score": compliance_payload.get("compliance_score"),
         "final_status": compliance_payload.get("compliance_status"),
         "decision_vector": compliance_payload.get("decision_trace"),
-        "policy_reason": reason
+        "policy_reason": reason,
     }
 
     if not job_after_policy:
         return None, compliance_report
-        
+
     processed_job = job_after_policy
 
     # 3. Taxonomy
@@ -93,13 +92,16 @@ def process_ingested_job(job: dict, source: str) -> Tuple[Optional[dict], dict]:
     # 4. Salary
     salary_info = extract_structured_salary(processed_job)
     if not salary_info:
-        salary_info = extract_salary(processed_job.get("description") or "", title=processed_job.get("title") or "")
+        salary_info = extract_salary(
+            processed_job.get("description") or "",
+            title=processed_job.get("title") or "",
+        )
         if salary_info:
             # Oznacz trudne przypadki do manualnej weryfikacji
             confidence = salary_info.get("salary_confidence")
             if confidence is not None and confidence < 80:
                 processed_job["_salary_parsing_case"] = salary_info
-                
+
     if salary_info:
         processed_job.update(salary_info)
     else:

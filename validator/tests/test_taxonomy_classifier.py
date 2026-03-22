@@ -1,4 +1,3 @@
-import pytest
 from app.domain.taxonomy.taxonomy import classify_taxonomy
 
 
@@ -273,10 +272,16 @@ class TestClassifyTaxonomySpecialization:
         result = classify_taxonomy("Customer Feedback Analyst")
         assert result["specialization"] == "unknown"
 
+
 class TestClassifyTaxonomyReturnStructure:
     def test_returns_dict_with_four_keys(self):
         result = classify_taxonomy("Senior Backend Engineer")
-        assert set(result.keys()) == {"job_family", "job_role", "seniority", "specialization"}
+        assert set(result.keys()) == {
+            "job_family",
+            "job_role",
+            "seniority",
+            "specialization",
+        }
 
     def test_all_values_are_strings(self):
         result = classify_taxonomy("Junior Data Analyst")

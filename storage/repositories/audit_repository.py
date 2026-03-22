@@ -3,6 +3,7 @@ from storage.db_engine import get_engine
 
 engine = get_engine()
 
+
 def _build_jobs_audit_filter_clauses(
     *,
     status: str | None = None,
@@ -77,12 +78,14 @@ def _build_jobs_audit_filter_clauses(
 
     return clauses, params
 
+
 def _rows_to_count_map(rows: list) -> dict[str, int]:
     result: dict[str, int] = {}
     for row in rows:
         key = str(row["label"])
         result[key] = int(row["count"])
     return result
+
 
 def get_jobs_audit(
     *,
@@ -119,9 +122,10 @@ def get_jobs_audit(
     with engine.connect() as conn:
         # Prepare params for queries
         query_params = {**params, "limit": limit, "offset": offset}
-        
-        jobs_rows = conn.execute(
-            text(f"""
+
+        jobs_rows = (
+            conn.execute(
+                text(f"""
                 SELECT
                     job_id,
                     source,
@@ -141,8 +145,11 @@ def get_jobs_audit(
                 ORDER BY COALESCE(last_seen_at, '1970-01-01T00:00:00+00:00') DESC
                 LIMIT :limit OFFSET :offset
             """),
-            query_params,
-        ).mappings().all()
+                query_params,
+            )
+            .mappings()
+            .all()
+        )
 
         if not where_clause:
             total_query = "SELECT GREATEST(0, CAST(reltuples AS BIGINT)) AS total FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid WHERE n.nspname = 'public' AND c.relname = 'jobs'"
@@ -154,19 +161,24 @@ def get_jobs_audit(
             params,
         ).fetchone()
 
-        status_rows = conn.execute(
-            text(f"""
+        status_rows = (
+            conn.execute(
+                text(f"""
                 SELECT COALESCE(status, 'null') AS label, COUNT(*) AS count
                 FROM jobs
                 {where_clause}
                 GROUP BY COALESCE(status, 'null')
                 ORDER BY count DESC, label ASC
             """),
-            params,
-        ).mappings().all()
+                params,
+            )
+            .mappings()
+            .all()
+        )
 
-        source_rows = conn.execute(
-            text(f"""
+        source_rows = (
+            conn.execute(
+                text(f"""
                 SELECT
                     COALESCE(js.source, 'null') AS label,
                     COUNT(DISTINCT jobs.job_id) AS count
@@ -177,41 +189,56 @@ def get_jobs_audit(
                 GROUP BY COALESCE(js.source, 'null')
                 ORDER BY count DESC, label ASC
             """),
-            params,
-        ).mappings().all()
+                params,
+            )
+            .mappings()
+            .all()
+        )
 
-        compliance_rows = conn.execute(
-            text(f"""
+        compliance_rows = (
+            conn.execute(
+                text(f"""
                 SELECT COALESCE(compliance_status, 'null') AS label, COUNT(*) AS count
                 FROM jobs
                 {where_clause}
                 GROUP BY COALESCE(compliance_status, 'null')
                 ORDER BY count DESC, label ASC
             """),
-            params,
-        ).mappings().all()
+                params,
+            )
+            .mappings()
+            .all()
+        )
 
-        remote_class_rows = conn.execute(
-            text(f"""
+        remote_class_rows = (
+            conn.execute(
+                text(f"""
                 SELECT COALESCE(remote_class, 'null') AS label, COUNT(*) AS count
                 FROM jobs
                 {where_clause}
                 GROUP BY COALESCE(remote_class, 'null')
                 ORDER BY count DESC, label ASC
             """),
-            params,
-        ).mappings().all()
+                params,
+            )
+            .mappings()
+            .all()
+        )
 
-        geo_class_rows = conn.execute(
-            text(f"""
+        geo_class_rows = (
+            conn.execute(
+                text(f"""
                 SELECT COALESCE(geo_class, 'null') AS label, COUNT(*) AS count
                 FROM jobs
                 {where_clause}
                 GROUP BY COALESCE(geo_class, 'null')
                 ORDER BY count DESC, label ASC
             """),
-            params,
-        ).mappings().all()
+                params,
+            )
+            .mappings()
+            .all()
+        )
 
     return {
         "total": int(total_row[0]) if total_row else 0,
@@ -227,10 +254,12 @@ def get_jobs_audit(
         },
     }
 
+
 def get_compliance_stats_last_7d() -> dict:
     with engine.connect() as conn:
-        row = conn.execute(
-            text("""
+        row = (
+            conn.execute(
+                text("""
                 SELECT
                     COUNT(*) AS total_jobs,
                     COUNT(*) FILTER (WHERE compliance_status = 'approved') AS approved,
@@ -244,7 +273,10 @@ def get_compliance_stats_last_7d() -> dict:
                 FROM jobs
                 WHERE first_seen_at > NOW() - INTERVAL '7 days'
             """)
-        ).mappings().one()
+            )
+            .mappings()
+            .one()
+        )
 
     ratio = row["approved_ratio_pct"]
     return {
@@ -256,10 +288,12 @@ def get_compliance_stats_last_7d() -> dict:
         "approved_ratio_pct": float(ratio) if ratio is not None else None,
     }
 
+
 def get_audit_source_filter_values() -> list[str]:
     with engine.connect() as conn:
-        rows = conn.execute(
-            text("""
+        rows = (
+            conn.execute(
+                text("""
                 SELECT
                     js.source,
                     COUNT(*) AS count
@@ -269,17 +303,22 @@ def get_audit_source_filter_values() -> list[str]:
                 GROUP BY js.source
                 ORDER BY count DESC, js.source ASC
             """)
-        ).mappings().all()
+            )
+            .mappings()
+            .all()
+        )
 
     return [str(row["source"]) for row in rows]
+
 
 def get_audit_company_compliance_stats(
     *,
     min_total_jobs: int = 10,
 ) -> list[dict]:
     with engine.connect() as conn:
-        rows = conn.execute(
-            text("""
+        rows = (
+            conn.execute(
+                text("""
                 SELECT
                     c.legal_name,
                     COUNT(*) AS total_jobs,
@@ -296,8 +335,11 @@ def get_audit_company_compliance_stats(
                 HAVING COUNT(*) > :min_total_jobs
                 ORDER BY approved DESC, c.legal_name ASC
             """),
-            {"min_total_jobs": int(min_total_jobs)},
-        ).mappings().all()
+                {"min_total_jobs": int(min_total_jobs)},
+            )
+            .mappings()
+            .all()
+        )
 
     result: list[dict] = []
     for row in rows:
@@ -313,10 +355,12 @@ def get_audit_company_compliance_stats(
         )
     return result
 
+
 def get_audit_source_compliance_stats_last_7d() -> list[dict]:
     with engine.connect() as conn:
-        rows = conn.execute(
-            text("""
+        rows = (
+            conn.execute(
+                text("""
                 SELECT
                     js.source AS source,
                     COUNT(DISTINCT j.job_id) AS total_jobs,
@@ -333,7 +377,10 @@ def get_audit_source_compliance_stats_last_7d() -> list[dict]:
                 GROUP BY js.source
                 ORDER BY approved DESC, js.source ASC
             """)
-        ).mappings().all()
+            )
+            .mappings()
+            .all()
+        )
 
     result: list[dict] = []
     for row in rows:
@@ -352,8 +399,9 @@ def get_audit_source_compliance_stats_last_7d() -> list[dict]:
 
 def get_ghost_jobs(days_threshold: int = 3) -> list[dict]:
     with engine.connect() as conn:
-        rows = conn.execute(
-            text("""
+        rows = (
+            conn.execute(
+                text("""
                 SELECT
                     job_id,
                     source,
@@ -365,16 +413,20 @@ def get_ghost_jobs(days_threshold: int = 3) -> list[dict]:
                 WHERE first_seen_at > NOW() - INTERVAL '30 days'
                   AND last_seen_at - first_seen_at < (:days_threshold * INTERVAL '1 day')
             """),
-            {"days_threshold": int(days_threshold)},
-        ).mappings().all()
+                {"days_threshold": int(days_threshold)},
+            )
+            .mappings()
+            .all()
+        )
 
     return [dict(row) for row in rows]
 
 
 def get_job_lifetime_stats() -> dict:
     with engine.connect() as conn:
-        row = conn.execute(
-            text("""
+        row = (
+            conn.execute(
+                text("""
                 SELECT
                     AVG(last_seen_at - first_seen_at) AS avg_lifetime,
                     PERCENTILE_CONT(0.5)
@@ -383,7 +435,10 @@ def get_job_lifetime_stats() -> dict:
                 FROM job_sources
                     WHERE first_seen_at > NOW() - INTERVAL '30 days'
             """)
-        ).mappings().one()
+            )
+            .mappings()
+            .one()
+        )
 
     return {
         "avg_lifetime": row["avg_lifetime"],
@@ -393,8 +448,9 @@ def get_job_lifetime_stats() -> dict:
 
 def get_repost_candidates(days_threshold: int = 30) -> list[dict]:
     with engine.connect() as conn:
-        rows = conn.execute(
-            text("""
+        rows = (
+            conn.execute(
+                text("""
                 SELECT
                     j.job_id,
                     j.company_name,
@@ -413,16 +469,20 @@ def get_repost_candidates(days_threshold: int = 30) -> list[dict]:
                   AND j.first_seen_at - prev.last_seen_at < (:days_threshold * INTERVAL '1 day')
                 ORDER BY j.first_seen_at DESC
             """),
-            {"days_threshold": int(days_threshold)},
-        ).mappings().all()
+                {"days_threshold": int(days_threshold)},
+            )
+            .mappings()
+            .all()
+        )
 
     return [dict(row) for row in rows]
 
 
 def get_failing_ats_integrations(days_threshold: int = 3) -> list[dict]:
     with engine.connect() as conn:
-        rows = conn.execute(
-            text("""
+        rows = (
+            conn.execute(
+                text("""
                 SELECT
                     ca.company_ats_id,
                     c.legal_name,
@@ -441,8 +501,11 @@ def get_failing_ats_integrations(days_threshold: int = 3) -> list[dict]:
                   )
                 ORDER BY COALESCE(ca.last_sync_at, ca.created_at) ASC
             """),
-            {"days_threshold": int(days_threshold)},
-        ).mappings().all()
+                {"days_threshold": int(days_threshold)},
+            )
+            .mappings()
+            .all()
+        )
 
     result = []
     for row in rows:

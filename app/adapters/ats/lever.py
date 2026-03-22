@@ -15,6 +15,7 @@ from app.utils.cleaning import clean_description
 
 logger = logging.getLogger(__name__)
 
+
 class LeverAdapter(ATSAdapter):
     dorking_target = "jobs.lever.co"
     source_name = "lever"
@@ -52,7 +53,7 @@ class LeverAdapter(ATSAdapter):
         slug = raw_job.get("_ats_slug")
         if not slug:
             raise ValueError("Missing _ats_slug in raw_job. Ensure fetch() was called.")
-        
+
         raw_id = raw_job.get("id")
         title = (raw_job.get("text") or "").strip()
         source_url = sanitize_url(raw_job.get("hostedUrl"))
@@ -75,27 +76,32 @@ class LeverAdapter(ATSAdapter):
         main_desc = self.build_description(raw_job, [(["description", "descriptionPlain"], None)])
         if main_desc:
             desc_parts.append(main_desc)
-            
+
         for lst in raw_job.get("lists") or []:
             if isinstance(lst, dict):
                 heading = lst.get("text")
                 content = lst.get("content")
                 if content:
                     desc_parts.append(f"<h3>{heading}</h3>\n{content}" if heading else str(content))
-                    
+
         add_desc = self.build_description(raw_job, [(["additional", "additionalPlain"], None)])
         if add_desc:
             desc_parts.append(add_desc)
-            
+
         description = "\n\n".join(desc_parts)
 
         if not raw_id or not title or not source_url:
             return None
 
         cleaned_description = clean_description(description, source=self.source_name)
-        
+
         is_remote_location = "remote" in (location or "").lower()
-        is_remote = self.detect_remote(title, location, explicit_flag=(workplace_type.lower() == "remote" or is_remote_location), extra_text=workplace_type)
+        is_remote = self.detect_remote(
+            title,
+            location,
+            explicit_flag=(workplace_type.lower() == "remote" or is_remote_location),
+            extra_text=workplace_type,
+        )
 
         normalized_remote_scope = self.normalize_remote_scope(location)
 
@@ -154,11 +160,17 @@ class LeverAdapter(ATSAdapter):
             categories = job.get("categories") or {}
             location_value = categories.get("location") or ""
             workplace_type = (job.get("workplaceType") or "").lower()
-            
+
             location = sanitize_location(location_value) or ""
-            
+
             is_remote_location = "remote" in location.lower()
-            if self.detect_remote(title, location, explicit_flag=(workplace_type == "remote" or is_remote_location), extra_text=workplace_type, is_probe=True):
+            if self.detect_remote(
+                title,
+                location,
+                explicit_flag=(workplace_type == "remote" or is_remote_location),
+                extra_text=workplace_type,
+                is_probe=True,
+            ):
                 remote_hits += 1
 
         return {
@@ -166,5 +178,6 @@ class LeverAdapter(ATSAdapter):
             "recent_job_at": recent_job_at,
             "remote_hits": remote_hits,
         }
+
 
 register(LeverAdapter.source_name, LeverAdapter)

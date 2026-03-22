@@ -6,10 +6,12 @@ from storage.common import _require_open_conn
 
 engine = get_engine()
 
+
 def get_jobs_for_verification(limit: int = 20) -> list[dict]:
     with engine.connect() as conn:
-        rows = conn.execute(
-            text("""
+        rows = (
+            conn.execute(
+                text("""
                 SELECT
                     job_id,
                     source_url,
@@ -24,9 +26,13 @@ def get_jobs_for_verification(limit: int = 20) -> list[dict]:
                     COALESCE(last_verified_at, '1970-01-01T00:00:00+00:00') ASC
                 LIMIT :limit
             """),
-            {"limit": limit},
-        ).mappings().all()
+                {"limit": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
+
 
 def update_job_availability(
     job_id: str,
@@ -49,6 +55,7 @@ def update_job_availability(
         ],
         conn=conn,
     )
+
 
 def update_jobs_availability(
     updates: list[dict],

@@ -38,37 +38,32 @@ def test_ats_adapters_expose_fetch_and_normalize_methods():
                 continue
 
             method_names = {
-                child.name
-                for child in node.body
-                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
+                child.name for child in node.body if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
             }
             required = {"fetch", "normalize", "probe_jobs"}
             if not required.issubset(method_names):
-                missing_methods.append(
-                    f"{file_path.relative_to(repo_root)}:{node.lineno}"
-                )
+                missing_methods.append(f"{file_path.relative_to(repo_root)}:{node.lineno}")
 
     assert not missing_methods, (
-        "ATS adapters must implement both fetch() and normalize(). "
-        f"Missing in: {', '.join(missing_methods)}"
+        f"ATS adapters must implement both fetch() and normalize(). Missing in: {', '.join(missing_methods)}"
     )
 
 
 @pytest.mark.parametrize("adapter", ADAPTERS)
 def test_ats_adapter_contract_fields(adapter):
     """Test that adapters implement required contract fields and methods."""
-    
+
     # Check source_name is defined
     assert hasattr(adapter, "source_name"), "Adapter must have source_name attribute"
     assert adapter.source_name, "source_name must not be empty"
-    
+
     # Check backward compatibility with provider
     assert hasattr(adapter, "provider"), "Adapter must have provider property for backward compatibility"
     assert adapter.provider == adapter.source_name, "provider should alias source_name"
-    
+
     # Check normalize_remote_scope method exists
     assert hasattr(adapter, "normalize_remote_scope"), "Adapter must have normalize_remote_scope method"
-    
+
     # Check it's callable
     assert callable(adapter.normalize_remote_scope), "normalize_remote_scope must be callable"
 
@@ -76,22 +71,22 @@ def test_ats_adapter_contract_fields(adapter):
 @pytest.mark.parametrize("adapter", ADAPTERS)
 def test_normalize_remote_scope_mapping(adapter):
     """Test that normalize_remote_scope correctly maps location strings."""
-    
+
     # Test Europe variants
     assert adapter.normalize_remote_scope("Remote - Europe") == "europe"
     assert adapter.normalize_remote_scope("remote europe") == "europe"
     assert adapter.normalize_remote_scope("EU Remote") == "europe"
     assert adapter.normalize_remote_scope("Remote EU") == "europe"
     assert adapter.normalize_remote_scope("Remote (EU)") == "europe"
-    
+
     # Test worldwide
     assert adapter.normalize_remote_scope("Remote Worldwide") == "worldwide"
-    
+
     # Test empty/None
     assert adapter.normalize_remote_scope(None) == ""
     assert adapter.normalize_remote_scope("") == ""
     assert adapter.normalize_remote_scope("   ") == ""
-    
+
     # Test passthrough for unmapped values
     assert adapter.normalize_remote_scope("New York") == "new york"
     assert adapter.normalize_remote_scope("Berlin, Germany") == "berlin, germany"
@@ -109,14 +104,8 @@ VALID_JOBS = [
             "departments": [{"name": "Engineering"}],
             "updated_at": "2024-01-15T10:00:00Z",
             "_ats_board_token": "test-company",
-            "pay_bounds": [
-                {
-                    "min_value": 80000,
-                    "max_value": 100000,
-                    "unit": "YEAR"
-                }
-            ]
-        }
+            "pay_bounds": [{"min_value": 80000, "max_value": 100000, "unit": "YEAR"}],
+        },
     ),
     (
         LeverAdapter(),
@@ -132,9 +121,9 @@ VALID_JOBS = [
                 "min": 90000,
                 "max": 110000,
                 "currency": "EUR",
-                "interval": "per year"
-            }
-        }
+                "interval": "per year",
+            },
+        },
     ),
     (
         WorkableAdapter(),
@@ -147,13 +136,8 @@ VALID_JOBS = [
             "department": ["Engineering"],
             "published": "2024-01-15T10:00:00Z",
             "_ats_slug": "test-company",
-            "salary": {
-                "min": 70000,
-                "max": 85000,
-                "currency": "GBP",
-                "unit": "yearly"
-            }
-        }
+            "salary": {"min": 70000, "max": 85000, "currency": "GBP", "unit": "yearly"},
+        },
     ),
     (
         AshbyAdapter(),
@@ -170,9 +154,9 @@ VALID_JOBS = [
                 "minAmount": 100000,
                 "maxAmount": 120000,
                 "currencyCode": "USD",
-                "interval": "year"
-            }
-        }
+                "interval": "year",
+            },
+        },
     ),
     (
         PersonioAdapter(),
@@ -183,8 +167,8 @@ VALID_JOBS = [
             "office": "Remote - Europe",
             "department": "Engineering",
             "createdAt": "2024-01-15T10:00:00Z",
-            "_ats_slug": "test-company"
-        }
+            "_ats_slug": "test-company",
+        },
     ),
     (
         SmartrecruitersAdapter(),
@@ -196,21 +180,20 @@ VALID_JOBS = [
             "releasedDate": "2024-01-15T10:00:00Z",
             "applyUrl": "https://jobs.smartrecruiters.com/test-company/123",
             "jobAd": {
-                "sections": {
-                    "jobDescription": {"text": "<p>We are looking for a senior Python developer...</p>"}
-                }
+                "sections": {"jobDescription": {"text": "<p>We are looking for a senior Python developer...</p>"}}
             },
-            "_ats_slug": "test-company"
-        }
+            "_ats_slug": "test-company",
+        },
     ),
 ]
+
 
 @pytest.mark.parametrize("adapter, raw_job", VALID_JOBS)
 def test_normalized_job_has_required_fields(adapter, raw_job):
     """Test that normalize() returns a dict with required canonical fields."""
-    
+
     normalized = adapter.normalize(raw_job)
-    
+
     # Required fields
     assert normalized is not None, "normalize() should return a dict for valid job"
     assert "source" in normalized, "Normalized job must have 'source' field"
@@ -218,19 +201,19 @@ def test_normalized_job_has_required_fields(adapter, raw_job):
     assert "title" in normalized, "Normalized job must have 'title' field"
     assert "description" in normalized, "Normalized job must have 'description' field"
     assert "remote_scope" in normalized, "Normalized job must have 'remote_scope' field"
-    
+
     # Optional but expected fields
     assert "company_name" in normalized, "Normalized job should have 'company_name' field"
-    
+
     # Verify remote_scope was normalized
     assert normalized["remote_scope"] == "europe", "remote_scope should be normalized"
-    
+
     # Verify values
     assert str(normalized["source_job_id"]) in str(raw_job.get("id") or raw_job.get("shortcode"))
     assert normalized["title"] == "Senior Python Developer"
     assert len(normalized["description"]) > 0
     assert normalized.get("department") == "Engineering", "Department should be extracted"
-    
+
     # Extra validation for transparent ATS structured data (e.g. Ashby)
     if raw_job.get("compensationTier"):
         assert normalized["salary_min"] == 100000
@@ -252,26 +235,124 @@ def test_normalized_job_has_required_fields(adapter, raw_job):
 
 INVALID_JOBS = [
     # Greenhouse missing attributes
-    (GreenhouseAdapter(), {"id": 12345, "content": "Description", "absolute_url": "http://example.com", "_ats_board_token": "test"}),
-    (GreenhouseAdapter(), {"title": "Developer", "content": "Description", "absolute_url": "http://example.com", "_ats_board_token": "test"}),
-    (GreenhouseAdapter(), {"id": 12345, "title": "Developer", "content": "Description", "_ats_board_token": "test"}),
+    (
+        GreenhouseAdapter(),
+        {
+            "id": 12345,
+            "content": "Description",
+            "absolute_url": "http://example.com",
+            "_ats_board_token": "test",
+        },
+    ),
+    (
+        GreenhouseAdapter(),
+        {
+            "title": "Developer",
+            "content": "Description",
+            "absolute_url": "http://example.com",
+            "_ats_board_token": "test",
+        },
+    ),
+    (
+        GreenhouseAdapter(),
+        {
+            "id": 12345,
+            "title": "Developer",
+            "content": "Description",
+            "_ats_board_token": "test",
+        },
+    ),
     # Lever missing attributes
-    (LeverAdapter(), {"id": "123", "descriptionPlain": "Desc", "hostedUrl": "http://example.com", "_ats_slug": "test"}),
-    (LeverAdapter(), {"text": "Developer", "descriptionPlain": "Desc", "hostedUrl": "http://example.com", "_ats_slug": "test"}),
-    (LeverAdapter(), {"id": "123", "text": "Developer", "descriptionPlain": "Desc", "_ats_slug": "test"}),
+    (
+        LeverAdapter(),
+        {
+            "id": "123",
+            "descriptionPlain": "Desc",
+            "hostedUrl": "http://example.com",
+            "_ats_slug": "test",
+        },
+    ),
+    (
+        LeverAdapter(),
+        {
+            "text": "Developer",
+            "descriptionPlain": "Desc",
+            "hostedUrl": "http://example.com",
+            "_ats_slug": "test",
+        },
+    ),
+    (
+        LeverAdapter(),
+        {
+            "id": "123",
+            "text": "Developer",
+            "descriptionPlain": "Desc",
+            "_ats_slug": "test",
+        },
+    ),
     # Workable missing attributes (URL is optional as workable adapter has a fallback for it)
-    (WorkableAdapter(), {"shortcode": "123", "description": "Desc", "url": "http://example.com", "_ats_slug": "test"}),
-    (WorkableAdapter(), {"title": "Developer", "description": "Desc", "url": "http://example.com", "_ats_slug": "test"}),
+    (
+        WorkableAdapter(),
+        {
+            "shortcode": "123",
+            "description": "Desc",
+            "url": "http://example.com",
+            "_ats_slug": "test",
+        },
+    ),
+    (
+        WorkableAdapter(),
+        {
+            "title": "Developer",
+            "description": "Desc",
+            "url": "http://example.com",
+            "_ats_slug": "test",
+        },
+    ),
     # Ashby missing attributes
-    (AshbyAdapter(), {"id": "123", "descriptionHtml": "Desc", "jobUrl": "http://example.com", "_ats_slug": "test"}),
-    (AshbyAdapter(), {"title": "Developer", "descriptionHtml": "Desc", "jobUrl": "http://example.com", "_ats_slug": "test"}),
+    (
+        AshbyAdapter(),
+        {
+            "id": "123",
+            "descriptionHtml": "Desc",
+            "jobUrl": "http://example.com",
+            "_ats_slug": "test",
+        },
+    ),
+    (
+        AshbyAdapter(),
+        {
+            "title": "Developer",
+            "descriptionHtml": "Desc",
+            "jobUrl": "http://example.com",
+            "_ats_slug": "test",
+        },
+    ),
     # Personio missing attributes
-    (PersonioAdapter(), {"name": "Developer", "description": "Desc", "office": "Remote", "_ats_slug": "test"}),
-    (PersonioAdapter(), {"id": "123", "name": "Developer", "description": "Desc", "office": "Remote"}),
+    (
+        PersonioAdapter(),
+        {
+            "name": "Developer",
+            "description": "Desc",
+            "office": "Remote",
+            "_ats_slug": "test",
+        },
+    ),
+    (
+        PersonioAdapter(),
+        {"id": "123", "name": "Developer", "description": "Desc", "office": "Remote"},
+    ),
     # Smartrecruiters missing attributes
-    (SmartrecruitersAdapter(), {"id": "123", "applyUrl": "http://x", "_ats_slug": "test"}),
-    (SmartrecruitersAdapter(), {"name": "Developer", "applyUrl": "http://x", "_ats_slug": "test"}),
+    (
+        SmartrecruitersAdapter(),
+        {"id": "123", "applyUrl": "http://x", "_ats_slug": "test"},
+    ),
+    (
+        SmartrecruitersAdapter(),
+        {"name": "Developer", "applyUrl": "http://x", "_ats_slug": "test"},
+    ),
 ]
+
 
 @pytest.mark.parametrize("adapter, raw_job", INVALID_JOBS)
 def test_normalized_job_skips_invalid_data(adapter, raw_job):

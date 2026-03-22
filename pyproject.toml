@@ -1,0 +1,13 @@
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# Zgłosi błąd F401, ale powstrzyma --fix przed usunięciem linijki z kodem
+unfixable = ["F401"]
+
+[tool.ruff.lint.per-file-ignores]
+# Ignorujemy "Module level import not at top of file" w skryptach i testach,
+# ponieważ w tych plikach celowo ustawiamy zmienne środowiskowe lub sys.path
+# przed zaimportowaniem docelowych modułów z naszej aplikacji.
+"scripts/*.py" = ["E402"]
+"validator/tests/*.py" = ["E402"]

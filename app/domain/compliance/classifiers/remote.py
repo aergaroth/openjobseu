@@ -73,13 +73,16 @@ def classify_remote(
 
     # 1 Scope has explicit office/hybrid signals
     if any(k in scope_l for k in V2_NEGATIVE_STRONG) or any(k in scope_l for k in V2_HYBRID_SIGNALS):
-        return {"remote_model": RemoteClass.NON_REMOTE, "reason": "scope_negative_or_hybrid"}
+        return {
+            "remote_model": RemoteClass.NON_REMOTE,
+            "reason": "scope_negative_or_hybrid",
+        }
 
     # 2 Scope contains strong remote signal
     found_keyword = next((k for k in V2_REMOTE_STRONG if k in scope_l), None)
     if not found_keyword and "remote" in scope_l:
         found_keyword = "remote"
-        
+
     if found_keyword:
         cleaned = scope_l.replace(found_keyword, "").replace("-", "").replace(",", "").strip()
         if cleaned and cleaned not in ("yes", "true", "1", "anywhere", "worldwide"):
@@ -87,7 +90,10 @@ def classify_remote(
                 "remote_model": RemoteClass.REMOTE_REGION_LOCKED,
                 "reason": "scope_region",
             }
-        return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": f"scope_{found_keyword.replace(' ', '_')}"}
+        return {
+            "remote_model": RemoteClass.REMOTE_ONLY,
+            "reason": f"scope_{found_keyword.replace(' ', '_')}",
+        }
 
     # 3 Title contains remote
     if "remote" in title_l:
