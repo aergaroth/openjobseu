@@ -1,0 +1,21 @@
+name: Check Commit Messages
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  commitizen-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Wymagane, aby pobrać całą historię PR-a
+          
+      - name: Validate commits with Commitizen
+        uses: commitizen-tools/commitizen-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
