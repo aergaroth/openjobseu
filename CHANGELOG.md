@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.2](https://github.com/aergaroth/openjobseu/compare/v2.2.1...v2.2.2) (2026-03-23)
+
+
+### Bug Fixes
+
+* change release type to simple and remove release-please manifest ([4775262](https://github.com/aergaroth/openjobseu/commit/4775262d4d3113119c5980c471ca7d856d27ca9b))
+* change release type to simple and remove release-please manifest ([da00b48](https://github.com/aergaroth/openjobseu/commit/da00b48a55ef82a6c569dd8e8640bf735e94627e))
+
 ## [2.2.1](https://github.com/aergaroth/openjobseu/compare/v2.2.0...v2.2.1) (2026-03-23)
 
 
