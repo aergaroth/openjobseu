@@ -120,8 +120,6 @@ jobs:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_PROD }}
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT_ASSETS_PROD }}
 
-      - uses: google-github-actions/setup-gcloud@v2
-
       - name: Publish frontend assets to GCS
         env:
           PUBLIC_FEED_BUCKET: ${{ secrets.PUBLIC_FEED_BUCKET_PROD }}
