@@ -14,6 +14,8 @@ aiosignal==1.4.0
     # via aiohttp
 alembic==1.18.4
     # via -r requirements.in
+annotated-doc==0.0.4
+    # via fastapi
 annotated-types==0.7.0
     # via pydantic
 anyio==4.12.1
@@ -50,7 +52,7 @@ cryptography==46.0.5
     #   google-auth
 dnspython==2.8.0
     # via cloud-sql-python-connector
-fastapi==0.115.2
+fastapi==0.133.1
     # via -r requirements.in
 frozenlist==1.8.0
     # via
@@ -69,7 +71,7 @@ google-auth==2.49.1
     #   google-cloud-storage
 google-cloud-core==2.5.0
     # via google-cloud-storage
-google-cloud-storage==3.10.0
+google-cloud-storage==3.10.1
     # via -r requirements.in
 google-crc32c==1.8.0
     # via
@@ -150,7 +152,7 @@ sqlalchemy==2.0.48
     # via
     #   -r requirements.in
     #   alembic
-starlette==0.40.0
+starlette==1.0.0
     # via
     #   -r requirements.in
     #   fastapi
@@ -164,7 +166,9 @@ typing-extensions==4.15.0
     #   sqlalchemy
     #   typing-inspection
 typing-inspection==0.4.2
-    # via pydantic
+    # via
+    #   fastapi
+    #   pydantic
 urllib3==2.6.3
     # via requests
 uvicorn==0.42.0
