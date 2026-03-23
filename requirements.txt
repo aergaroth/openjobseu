@@ -52,7 +52,7 @@ cryptography==46.0.5
     #   google-auth
 dnspython==2.8.0
     # via cloud-sql-python-connector
-fastapi==0.133.1
+fastapi==0.135.2
     # via -r requirements.in
 frozenlist==1.8.0
     # via
