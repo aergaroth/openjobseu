@@ -104,6 +104,12 @@ Feed behavior (`feed.json` contract):
 - minimum compliance score: `80`
 - cache header: `Cache-Control: public, max-age=300`
 
+### Ownership Model (Least Privilege)
+
+- **Frontend Assets (HTML/CSS/JS)**: Owned by the CI/CD pipeline or deploy scripts. Updated rarely.
+- **Data Feed (`feed.json`)**: Owned by the Runtime pipeline (Frontend Exporter). Updated frequently during maintenance ticks.
+To enforce security boundaries, the Cloud Run service account is restricted via IAM conditions to strictly edit only `feed.json`. It cannot alter or overwrite the primary website logic.
+
 Internal endpoints:
 - `POST /internal/tick` (`format=auto|text|json`, `incremental=true|false`, `limit=100`)
 - `GET /internal/audit`
@@ -114,7 +120,7 @@ Internal endpoints:
 - `POST /internal/audit/tick-dev`
 - `POST /internal/backfill-compliance`
 - `POST /internal/tasks/{task_name}` (Delegates async processes to Cloud Tasks via Hybrid Router)
-- `POST /internal/tasks/{task_name}/execute` (Strictly Machine-to-Machine Cloud Tasks handler with OIDC `audience` validation)
+- `POST /internal/tasks/{task_name}/execute` (Strictly Machine-to-Machine Cloud Tasks handler with OIDC `audience` validation; legacy `X-Internal-Secret` fallback strictly disabled outside `APP_RUNTIME=local`)
 - `POST /internal/discovery/careers`
 - `POST /internal/discovery/guess`
 - `POST /internal/discovery/run`
@@ -124,6 +130,19 @@ Audit panel data shape:
 - `/internal/audit/jobs` uses high-performance `GROUPING SETS` for instant metadata aggregations
 - `/internal/audit/stats/company` provides aggregated compliance ratio by `companies.legal_name` (`HAVING COUNT(*) > 10` by default)
 - `/internal/audit/stats/source-7d` provides aggregated compliance ratio by source for rows with `first_seen_at` in last 7 days
+
+### Security & Environment Matrix
+
+OpenJobsEU enforces strict configuration rules depending on the runtime environment to ensure security while preserving the developer experience locally.
+
+| Environment | `APP_RUNTIME` | OIDC for M2M | Session/OAuth (Admin UI) | Required Secrets |
+|---|---|---|---|---|
+| **Local** | `local` | Disabled (Shared Secret fallback) | Dummy allowed (throws HTTP 500 on login) | None (`dummy-*` fallbacks used safely) |
+| **Dev** | `cloud` (default) | Enforced (Internal-Only) | Strict (Fail-fast on startup) | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET_KEY`, `ALLOWED_AUTH_EMAIL` |
+| **Prod** | `cloud` (default) | Enforced (Internal-Only) | Strict (Fail-fast on startup) | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET_KEY`, `ALLOWED_AUTH_EMAIL` |
+
+Deploying to Dev or Prod with placeholder values (`dummy-*`) or missing OAuth/Session keys will cause the application to crash immediately on startup (fail-fast behavior).
+
 
 ---
 
@@ -146,7 +165,7 @@ Infrastructure is managed with Terraform in split environments:
 - `infra/gcp/prod`
 
 Core GCP services used:
-- **Cloud Run**: Core compute layer (configured with `cpu_idle=true`).
+- **Cloud Run**: Core compute layer (configured with `cpu_idle=true`). Both `dev` and `prod` services are strictly internal and require active GCP IAM credentials (`roles/run.invoker`) for access, enforcing a purely backend/administrative boundary.
 - **Cloud Scheduler**: Cron triggers for pipelines.
 - **Cloud Tasks**: Durable async job queue for long-running endpoints (bypassing timeouts).
 - **Cloud SQL (PostgreSQL)**: GIN-indexed relational database.
