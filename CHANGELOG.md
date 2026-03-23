@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/aergaroth/openjobseu/compare/v2.0.1...v2.1.0) (2026-03-23)
+
+
+### Features
+
+* Restrict Cloud Run invoker and enhance frontend asset publishing ([#80](https://github.com/aergaroth/openjobseu/issues/80)) ([4a073e8](https://github.com/aergaroth/openjobseu/commit/4a073e8b398416499cac97fade95ea04c959bdab))
+
 ## [2.0.1](https://github.com/aergaroth/openjobseu/compare/v2.0.0...v2.0.1) (2026-03-23)
 
 
