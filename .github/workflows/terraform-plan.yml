@@ -21,8 +21,12 @@ jobs:
     env:
       TF_VAR_project_id: dev-openjobseu
       TF_VAR_image: europe-north1-docker.pkg.dev/dev-openjobseu/dev-openjobseu/dev-openjobseu:pr-placeholder
-      TF_VAR_google_api_key: "dummy-api-key"
-      TF_VAR_google_cse_id: "dummy-cse-id"
+      TF_VAR_google_client_id: ${{ secrets.DEV_GOOGLE_CLIENT_ID }}
+      TF_VAR_google_client_secret: ${{ secrets.DEV_GOOGLE_CLIENT_SECRET }}
+      TF_VAR_session_secret_key: ${{ secrets.DEV_SESSION_SECRET_KEY }}
+      TF_VAR_allowed_auth_email: ${{ secrets.DEV_ALLOWED_AUTH_EMAIL }}
+      TF_VAR_google_api_key: ${{ secrets.DEV_GOOGLE_API_KEY }}
+      TF_VAR_google_cse_id: ${{ secrets.DEV_GOOGLE_CSE_ID }}
 
     steps:
       - uses: actions/checkout@v4
@@ -50,12 +54,12 @@ jobs:
     env:
       TF_VAR_project_id: openjobseu
       TF_VAR_image: europe-north1-docker.pkg.dev/openjobseu/openjobseu/openjobseu:pr-placeholder
-      TF_VAR_google_client_id: "dummy-client-id"
-      TF_VAR_google_client_secret: "dummy-client-secret"
-      TF_VAR_session_secret_key: "dummy-session-key"
-      TF_VAR_allowed_auth_email: "dummy@example.com"
-      TF_VAR_google_api_key: "dummy-api-key"
-      TF_VAR_google_cse_id: "dummy-cse-id"
+      TF_VAR_google_client_id: ${{ secrets.PROD_GOOGLE_CLIENT_ID }}
+      TF_VAR_google_client_secret: ${{ secrets.PROD_GOOGLE_CLIENT_SECRET }}
+      TF_VAR_session_secret_key: ${{ secrets.PROD_SESSION_SECRET_KEY }}
+      TF_VAR_allowed_auth_email: ${{ secrets.PROD_ALLOWED_AUTH_EMAIL }}
+      TF_VAR_google_api_key: ${{ secrets.PROD_GOOGLE_API_KEY }}
+      TF_VAR_google_cse_id: ${{ secrets.PROD_GOOGLE_CSE_ID }}
 
     steps:
       - uses: actions/checkout@v4

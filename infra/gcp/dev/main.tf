@@ -167,6 +167,14 @@ resource "google_cloud_run_v2_service" "this" {
   }
 }
 
+resource "google_cloud_run_v2_service_iam_member" "scheduler_invoker" {
+  project  = var.project_id
+  location = google_cloud_run_v2_service.this.location
+  name     = google_cloud_run_v2_service.this.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.scheduler_sa.email}"
+}
+
 resource "google_project_iam_member" "cloud_run_tasks_enqueuer" {
   project = var.project_id
   role    = "roles/cloudtasks.enqueuer"
