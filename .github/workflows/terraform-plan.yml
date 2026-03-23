@@ -2,8 +2,13 @@ name: Terraform Plan
 
 on:
   pull_request:
+    branches: [main, develop]
     paths:
       - "infra/**"
+
+concurrency:
+  group: terraform-plan-${{ github.event.pull_request.number }}-${{ github.base_ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

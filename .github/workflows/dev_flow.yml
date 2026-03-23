@@ -6,12 +6,11 @@ on:
     paths-ignore:
       - "README.md"
       - "docs/**"
-  pull_request:
-    branches: [develop]
-    paths-ignore:
-      - "README.md"
-      - "docs/**"
   workflow_dispatch:
+
+concurrency:
+  group: dev-flow-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   DB_MODE: standard
@@ -71,7 +70,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
 
     steps:
       - uses: actions/checkout@v4
