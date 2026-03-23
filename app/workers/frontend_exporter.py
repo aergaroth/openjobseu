@@ -115,7 +115,6 @@ def _export_feed(bucket) -> tuple[int, int]:
     return len(jobs), 1
 
 
-
 def run_frontend_export(
     sync_assets: bool = False,
     *,

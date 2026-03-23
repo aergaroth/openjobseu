@@ -109,8 +109,8 @@ def test_frontend_export_success(mock_storage_client, monkeypatch, tmp_path, job
     assert created_blobs["feed.js"].cache_control == "public, max-age=31536000, immutable"
 
     uploaded_index = created_blobs["index.html"].upload_from_string.call_args[0][0].decode("utf-8")
-    assert './style.css?v=release-123' in uploaded_index
-    assert './feed.js?v=release-123' in uploaded_index
+    assert "./style.css?v=release-123" in uploaded_index
+    assert "./feed.js?v=release-123" in uploaded_index
 
     uploaded_json_string = created_blobs["feed.json"].upload_from_string.call_args[0][0]
     uploaded_data = json.loads(uploaded_json_string)

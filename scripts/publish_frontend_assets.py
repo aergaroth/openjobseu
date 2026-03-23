@@ -15,12 +15,9 @@ if str(REPO_ROOT) not in sys.path:
 from app.workers.frontend_exporter import run_frontend_export
 
 
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=(
-            "Publish frontend/index.html, frontend/style.css i frontend/feed.js to the public bucket."
-        )
+        description=("Publish frontend/index.html, frontend/style.css i frontend/feed.js to the public bucket.")
     )
     parser.add_argument(
         "--release-version",
@@ -33,7 +30,6 @@ def parse_args() -> argparse.Namespace:
         help="Also refresh feed.json in the same invocation.",
     )
     return parser.parse_args()
-
 
 
 def main() -> int:
