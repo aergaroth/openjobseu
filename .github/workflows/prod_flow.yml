@@ -122,7 +122,7 @@ jobs:
 
       - name: Publish frontend assets to GCS
         env:
-          PUBLIC_FEED_BUCKET: ${{ secrets.PUBLIC_FEED_BUCKET_PROD }}
+          PUBLIC_FEED_BUCKET: ${{ vars.PUBLIC_FEED_BUCKET_PROD }}
           RELEASE_VERSION: ${{ needs.build-deploy-prod.outputs.release_version }}
         run: |
           python scripts/publish_frontend_assets.py --release-version "$RELEASE_VERSION"
