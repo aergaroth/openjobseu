@@ -12,14 +12,15 @@ def test_fetch_careers_page(monkeypatch):
     mock_resp.url = "https://example.com/careers"
     monkeypatch.setattr(crawler_module.requests, "get", lambda *a, **kw: mock_resp)
 
-    resp = _fetch_careers_page("https://example.com/careers")
+    resp, err = _fetch_careers_page("https://example.com/careers")
     assert resp is not None
+    assert err is None
     assert resp._content == b"<html>data</html>"
 
 
 def test_fetch_careers_page_invalid_url():
-    assert _fetch_careers_page(None) is None
-    assert _fetch_careers_page("ftp://example.com") is None
+    assert _fetch_careers_page(None) == (None, "invalid_url")
+    assert _fetch_careers_page("ftp://example.com") == (None, "invalid_url")
 
 
 def test_fetch_careers_page_exception(monkeypatch):
@@ -30,7 +31,7 @@ def test_fetch_careers_page_exception(monkeypatch):
         "get",
         MagicMock(side_effect=requests.RequestException("Fail")),
     )
-    assert _fetch_careers_page("https://example.com/careers") is None
+    assert _fetch_careers_page("https://example.com/careers") == (None, "other_error")
 
 
 def test_run_careers_discovery_empty(monkeypatch):
@@ -135,7 +136,7 @@ def test_run_careers_discovery_happy_path(monkeypatch):
     mock_resp.url = "https://example.com/careers"
     mock_resp.text = "<html>some content</html>"
     mock_resp.history = []
-    monkeypatch.setattr(crawler_module, "_fetch_careers_page", lambda url: mock_resp)
+    monkeypatch.setattr(crawler_module, "_fetch_careers_page", lambda url: (mock_resp, None))
     monkeypatch.setattr(
         crawler_module,
         "_detect_provider_from_redirects",
