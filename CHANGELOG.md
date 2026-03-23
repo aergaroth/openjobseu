@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.0.1](https://github.com/aergaroth/openjobseu/compare/v2.0.0...v2.0.1) (2026-03-23)
+
+
+### Bug Fixes
+
+* **performance:** optimize frontend exporter and enforce least privilege model ([a6e1d72](https://github.com/aergaroth/openjobseu/commit/a6e1d72693fb2925c5a90e2535a60de43bb4a105))
+* **security:** enforce fail-fast for OAuth configs in non-local environments ([4880b34](https://github.com/aergaroth/openjobseu/commit/4880b34c6d1bacb9d1c26b0f217bce7fca019ad6))
+* **security:** enforce strict TLS verification in careers crawler ([a7369fb](https://github.com/aergaroth/openjobseu/commit/a7369fb3405795d14bfcd0ea807b3652fb806e61))
+
+
+### Documentation
+
+* update architecture and security matrix to reflect strict policies ([c9010ef](https://github.com/aergaroth/openjobseu/commit/c9010efdffa370f2216e43b4b20253853e8235cf))
+
 ## [2.0.0](https://github.com/aergaroth/openjobseu/compare/v1.0.0...v2.0.0) (2026-03-22)
 
 
