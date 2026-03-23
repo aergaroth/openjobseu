@@ -92,12 +92,17 @@ Lifecycle states in runtime:
 
 ## API Layer & Zero-Compute Public Strategy
 
-Public endpoints:
-- `GET /health`
-- `GET /ready`
-- `GET /jobs` (fast fuzzy search excluding heavy description text)
-- `GET /feed.json` (Served directly by GCS Edge cache, bypassing Cloud Run)
-- `GET /jobs/stats/compliance-7d` (Deprecated from public UI, used primarily for API access)
+OpenJobsEU has one active access model in `dev` and `prod`: the Cloud Run runtime is private, while public read access is served only from static assets in Cloud Storage/CDN. This means `GET /jobs`, `GET /companies`, and `GET /jobs/stats/compliance-7d` remain available in application code but are treated as internal/admin-only runtime interfaces, not public internet APIs.
+
+### Access surface
+
+| Interface | Backing layer | Audience | Notes |
+|---|---|---|---|
+| `GET /feed.json` | GCS + CDN | Public | Zero-compute data feed exported by `run_frontend_export(export_feed=True)` during runtime maintenance. |
+| Static frontend (`/`, `index.html`, JS/CSS assets) | GCS + CDN | Public | Read-only website consuming `feed.json`, published separately by CI/CD after a successful production deploy. |
+| `GET /health`, `GET /ready` | Private Cloud Run | Internal/admin | Operational endpoints on the private runtime. |
+| `GET /jobs`, `GET /companies`, `GET /jobs/stats/compliance-7d` | Private Cloud Run | Internal/admin | Read/query endpoints reachable only by callers with Cloud Run IAM access. |
+| `/internal/*` | Private Cloud Run | Internal/admin | Scheduler, Cloud Tasks, and audit/ops tooling. |
 
 Feed behavior (`feed.json` contract):
 - visible jobs only (`new`, `active`)
@@ -106,9 +111,28 @@ Feed behavior (`feed.json` contract):
 
 ### Ownership Model (Least Privilege)
 
-- **Frontend Assets (HTML/CSS/JS)**: Owned by the CI/CD pipeline or deploy scripts. Updated rarely.
-- **Data Feed (`feed.json`)**: Owned by the Runtime pipeline (Frontend Exporter). Updated frequently during maintenance ticks.
-To enforce security boundaries, the Cloud Run service account is restricted via IAM conditions to strictly edit only `feed.json`. It cannot alter or overwrite the primary website logic.
+- **Frontend Assets (HTML/CSS/JS)**: Owned by the CI/CD pipeline or deploy scripts. Published only after a successful production deploy, via `scripts/publish_frontend_assets.py`.
+- **Data Feed (`feed.json`)**: Owned by the Runtime pipeline (Frontend Exporter). Updated frequently during maintenance ticks via `run_frontend_export(export_feed=True)`.
+To enforce security boundaries, the Cloud Run service account can stay restricted to editing only `feed.json`, while the deploy credential used by CI publishes `frontend/index.html`, `frontend/style.css`, and `frontend/feed.js`.
+
+### Publication split: runtime data vs deploy-time assets
+
+**Runtime refresh (`feed.json`)**
+- Trigger: maintenance ticks / backend pipeline execution.
+- Publisher: private runtime worker `app/workers/frontend_exporter.py`.
+- Scope: only `feed.json`.
+- Goal: update visible jobs frequently without redeploying frontend files.
+
+**Deploy/sync static assets**
+- Trigger: `prod_flow` CI, after `build-deploy-prod` finishes successfully.
+- Publisher: `scripts/publish_frontend_assets.py`, reusing `run_frontend_export(sync_assets=True, export_feed=False)`.
+- Scope: `frontend/index.html`, `frontend/style.css`, `frontend/feed.js`.
+- Goal: release-controlled publication of website shell and JS/CSS changes.
+
+**Cache busting**
+- `frontend/index.html` is published as the mutable entrypoint with short cache lifetime.
+- `frontend/style.css` and `frontend/feed.js` receive release-based cache busting through `?v=<release tag or commit SHA>` injected during CI publication.
+- This keeps frontend changes visible immediately after deploy without handing asset overwrite privileges to the runtime service account.
 
 Internal endpoints:
 - `POST /internal/tick` (`format=auto|text|json`, `incremental=true|false`, `limit=100`)
@@ -205,7 +229,7 @@ Primary runtime flow in code:
 #### `app/` (application runtime)
 - `app/main.py` – FastAPI app, DB bootstrap (`init_db`), readiness middleware, router registration.
 - `app/internal.py` – internal/ops endpoints (`/internal/tick`, audit and backfill endpoints).
-- `app/api/` – public read API (`app/api/jobs.py`).
+- `app/api/` – runtime read/query routers mounted on the private Cloud Run service (`app/api/jobs.py`, `app/api/companies.py`).
 - `app/workers/` – runtime workers and orchestrators.
 - `app/adapters/` – ATS adapter abstraction and implementations.
 - `app/domain/` – pure business logic (compliance, identity, taxonomy, salary, company logic).
@@ -364,7 +388,8 @@ Discovery orchestrator: `app/workers/discovery/pipeline.py`
 
 5. **Frontend Exporter worker** – `app/workers/frontend_exporter.py`
    - Reads: `jobs`
-   - Writes: `feed.json` and `frontend/*` objects to public GCS bucket
+   - Writes: `feed.json` to the public GCS bucket during runtime ticks
+   - Can also sync `frontend/*` when explicitly invoked by deploy tooling with `sync_assets=True`
 
 #### Discovery workers (separate discovery pipeline)
 - `run_careers_discovery` and `run_ats_guessing`
@@ -427,15 +452,19 @@ Schema source: `storage/migrations/*.sql` + repository usage in `storage/reposit
 #### Application composition
 - Routers mounted in `app/main.py`:
   - `app/api/jobs.py` under `/jobs`
+  - `app/api/companies.py` under `/companies`
   - `app/internal.py` under `/internal`
 
-#### Public endpoints
-- `GET /health` (`app/main.py`) – liveness.
-- `GET /ready` (`app/main.py`) – readiness state.
-- `GET /companies` (`app/api/companies.py`) – public directory of remote-friendly companies.
-- `GET /jobs` (`app/api/jobs.py`) – filtered list supporting GIN trigram fuzzy search (`?q=`) from `storage.repositories.jobs_repository.get_jobs`.
+#### Public interfaces
+- Static frontend assets from GCS/CDN – read-only website for browsing the exported dataset.
 - `GET /feed.json` – zero-compute visible jobs feed, updated by pipeline and served via GCS.
-- `GET /jobs/stats/compliance-7d` – compliance aggregate from `jobs`.
+
+#### Internal/admin runtime endpoints
+- `GET /health` (`app/main.py`) – liveness for the private runtime.
+- `GET /ready` (`app/main.py`) – readiness state for the private runtime.
+- `GET /companies` (`app/api/companies.py`) – company directory exposed only behind private Cloud Run IAM.
+- `GET /jobs` (`app/api/jobs.py`) – filtered list supporting GIN trigram fuzzy search (`?q=`) from `storage.repositories.jobs_repository.get_jobs`, exposed only behind private Cloud Run IAM.
+- `GET /jobs/stats/compliance-7d` – compliance aggregate from `jobs`, exposed only behind private Cloud Run IAM.
 
 #### Internal endpoints
 - `POST /internal/tick` – execute full runtime pipeline (supports batched processing via `limit` and `incremental` flags).
@@ -496,7 +525,7 @@ Already implemented analytics foundations in current codebase:
   - `market_daily_stats`
   - `market_daily_stats_segments`
 
-This forms the current base for a broader analytics layer, while existing public API still focuses on jobs feed and compliance stats.
+This forms the current base for a broader analytics layer, while the public surface is intentionally limited to the static frontend and `feed.json`; richer query endpoints stay internal to the private runtime.
 
 ### Architectural boundaries (cross-layer summary)
 

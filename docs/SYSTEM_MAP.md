@@ -80,7 +80,8 @@ Goal:
 
 - **Frontend exporter** (`app/workers/frontend_exporter.py`)
   - Reads: `jobs`
-  - Writes: `feed.json` and static frontend files to GCS bucket
+  - Writes: `feed.json` to GCS during runtime ticks
+  - Can also sync static frontend files during deploy-time publication when `sync_assets=True`
 
 ### Discovery workers
 - `run_careers_discovery` (`app/workers/discovery/careers_crawler.py`)
@@ -95,22 +96,19 @@ Goal:
 
 ## 4) APIs
 
-### Public API
-- `GET /health` – liveness
-- `GET /ready` – readiness
-- `GET /jobs` – job list (filters)
-- `GET /feed.json` – zero-compute static job feed (served directly from GCS)
-- `GET /jobs/stats/compliance-7d` – compliance 7d aggregates
+### Access model
 
-- `POST /internal/tick` – runs runtime pipeline
-- `GET /internal/audit` – audit panel HTML
-- `GET /internal/audit/jobs` – listing + audit statistics
-- `GET /internal/audit/filters` – filter dictionaries + dynamic source
-- `GET /internal/audit/stats/company` – compliance ratio per company
-- `GET /internal/audit/stats/source-7d` – compliance ratio per source (7d)
-- `POST /internal/audit/tick-dev` – tick dev/debug
-- `POST /internal/tasks/{task_name}` – async worker triggers (Cloud Tasks).
-- `POST /internal/tasks/{task_name}/execute` – strictly M2M Cloud Tasks execution handlers.
+| Interface | Audience | Delivery path |
+|---|---|---|
+| Static frontend (`/`, JS/CSS assets) | Public | GCS + CDN |
+| `GET /feed.json` | Public | GCS + CDN |
+| `GET /health`, `GET /ready` | Internal/admin | Private Cloud Run |
+| `GET /jobs`, `GET /companies`, `GET /jobs/stats/compliance-7d` | Internal/admin | Private Cloud Run |
+| `POST /internal/tick`, `GET /internal/audit*`, `POST /internal/tasks/*` | Internal/admin | Private Cloud Run |
+
+Notes:
+- `GET /jobs`, `GET /companies`, and `GET /jobs/stats/compliance-7d` exist in FastAPI, but are not public internet endpoints in `dev` or `prod` because Cloud Run invocation is restricted via IAM.
+- `GET /feed.json` remains the public dataset contract used by the static frontend.
 
 ---
 
