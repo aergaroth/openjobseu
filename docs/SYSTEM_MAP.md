@@ -80,7 +80,8 @@ Goal:
 
 - **Frontend exporter** (`app/workers/frontend_exporter.py`)
   - Reads: `jobs`
-  - Writes: `feed.json` and static frontend files to GCS bucket
+  - Writes: `feed.json` to GCS during runtime ticks
+  - Can also sync static frontend files during deploy-time publication when `sync_assets=True`
 
 ### Discovery workers
 - `run_careers_discovery` (`app/workers/discovery/careers_crawler.py`)
