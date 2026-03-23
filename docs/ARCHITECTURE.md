@@ -98,8 +98,8 @@ OpenJobsEU has one active access model in `dev` and `prod`: the Cloud Run runtim
 
 | Interface | Backing layer | Audience | Notes |
 |---|---|---|---|
-| `GET /feed.json` | GCS + CDN | Public | Zero-compute data feed exported by `run_frontend_export()`. |
-| Static frontend (`/`, `index.html`, JS/CSS assets) | GCS + CDN | Public | Read-only website consuming `feed.json`. |
+| `GET /feed.json` | GCS + CDN | Public | Zero-compute data feed exported by `run_frontend_export(export_feed=True)` during runtime maintenance. |
+| Static frontend (`/`, `index.html`, JS/CSS assets) | GCS + CDN | Public | Read-only website consuming `feed.json`, published separately by CI/CD after a successful production deploy. |
 | `GET /health`, `GET /ready` | Private Cloud Run | Internal/admin | Operational endpoints on the private runtime. |
 | `GET /jobs`, `GET /companies`, `GET /jobs/stats/compliance-7d` | Private Cloud Run | Internal/admin | Read/query endpoints reachable only by callers with Cloud Run IAM access. |
 | `/internal/*` | Private Cloud Run | Internal/admin | Scheduler, Cloud Tasks, and audit/ops tooling. |
@@ -111,9 +111,28 @@ Feed behavior (`feed.json` contract):
 
 ### Ownership Model (Least Privilege)
 
-- **Frontend Assets (HTML/CSS/JS)**: Owned by the CI/CD pipeline or deploy scripts. Updated rarely.
-- **Data Feed (`feed.json`)**: Owned by the Runtime pipeline (Frontend Exporter). Updated frequently during maintenance ticks.
-To enforce security boundaries, the Cloud Run service account is restricted via IAM conditions to strictly edit only `feed.json`. It cannot alter or overwrite the primary website logic.
+- **Frontend Assets (HTML/CSS/JS)**: Owned by the CI/CD pipeline or deploy scripts. Published only after a successful production deploy, via `scripts/publish_frontend_assets.py`.
+- **Data Feed (`feed.json`)**: Owned by the Runtime pipeline (Frontend Exporter). Updated frequently during maintenance ticks via `run_frontend_export(export_feed=True)`.
+To enforce security boundaries, the Cloud Run service account can stay restricted to editing only `feed.json`, while the deploy credential used by CI publishes `frontend/index.html`, `frontend/style.css`, and `frontend/feed.js`.
+
+### Publication split: runtime data vs deploy-time assets
+
+**Runtime refresh (`feed.json`)**
+- Trigger: maintenance ticks / backend pipeline execution.
+- Publisher: private runtime worker `app/workers/frontend_exporter.py`.
+- Scope: only `feed.json`.
+- Goal: update visible jobs frequently without redeploying frontend files.
+
+**Deploy/sync static assets**
+- Trigger: `prod_flow` CI, after `build-deploy-prod` finishes successfully.
+- Publisher: `scripts/publish_frontend_assets.py`, reusing `run_frontend_export(sync_assets=True, export_feed=False)`.
+- Scope: `frontend/index.html`, `frontend/style.css`, `frontend/feed.js`.
+- Goal: release-controlled publication of website shell and JS/CSS changes.
+
+**Cache busting**
+- `frontend/index.html` is published as the mutable entrypoint with short cache lifetime.
+- `frontend/style.css` and `frontend/feed.js` receive release-based cache busting through `?v=<release tag or commit SHA>` injected during CI publication.
+- This keeps frontend changes visible immediately after deploy without handing asset overwrite privileges to the runtime service account.
 
 Internal endpoints:
 - `POST /internal/tick` (`format=auto|text|json`, `incremental=true|false`, `limit=100`)
@@ -369,7 +388,8 @@ Discovery orchestrator: `app/workers/discovery/pipeline.py`
 
 5. **Frontend Exporter worker** – `app/workers/frontend_exporter.py`
    - Reads: `jobs`
-   - Writes: `feed.json` and `frontend/*` objects to public GCS bucket
+   - Writes: `feed.json` to the public GCS bucket during runtime ticks
+   - Can also sync `frontend/*` when explicitly invoked by deploy tooling with `sync_assets=True`
 
 #### Discovery workers (separate discovery pipeline)
 - `run_careers_discovery` and `run_ats_guessing`
