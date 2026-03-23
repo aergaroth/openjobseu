@@ -1,0 +1,36 @@
+name: Sync Main to Develop
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create Pull Request to develop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_URL=$(gh pr create \
+            --base develop \
+            --head main \
+            --title "chore: sync \`main\` to \`develop\`" \
+            --body "Automatyczny PR synchronizujący najnowsze zmiany z gałęzi \`main\` (m.in. zaktualizowany \`CHANGELOG.md\` i podbicie wersji) z powrotem do gałęzi \`develop\`." \
+            2> error.log || true)
+          
+          if [[ "$PR_URL" == https://github.com/* ]]; then
+            echo "Utworzono PR: $PR_URL. Wykonuję natychmiastowy merge..."
+            gh pr merge "$PR_URL" --merge
+          else
+            echo "Nie utworzono PR. Powód:"
+            cat error.log
+          fi
