@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import logging
 import re
 import time
@@ -7,7 +8,6 @@ from datetime import datetime, timezone, timedelta
 from typing import Any, Dict
 
 import requests
-import urllib3
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, parse_qs
 
@@ -20,8 +20,6 @@ from storage.repositories.discovery_repository import (
 )
 
 logger = logging.getLogger("openjobseu.discovery")
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 MAX_COMPANIES_PER_RUN = 10
 QUALITY_MIN_JOBS = 1
@@ -103,25 +101,48 @@ def _is_recent(recent_job_at: Any) -> bool:
     return recent_job_at >= cutoff
 
 
-def _fetch_careers_page(url: str) -> requests.Response | None:
+def _fetch_careers_page(url: str) -> tuple[requests.Response | None, str | None]:
     if not url or not url.startswith(("http://", "https://")):
-        return None
+        return None, "invalid_url"
 
     start_time = time.perf_counter()
 
+    # Allow bypassing TLS for specific broken domains (comma-separated list)
+    bypass_domains = [d.strip() for d in os.getenv("DISCOVERY_TLS_BYPASS_DOMAINS", "").split(",") if d.strip()]
+    parsed_url = urlparse(url)
+    verify_tls = parsed_url.hostname not in bypass_domains
+
     try:
-        response = requests.get(url, timeout=15, allow_redirects=True, verify=False, stream=True)
+        response = requests.get(url, timeout=15, allow_redirects=True, verify=verify_tls, stream=True)
         response.raise_for_status()
 
         content = b""
         for chunk in response.iter_content(chunk_size=8192):
             content += chunk
-            if len(content) > 5 * 1024 * 1024:  # Sztywny limit wielkości do 5MB dla stron HTML
-                logger.warning("careers page too large, truncating to 5MB", extra={"url": url})
-                break
+            if len(content) > 5 * 1024 * 1024:  # Sztywny limit wielkości do 5MB
+                logger.warning("careers page too large, aborting", extra={"url": url})
+                return None, "too_large"
 
         response._content = content  # Bezpieczny "hack", aby response.text i kodowanie zadziałały dla reszty skryptu
-        return response
+        return response, None
+    except requests.exceptions.SSLError as exc:
+        duration_ms = int((time.perf_counter() - start_time) * 1000)
+        logger.warning(
+            f"discovery TLS/SSL error [{url}]: {exc}",
+            extra={
+                "component": "discovery",
+                "phase": "careers_discovery",
+                "careers_url": url,
+                "duration_ms": duration_ms,
+                "error_type": "tls_failure",
+                "error": str(exc),
+            },
+        )
+        return None, "tls_failure"
+    except requests.exceptions.Timeout:
+        return None, "timeout"
+    except requests.exceptions.TooManyRedirects:
+        return None, "redirect_loop"
     except Exception as exc:
         duration_ms = int((time.perf_counter() - start_time) * 1000)
         logger.warning(
@@ -131,10 +152,11 @@ def _fetch_careers_page(url: str) -> requests.Response | None:
                 "phase": "careers_discovery",
                 "careers_url": url,
                 "duration_ms": duration_ms,
+                "error_type": "other_error",
                 "error": str(exc),
             },
         )
-        return None
+        return None, "other_error"
 
 
 def _detect_provider_from_fetch(final_url: str, html: str) -> tuple[str, str] | None:
@@ -179,7 +201,7 @@ def _detect_provider_with_shallow_crawl(final_url: str, html: str) -> tuple[str,
 
     candidate_links = _extract_candidate_links(html, final_url)
     for link in candidate_links:
-        response = _fetch_careers_page(link)
+        response, _ = _fetch_careers_page(link)
         if not response:
             continue
 
@@ -202,6 +224,12 @@ def run_careers_discovery() -> Dict[str, int]:
         "ats_inserted": 0,
         "ats_skipped_quality": 0,
         "ats_duplicates": 0,
+        "errors_tls": 0,
+        "errors_timeout": 0,
+        "errors_redirect": 0,
+        "errors_too_large": 0,
+        "errors_other": 0,
+        "no_ats_detected": 0,
     }
 
     try:
@@ -231,7 +259,20 @@ def run_careers_discovery() -> Dict[str, int]:
                 if not careers_url:
                     continue
 
-                response = _fetch_careers_page(careers_url)
+                response, err_reason = _fetch_careers_page(careers_url)
+
+                if err_reason:
+                    if err_reason == "tls_failure":
+                        metrics["errors_tls"] += 1
+                    elif err_reason == "timeout":
+                        metrics["errors_timeout"] += 1
+                    elif err_reason == "redirect_loop":
+                        metrics["errors_redirect"] += 1
+                    elif err_reason == "too_large":
+                        metrics["errors_too_large"] += 1
+                    elif err_reason != "invalid_url":
+                        metrics["errors_other"] += 1
+
                 if not response:
                     continue
 
@@ -244,6 +285,7 @@ def run_careers_discovery() -> Dict[str, int]:
                     provider_slug = _detect_provider_with_shallow_crawl(final_url, body)
 
                 if not provider_slug:
+                    metrics["no_ats_detected"] += 1
                     continue
 
                 provider, slug = provider_slug

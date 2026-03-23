@@ -117,9 +117,6 @@ def trigger_async_task(
         payload = {"incremental": incremental, "limit": limit}
         headers = {"Content-Type": "application/json"}
 
-        if request.headers.get("x-internal-secret"):
-            headers["X-Internal-Secret"] = request.headers.get("x-internal-secret")
-
         try:
             task_response = create_tick_task(
                 task_id=task_id,

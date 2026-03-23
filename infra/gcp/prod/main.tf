@@ -3,11 +3,6 @@ provider "google" {
   region  = var.region
 }
 
-resource "random_password" "internal_secret" {
-  length  = 32
-  special = false
-}
-
 resource "google_secret_manager_secret" "google_api_key" {
   secret_id = "google-api-key"
   replication {
@@ -103,10 +98,6 @@ resource "google_cloud_run_v2_service" "this" {
         value = var.allowed_auth_email
       }
       env {
-        name  = "INTERNAL_SECRET"
-        value = random_password.internal_secret.result
-      }
-      env {
         name  = "SCHEDULER_SA_EMAIL"
         value = google_service_account.scheduler_sa.email
       }
@@ -172,17 +163,16 @@ resource "google_cloud_run_v2_service" "this" {
   }
 }
 
-resource "google_cloud_run_v2_service_iam_member" "public" {
-  name     = google_cloud_run_v2_service.this.name
-  location = var.region
-  role     = "roles/run.invoker"
-  member   = "allUsers"
-}
-
 resource "google_storage_bucket_iam_member" "cloud_run_feed_write" {
   bucket = "openjobseu.org"
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:cloudrun-prod-runtime@openjobseu.iam.gserviceaccount.com"
+
+  condition {
+    title       = "feed_json_only"
+    description = "Allow runtime to only manage feed.json"
+    expression  = "resource.name == \"projects/_/buckets/openjobseu.org/objects/feed.json\""
+  }
 }
 
 resource "google_project_iam_member" "cloud_run_tasks_enqueuer" {

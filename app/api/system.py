@@ -236,7 +236,6 @@ def _enqueue_tick(*, request: Request, response_format: str, force_text: bool, c
             },
             headers={
                 "Content-Type": "application/json",
-                "X-Internal-Secret": request.headers.get("x-internal-secret", ""),
                 "X-Request-Id": context["request_id"],
                 "X-Tick-Id": context["tick_id"],
                 "X-Scheduler-Job-Name": context.get("scheduler_job_name", ""),

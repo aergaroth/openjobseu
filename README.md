@@ -9,10 +9,10 @@ The project is backend-first and infrastructure-oriented. It leverages a modern 
 ## Core Features
 
 - **Compliance First**: Deterministic policy engine grading jobs by remote purity and EU geo-restrictions.
-- **Zero-Compute Public Feed**: The public frontend is 100% static, exported iteratively to Google Cloud Storage and served via CDN.
+- **Zero-Compute Public Feed**: The public frontend is 100% static. Core layout is deployed at release, while the dynamic `feed.json` is exported iteratively by the backend to Google Cloud Storage and served via CDN.
 - **Modular Monolith**: Cleanly separated domains (Ingestion, Compliance, Operations) within a single Python FastAPI application.
 - **Robust Async Processing**: Leverages Google Cloud Tasks and Cloud Scheduler for time-budgeted, idempotent, and heavily retried worker execution.
-- **Strict Security**: Endpoints split between UI (Session-based via Google OAuth) and M2M routes (OIDC tokens with strict Audience validation).
+- **Strict Security**: Endpoints split between UI (Session-based via Google OAuth) and M2M routes (OIDC tokens with strict Audience validation). For local development (`APP_RUNTIME=local`), the system falls back to dummy placeholders to ensure low friction.
 - **High Performance Data**: Scalable PostgreSQL database design with GIN Trigram indexing for fuzzy search and `GROUPING SETS` for real-time audit aggregations.
 
 ## Documentation

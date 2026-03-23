@@ -62,8 +62,8 @@ def test_shallow_crawl_follows_candidate_links(monkeypatch):
             resp = Mock()
             resp.url = "https://boards.greenhouse.io/acme-team"
             resp.text = "<html>"
-            return resp
-        return None
+            return resp, None
+        return None, "invalid_url"
 
     monkeypatch.setattr(
         "app.workers.discovery.careers_crawler._fetch_careers_page",
@@ -81,7 +81,7 @@ def test_shallow_crawl_returns_none_when_candidate_fetch_fails(monkeypatch):
     html = '<a href="/jobs">See jobs</a>'
     monkeypatch.setattr(
         "app.workers.discovery.careers_crawler._fetch_careers_page",
-        lambda url: None,
+        lambda url: (None, "error"),
     )
 
     assert _detect_provider_with_shallow_crawl("https://company.com/careers", html) is None

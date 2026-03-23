@@ -1,4 +1,5 @@
 import os
+import logging
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import RedirectResponse, HTMLResponse
 from authlib.integrations.starlette_client import OAuth
@@ -7,18 +8,36 @@ from app.security.internal_access import require_internal_access
 
 auth_router = APIRouter()
 oauth = OAuth()
+logger = logging.getLogger(__name__)
 
 
 def configure_oauth(app):
     """
     This should be called from the main application factory.
-    It registers the Google OAuth provider.
+    It registers the Google OAuth provider and validates required variables.
     """
+    runtime = os.getenv("APP_RUNTIME", "cloud")
+    client_id = os.environ.get("GOOGLE_CLIENT_ID")
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+    allowed_email = os.environ.get("ALLOWED_AUTH_EMAIL")
+
+    if runtime != "local":
+        if not client_id or not client_secret or "dummy" in client_id.lower():
+            logger.critical("OAuth credentials missing or using dummy values in non-local runtime. Failing fast.")
+            raise RuntimeError(
+                "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are strictly required outside APP_RUNTIME=local."
+            )
+        if not allowed_email or "dummy" in allowed_email.lower():
+            logger.critical("ALLOWED_AUTH_EMAIL missing or using dummy value. Failing fast.")
+            raise RuntimeError(
+                "ALLOWED_AUTH_EMAIL is strictly required outside APP_RUNTIME=local to prevent unauthorized access."
+            )
+
     oauth.register(
         name="google",
         server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-        client_id=os.environ.get("GOOGLE_CLIENT_ID", "dummy-client-id"),
-        client_secret=os.environ.get("GOOGLE_CLIENT_SECRET", "dummy-client-secret"),
+        client_id=client_id or "dummy-client-id",
+        client_secret=client_secret or "dummy-client-secret",
         client_kwargs={"scope": "openid email"},
     )
 
