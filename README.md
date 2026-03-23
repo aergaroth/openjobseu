@@ -60,3 +60,48 @@ Detailed documentation detailing the design decisions and data flows is located 
 - `frontend/style.css` and `frontend/feed.js` are also published by CI/CD, not by the runtime worker.
 - During publish, CI injects `?v=<release tag or commit SHA>` into the `index.html` references to `style.css` and `feed.js`, which provides simple cache busting for frontend changes without coupling asset deploys to `feed.json` refreshes.
 - Runtime IAM can stay limited to `feed.json`, while asset publication can use a separate deploy credential.
+
+## GitHub Actions → GCP Workload Identity Federation
+
+The repository now assumes **OIDC-based federation** between GitHub Actions and Google Cloud instead of long-lived JSON keys.
+
+### Trust model after migration
+
+- GitHub Actions requests a short-lived OIDC token from `token.actions.githubusercontent.com`.
+- GCP Workload Identity Federation verifies the token against a dedicated provider in each project (`dev-openjobseu` and `openjobseu`).
+- The provider trusts only this repository: `aergaroth/openjobseu`.
+- `dev` trust accepts only:
+  - `push` / `workflow_dispatch` runs from `refs/heads/develop`
+  - `pull_request` runs whose `base_ref` is `develop`
+- `prod` trust accepts only:
+  - `push` / `workflow_dispatch` runs from `refs/heads/main`
+  - `pull_request` runs whose `base_ref` is `main`
+- Each workflow step then impersonates a dedicated Google service account with the minimum role set for its purpose.
+
+### Service accounts and least-privilege split
+
+- `github-deploy` (dev/prod): builds and pushes the container image, runs `terraform apply`, and therefore needs Artifact Registry write access, Terraform state bucket object access, Cloud Run/Scheduler/Tasks admin, Secret Manager admin, project IAM admin, plus `iam.serviceAccountUser` on the runtime and scheduler identities.
+- `github-terraform-plan` (dev/prod): used only by PR plans; it gets read-only access to the Terraform state bucket and project metadata (`roles/viewer` + `roles/secretmanager.viewer`).
+- `github-assets-publish` (prod): used only after a successful production deploy to publish `frontend/index.html`, `frontend/style.css`, and `frontend/feed.js`; it only receives `roles/storage.objectAdmin` on the public bucket.
+- The Cloud Run runtime account remains separate and still owns only runtime responsibilities (for example the conditional write access to `feed.json`).
+
+### GitHub configuration after `terraform apply`
+
+Create/update GitHub **repository variables** (not secrets) with the Terraform outputs from each environment:
+
+- `GCP_WIF_PROVIDER_DEV`
+- `GCP_SERVICE_ACCOUNT_DEV`
+- `GCP_SERVICE_ACCOUNT_TERRAFORM_PLAN_DEV`
+- `GCP_WIF_PROVIDER_PROD`
+- `GCP_SERVICE_ACCOUNT_PROD`
+- `GCP_SERVICE_ACCOUNT_TERRAFORM_PLAN_PROD`
+- `GCP_SERVICE_ACCOUNT_ASSETS_PROD`
+
+The remaining application secrets (`DEV_GOOGLE_CLIENT_SECRET`, `PROD_GOOGLE_API_KEY`, etc.) stay in GitHub Secrets because they are application data, not cloud authentication material.
+
+### Migration / cleanup checklist
+
+1. Run `terraform apply` in `infra/gcp/dev` and `infra/gcp/prod` to create the workload identity pools/providers, service accounts, and IAM bindings.
+2. Copy the Terraform outputs into the GitHub repository variables listed above.
+3. Trigger `terraform-plan.yml`, `dev_flow.yml`, and `prod_flow.yml` once to confirm OIDC authentication works end to end.
+4. After successful verification, delete the legacy GitHub Secrets `GCP_SA_KEY_DEV` and `GCP_SA_KEY_PROD`.
