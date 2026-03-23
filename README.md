@@ -1,6 +1,6 @@
 # OpenJobsEU
 
-[![CI Status](https://github.com/aergaroth/openjobseu/actions/workflows/prod_flow.yml/badge.svg)](https://github.com/aergaroth/openjobseu/actions)
+[![CI Status](https://github.com/aergaroth/openjobseu/actions/workflows/ci.yml/badge.svg)](https://github.com/aergaroth/openjobseu/actions/workflows/ci.yml)
 
 OpenJobsEU is an open-source, compliance-first project focused on aggregating legally accessible, EU-wide remote job offers. 
 
@@ -28,6 +28,14 @@ Detailed documentation detailing the design decisions and data flows is located 
 - Roadmap
 
 *Note: OpenJobsEU does not engage in scraping closed/protected platforms, nor does it automate applications.*
+
+## Merge gatekeepers vs deploy workflows
+
+- **Merge gatekeeper:** `ci.yml` runs the full `pytest` suite for pull requests targeting `main` and `develop`. This is the required status check that should block merges until green.
+- **Additional PR quality checks:** `pre-commit.yml` continues to validate pre-commit hooks and Commitizen commit-message compliance on pull requests.
+- **Deploy only:** `dev_flow.yml` deploys after pushes to `develop` (typically after merge), and `prod_flow.yml` handles release/deploy steps after pushes to `main`. Neither workflow runs on pull requests.
+- **No duplicated full flow:** feature-branch pushes do not trigger the deploy workflows, while PRs trigger only `ci.yml`/`pre-commit.yml`. The deploy workflows run only after the merge commit lands on `develop` or `main`.
+- **Branch protection:** configure GitHub branch protection for both `main` and `develop` so the required status check includes `CI / pytest` before merge.
 
 ## Public frontend publishing model
 
