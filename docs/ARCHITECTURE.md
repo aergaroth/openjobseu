@@ -92,12 +92,17 @@ Lifecycle states in runtime:
 
 ## API Layer & Zero-Compute Public Strategy
 
-Public endpoints:
-- `GET /health`
-- `GET /ready`
-- `GET /jobs` (fast fuzzy search excluding heavy description text)
-- `GET /feed.json` (Served directly by GCS Edge cache, bypassing Cloud Run)
-- `GET /jobs/stats/compliance-7d` (Deprecated from public UI, used primarily for API access)
+OpenJobsEU has one active access model in `dev` and `prod`: the Cloud Run runtime is private, while public read access is served only from static assets in Cloud Storage/CDN. This means `GET /jobs`, `GET /companies`, and `GET /jobs/stats/compliance-7d` remain available in application code but are treated as internal/admin-only runtime interfaces, not public internet APIs.
+
+### Access surface
+
+| Interface | Backing layer | Audience | Notes |
+|---|---|---|---|
+| `GET /feed.json` | GCS + CDN | Public | Zero-compute data feed exported by `run_frontend_export()`. |
+| Static frontend (`/`, `index.html`, JS/CSS assets) | GCS + CDN | Public | Read-only website consuming `feed.json`. |
+| `GET /health`, `GET /ready` | Private Cloud Run | Internal/admin | Operational endpoints on the private runtime. |
+| `GET /jobs`, `GET /companies`, `GET /jobs/stats/compliance-7d` | Private Cloud Run | Internal/admin | Read/query endpoints reachable only by callers with Cloud Run IAM access. |
+| `/internal/*` | Private Cloud Run | Internal/admin | Scheduler, Cloud Tasks, and audit/ops tooling. |
 
 Feed behavior (`feed.json` contract):
 - visible jobs only (`new`, `active`)
@@ -205,7 +210,7 @@ Primary runtime flow in code:
 #### `app/` (application runtime)
 - `app/main.py` – FastAPI app, DB bootstrap (`init_db`), readiness middleware, router registration.
 - `app/internal.py` – internal/ops endpoints (`/internal/tick`, audit and backfill endpoints).
-- `app/api/` – public read API (`app/api/jobs.py`).
+- `app/api/` – runtime read/query routers mounted on the private Cloud Run service (`app/api/jobs.py`, `app/api/companies.py`).
 - `app/workers/` – runtime workers and orchestrators.
 - `app/adapters/` – ATS adapter abstraction and implementations.
 - `app/domain/` – pure business logic (compliance, identity, taxonomy, salary, company logic).
@@ -427,15 +432,19 @@ Schema source: `storage/migrations/*.sql` + repository usage in `storage/reposit
 #### Application composition
 - Routers mounted in `app/main.py`:
   - `app/api/jobs.py` under `/jobs`
+  - `app/api/companies.py` under `/companies`
   - `app/internal.py` under `/internal`
 
-#### Public endpoints
-- `GET /health` (`app/main.py`) – liveness.
-- `GET /ready` (`app/main.py`) – readiness state.
-- `GET /companies` (`app/api/companies.py`) – public directory of remote-friendly companies.
-- `GET /jobs` (`app/api/jobs.py`) – filtered list supporting GIN trigram fuzzy search (`?q=`) from `storage.repositories.jobs_repository.get_jobs`.
+#### Public interfaces
+- Static frontend assets from GCS/CDN – read-only website for browsing the exported dataset.
 - `GET /feed.json` – zero-compute visible jobs feed, updated by pipeline and served via GCS.
-- `GET /jobs/stats/compliance-7d` – compliance aggregate from `jobs`.
+
+#### Internal/admin runtime endpoints
+- `GET /health` (`app/main.py`) – liveness for the private runtime.
+- `GET /ready` (`app/main.py`) – readiness state for the private runtime.
+- `GET /companies` (`app/api/companies.py`) – company directory exposed only behind private Cloud Run IAM.
+- `GET /jobs` (`app/api/jobs.py`) – filtered list supporting GIN trigram fuzzy search (`?q=`) from `storage.repositories.jobs_repository.get_jobs`, exposed only behind private Cloud Run IAM.
+- `GET /jobs/stats/compliance-7d` – compliance aggregate from `jobs`, exposed only behind private Cloud Run IAM.
 
 #### Internal endpoints
 - `POST /internal/tick` – execute full runtime pipeline (supports batched processing via `limit` and `incremental` flags).
@@ -496,7 +505,7 @@ Already implemented analytics foundations in current codebase:
   - `market_daily_stats`
   - `market_daily_stats_segments`
 
-This forms the current base for a broader analytics layer, while existing public API still focuses on jobs feed and compliance stats.
+This forms the current base for a broader analytics layer, while the public surface is intentionally limited to the static frontend and `feed.json`; richer query endpoints stay internal to the private runtime.
 
 ### Architectural boundaries (cross-layer summary)
 
