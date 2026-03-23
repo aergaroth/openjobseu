@@ -1,3 +1,5 @@
+import base64
+import hashlib
 import json
 import logging
 import mimetypes
@@ -26,10 +28,11 @@ def _json_serial(obj):
     raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
 
-def run_frontend_export() -> dict:
+def run_frontend_export(sync_assets: bool = False) -> dict:
     """
     Pobiera najświeższy, zwalidowany feed ofert z bazy i wgrywa jako statyczny plik JSON
-    do publicznego bucketa GCS. Kopiuje również całą zawartość folderu 'frontend'.
+    do publicznego bucketa GCS. Opcjonalnie kopiuje zawartość folderu 'frontend'
+    (pomijając niezmienione pliki za pomocą weryfikacji MD5).
     """
     bucket_name = os.getenv("PUBLIC_FEED_BUCKET")
     if not bucket_name:
@@ -44,17 +47,24 @@ def run_frontend_export() -> dict:
         bucket = client.bucket(bucket_name)
         uploaded_files = 0
 
-        # 1. Kopiowanie plików statycznych z folderu frontend
-        if FRONTEND_DIR.exists() and FRONTEND_DIR.is_dir():
+        # 1. Kopiowanie plików statycznych z folderu frontend (tylko w trybie sync_assets)
+        if sync_assets and FRONTEND_DIR.exists() and FRONTEND_DIR.is_dir():
             for file_path in FRONTEND_DIR.rglob("*"):
                 if file_path.is_file():
                     blob_name = file_path.relative_to(FRONTEND_DIR).as_posix()
+                    file_data = file_path.read_bytes()
+
+                    local_md5 = base64.b64encode(hashlib.md5(file_data).digest()).decode("utf-8")
+                    existing_blob = bucket.get_blob(blob_name)
+                    if existing_blob and existing_blob.md5_hash == local_md5:
+                        continue  # Pomijamy pliki, które się nie zmieniły
+
                     content_type, _ = mimetypes.guess_type(file_path.name)
 
                     blob = bucket.blob(blob_name)
                     blob.cache_control = "public, max-age=3600"  # Dłuższy cache dla assetów z racji ew. CDN
-                    blob.upload_from_filename(
-                        str(file_path),
+                    blob.upload_from_string(
+                        file_data,
                         content_type=content_type or "application/octet-stream",
                     )
                     uploaded_files += 1

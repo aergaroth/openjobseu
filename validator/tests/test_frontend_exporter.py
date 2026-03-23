@@ -68,6 +68,7 @@ def test_frontend_export_success(mock_storage_client, monkeypatch, tmp_path, job
     mock_bucket = MagicMock()
     mock_client_instance.bucket.return_value = mock_bucket
 
+    mock_bucket.get_blob.return_value = None  # Symulacja braku pliku w GCS (wymusi upload)
     # Śledzimy tworzone obiekty Blob w słowniku, by móc sprawdzić ich właściwości
     created_blobs = {}
 
@@ -89,7 +90,7 @@ def test_frontend_export_success(mock_storage_client, monkeypatch, tmp_path, job
     monkeypatch.setattr(frontend_exporter, "get_jobs", lambda **kwargs: jobs_payload)
 
     # 4. Wykonanie funkcji
-    result = run_frontend_export()
+    result = run_frontend_export(sync_assets=True)
 
     # 5. Asercje
     assert result["status"] == "ok"
@@ -106,7 +107,7 @@ def test_frontend_export_success(mock_storage_client, monkeypatch, tmp_path, job
     assert created_blobs["feed.json"].upload_from_string.called
 
     assert created_blobs["index.html"].cache_control == "public, max-age=3600"
-    assert created_blobs["index.html"].upload_from_filename.called
+    assert created_blobs["index.html"].upload_from_string.called
     assert created_blobs["style.css"].cache_control == "public, max-age=3600"
 
     # 7. Weryfikacja struktury wygenerowanego i wgranego JSON-a
@@ -153,3 +154,30 @@ def test_frontend_export_handles_gcs_error(mock_storage_client, monkeypatch):
 
     assert result["status"] == "error"
     assert "Simulated GCS Upload Failure" in result["error"]
+
+
+@patch("google.cloud.storage.Client")
+def test_frontend_export_skips_unchanged_assets(mock_storage_client, monkeypatch, tmp_path):
+    import base64
+    import hashlib
+
+    monkeypatch.setenv("PUBLIC_FEED_BUCKET", "test-bucket.local")
+    mock_bucket = MagicMock()
+    mock_storage_client.return_value.bucket.return_value = mock_bucket
+
+    fake_frontend_dir = tmp_path / "frontend"
+    fake_frontend_dir.mkdir()
+    content = b"<h1>Test</h1>"
+    (fake_frontend_dir / "index.html").write_bytes(content)
+    monkeypatch.setattr(frontend_exporter, "FRONTEND_DIR", fake_frontend_dir)
+    monkeypatch.setattr(frontend_exporter, "get_jobs", lambda **kwargs: [])
+
+    md5_hash = base64.b64encode(hashlib.md5(content).digest()).decode("utf-8")
+    mock_existing_blob = MagicMock()
+    mock_existing_blob.md5_hash = md5_hash
+    mock_bucket.get_blob.return_value = mock_existing_blob
+
+    result = run_frontend_export(sync_assets=True)
+
+    assert result["status"] == "ok"
+    assert result["uploaded_files"] == 1  # Tylko feed.json, index.html powinien zostać pominięty
