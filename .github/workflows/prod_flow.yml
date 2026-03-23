@@ -3,12 +3,14 @@ name: Prod Flow
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
     paths-ignore:
       - "README.md"
       - "docs/**"
   workflow_dispatch:
+
+concurrency:
+  group: prod-flow-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   DB_MODE: standard
@@ -86,7 +88,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
     outputs:
       release_version: ${{ steps.release-meta.outputs.release_version }}
 
@@ -147,7 +148,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
 
     steps:
       - uses: actions/checkout@v4
