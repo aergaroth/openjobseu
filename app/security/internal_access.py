@@ -24,12 +24,13 @@ def require_internal_access(request: Request):
     if client_host in ("127.0.0.1", "localhost", "testclient"):
         return
 
-    # 1. Fallback: Validate using a shared secret (local dev or backward compat)
-    expected_secret = os.getenv("INTERNAL_SECRET")
-    provided_secret = request.headers.get("X-Internal-Secret")
+    # 1. Fallback: Validate using a shared secret (strictly limited to local development)
+    if os.getenv("APP_RUNTIME") == "local":
+        expected_secret = os.getenv("INTERNAL_SECRET")
+        provided_secret = request.headers.get("X-Internal-Secret")
 
-    if expected_secret and provided_secret == expected_secret:
-        return
+        if expected_secret and provided_secret == expected_secret:
+            return
 
     # 2. GCP OIDC Token Validation (Cloud Scheduler or Administrator's gcloud token)
     auth_header = request.headers.get("Authorization")
