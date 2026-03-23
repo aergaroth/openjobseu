@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.2.0](https://github.com/aergaroth/openjobseu/compare/v2.1.0...v2.2.0) (2026-03-23)
+
+
+### Features
+
+* migrate github actions auth to gcp wif ([ad0c115](https://github.com/aergaroth/openjobseu/commit/ad0c11576c89afca091665ad32c9db83c2ead29f))
+* migrate GitHub Actions auth to GCP Workload Identity Federation ([3f46e63](https://github.com/aergaroth/openjobseu/commit/3f46e6347f666ff4a605e4bd0f08a595dbfb7c00))
+
+
+### Bug Fixes
+
+* update service account references to use dynamic email ([8d34cd3](https://github.com/aergaroth/openjobseu/commit/8d34cd330d3a1ff0e1eda92f599403be69cf5869))
+* update version ([17a6a55](https://github.com/aergaroth/openjobseu/commit/17a6a55129fa4727da34a05a5a0112291767517b))
+
 ## [2.1.0](https://github.com/aergaroth/openjobseu/compare/v2.0.1...v2.1.0) (2026-03-23)
 
 
