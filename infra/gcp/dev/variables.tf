@@ -67,3 +67,27 @@ variable "google_cse_id" {
   description = "Google Custom Search Engine ID"
   sensitive   = true
 }
+
+variable "artifact_registry_repository_id" {
+  type        = string
+  description = "Artifact Registry repository used by GitHub Actions in dev"
+  default     = "dev-openjobseu"
+}
+
+variable "terraform_state_bucket" {
+  type        = string
+  description = "GCS bucket storing the Terraform remote state for dev"
+  default     = "openjobseu-tfstate-dev"
+}
+
+variable "github_repository_owner" {
+  type        = string
+  description = "GitHub organization/user allowed to federate into dev GCP"
+  default     = "aergaroth"
+}
+
+variable "github_repository_name" {
+  type        = string
+  description = "GitHub repository allowed to federate into dev GCP"
+  default     = "openjobseu"
+}

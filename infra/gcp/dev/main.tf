@@ -18,7 +18,7 @@ resource "google_secret_manager_secret_version" "google_api_key" {
 resource "google_secret_manager_secret_iam_member" "cloud_run_google_api_key" {
   secret_id = google_secret_manager_secret.google_api_key.id
   role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:cloudrun-dev-runtime@dev-openjobseu.iam.gserviceaccount.com"
+  member    = "serviceAccount:${data.google_service_account.cloud_run_runtime.email}"
 }
 
 resource "google_secret_manager_secret" "google_cse_id" {
@@ -36,7 +36,7 @@ resource "google_secret_manager_secret_version" "google_cse_id" {
 resource "google_secret_manager_secret_iam_member" "cloud_run_google_cse_id" {
   secret_id = google_secret_manager_secret.google_cse_id.id
   role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:cloudrun-dev-runtime@dev-openjobseu.iam.gserviceaccount.com"
+  member    = "serviceAccount:${data.google_service_account.cloud_run_runtime.email}"
 }
 
 
@@ -51,7 +51,7 @@ resource "google_cloud_run_v2_service" "this" {
 
   template {
 
-    service_account = "cloudrun-dev-runtime@dev-openjobseu.iam.gserviceaccount.com"
+    service_account = data.google_service_account.cloud_run_runtime.email
 
     timeout = "180s"
 
@@ -178,11 +178,11 @@ resource "google_cloud_run_v2_service_iam_member" "scheduler_invoker" {
 resource "google_project_iam_member" "cloud_run_tasks_enqueuer" {
   project = var.project_id
   role    = "roles/cloudtasks.enqueuer"
-  member  = "serviceAccount:cloudrun-dev-runtime@dev-openjobseu.iam.gserviceaccount.com"
+  member  = "serviceAccount:${data.google_service_account.cloud_run_runtime.email}"
 }
 
 resource "google_service_account_iam_member" "cloud_run_can_act_as_scheduler" {
   service_account_id = google_service_account.scheduler_sa.name
   role               = "roles/iam.serviceAccountUser"
-  member             = "serviceAccount:cloudrun-dev-runtime@dev-openjobseu.iam.gserviceaccount.com"
+  member             = "serviceAccount:${data.google_service_account.cloud_run_runtime.email}"
 }
