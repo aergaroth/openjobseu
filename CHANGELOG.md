@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.1](https://github.com/aergaroth/openjobseu/compare/v2.2.0...v2.2.1) (2026-03-23)
+
+
+### Bug Fixes
+
+* update frontend asset publishing to use vars for bucket reference ([f65f57d](https://github.com/aergaroth/openjobseu/commit/f65f57d7a06d46fa972a1f4c6b1643989794d49f))
+* update frontend asset publishing to use vars for bucket reference ([2a434d1](https://github.com/aergaroth/openjobseu/commit/2a434d1f0c9b74b0dd10c6216cb4ace38e32633b))
+
 ## [2.2.0](https://github.com/aergaroth/openjobseu/compare/v2.1.0...v2.2.0) (2026-03-23)
 
 
