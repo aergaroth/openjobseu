@@ -87,7 +87,7 @@ def test_frontend_export_success(mock_storage_client, monkeypatch, tmp_path, job
     (fake_frontend_dir / "feed.js").write_text("console.log('feed');", encoding="utf-8")
 
     monkeypatch.setattr(frontend_exporter, "FRONTEND_DIR", fake_frontend_dir)
-    monkeypatch.setattr(frontend_exporter, "get_jobs", lambda **kwargs: jobs_payload)
+    monkeypatch.setattr("storage.repositories.jobs_repository.get_jobs", lambda **kwargs: jobs_payload)
 
     result = run_frontend_export(sync_assets=True, asset_version="release-123")
 
@@ -141,7 +141,7 @@ def test_frontend_export_handles_gcs_error(mock_storage_client, monkeypatch):
     mock_blob.upload_from_string.side_effect = RuntimeError("Simulated GCS Upload Failure")
     mock_bucket.blob.return_value = mock_blob
 
-    monkeypatch.setattr(frontend_exporter, "get_jobs", lambda **kwargs: [])
+    monkeypatch.setattr("storage.repositories.jobs_repository.get_jobs", lambda **kwargs: [])
     monkeypatch.setattr(frontend_exporter, "FRONTEND_DIR", Path("/tmp/nonexistent"))
 
     result = run_frontend_export()
@@ -164,7 +164,7 @@ def test_frontend_export_skips_unchanged_assets(mock_storage_client, monkeypatch
     content = b"<h1>Test</h1>"
     (fake_frontend_dir / "index.html").write_bytes(content)
     monkeypatch.setattr(frontend_exporter, "FRONTEND_DIR", fake_frontend_dir)
-    monkeypatch.setattr(frontend_exporter, "get_jobs", lambda **kwargs: [])
+    monkeypatch.setattr("storage.repositories.jobs_repository.get_jobs", lambda **kwargs: [])
 
     md5_hash = base64.b64encode(hashlib.md5(content).digest()).decode("utf-8")
     mock_existing_blob = MagicMock()
