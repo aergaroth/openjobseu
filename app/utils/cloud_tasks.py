@@ -58,6 +58,7 @@ def create_tick_task(
         },
     }
 
+    # Must match google_service_account.scheduler_sa.email used by Cloud Scheduler OIDC callers.
     service_account_email = os.getenv("SCHEDULER_SA_EMAIL")
     audience = os.getenv("BASE_URL")
 
