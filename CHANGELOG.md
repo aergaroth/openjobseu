@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.0](https://github.com/aergaroth/openjobseu/compare/v2.2.2...v2.3.0) (2026-03-23)
+
+
+### Features
+
+* add workflow to sync changes from main to develop ([c4d1956](https://github.com/aergaroth/openjobseu/commit/c4d19568bd066c737d36f2f082263c1e9bdf596e))
+* add workflow to sync changes from main to develop ([db6e33f](https://github.com/aergaroth/openjobseu/commit/db6e33f882c06c1b29239343c21460affa086c14))
+
 ## [2.2.2](https://github.com/aergaroth/openjobseu/compare/v2.2.1...v2.2.2) (2026-03-23)
 
 
