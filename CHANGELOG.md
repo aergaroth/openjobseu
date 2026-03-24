@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1](https://github.com/aergaroth/openjobseu/compare/v2.3.0...v2.3.1) (2026-03-24)
+
+
+### Bug Fixes
+
+* **compliance-engine-and-classifiers:** enhance geo and remote classification logic for mixed regions and title handling ([446936b](https://github.com/aergaroth/openjobseu/commit/446936bc387e246260fc04110339d4ca40a165b8))
+
 ## [2.3.0](https://github.com/aergaroth/openjobseu/compare/v2.2.2...v2.3.0) (2026-03-23)
 
 
