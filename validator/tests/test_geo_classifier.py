@@ -193,3 +193,13 @@ def test_geo_v3_marks_remote_us_scope_as_non_eu_even_with_poland_in_description(
     assert remote["remote_model"] is not None
     assert job is not None
     assert job["_compliance"]["geo_class"] == GeoClass.NON_EU
+
+
+def test_geo_v3_mixed_region_resolves_to_eu_region():
+    result = classify_geo_v3(
+        title="Software Engineer - US & EMEA",
+        description="",
+        remote_scope="US & EMEA",
+    )
+    assert result["geo_class"] == GeoClass.EU_REGION
+    assert result["reason"] == "mixed_region"

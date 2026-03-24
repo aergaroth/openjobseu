@@ -71,11 +71,24 @@ def classify_remote(
     desc_l = (description or "").lower()
     scope_l = (remote_scope or "").lower()
 
-    # 1 Scope has explicit office/hybrid signals
+    # 1 Scope or Title has explicit office/hybrid signals
     if any(k in scope_l for k in V2_NEGATIVE_STRONG) or any(k in scope_l for k in V2_HYBRID_SIGNALS):
         return {
             "remote_model": RemoteClass.NON_REMOTE,
             "reason": "scope_negative_or_hybrid",
+        }
+
+    if any(k in title_l for k in V2_NEGATIVE_STRONG) or any(k in title_l for k in V2_HYBRID_SIGNALS):
+        return {
+            "remote_model": RemoteClass.NON_REMOTE,
+            "reason": "title_negative_or_hybrid",
+        }
+
+    # 1.5 Scope or Title has Optional Remote signals
+    if any(k in title_l for k in V2_REMOTE_OPTIONAL_SIGNALS) or any(k in scope_l for k in V2_REMOTE_OPTIONAL_SIGNALS):
+        return {
+            "remote_model": RemoteClass.REMOTE_OPTIONAL,
+            "reason": "title_or_scope_optional",
         }
 
     # 2 Scope contains strong remote signal
@@ -95,17 +108,21 @@ def classify_remote(
             "reason": f"scope_{found_keyword.replace(' ', '_')}",
         }
 
-    # 3 Title contains remote
-    if "remote" in title_l:
-        return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": "title_remote"}
+    # 3 Title contains strong remote or general remote
+    if any(k in title_l for k in V2_REMOTE_STRONG):
+        return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": "title_remote_strong"}
 
-    # 4 Hybrid detection (strong negative)
+    # 4 Strong Remote in description (Allows bypassing Hybrid if description explicitly says '100% remote')
+    if any(k in desc_l for k in V2_REMOTE_STRONG):
+        return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": "desc_remote_strong"}
+
+    # 5 Hybrid detection (moved below Strong Remote to avoid false negatives)
     if any(k in desc_l for k in V2_HYBRID_SIGNALS):
         return {"remote_model": RemoteClass.NON_REMOTE, "reason": "hybrid_signal"}
 
-    # 5 Strong Remote in description (This was previously missing!)
-    if any(k in desc_l for k in V2_REMOTE_STRONG):
-        return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": "desc_remote_strong"}
+    # 5.5 General Remote in title (Moved below Hybrid to avoid False Positives where Title=Remote, Desc=Hybrid)
+    if "remote" in title_l:
+        return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": "title_remote"}
 
     # 6 Explicit negative in description
     if any(k in desc_l for k in V2_NEGATIVE_STRONG):

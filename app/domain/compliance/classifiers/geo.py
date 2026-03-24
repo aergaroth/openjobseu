@@ -195,30 +195,65 @@ def classify_geo(
     title_l = (title or "").lower()
     scope_l = (remote_scope or "").lower()
 
-    # 1 Hard non-EU regions (highest priority)
-    for kw in NON_EU_REGION_CUSTOM:
-        if kw in scope_l or kw in title_l:
-            return {"geo_class": GeoClass.NON_EU, "reason": kw}
-    for kw in NON_EU_SCOPE_TITLE_PHRASES:
-        if _contains_phrase(scope_l, kw) or _contains_phrase(title_l, kw):
-            return {"geo_class": GeoClass.NON_EU, "reason": kw}
+    found_eu = False
+    found_non_eu = False
+    eu_result = None
+    non_eu_reason = None
 
-    # 2 EU region custom keywords (EMEA, Nordics, Western Europe, UK&I)
+    # 1 Evaluate structural parse of scope and title together
+    scope_result = _classify_from_remote_scope(scope_l)
+    title_result = _classify_from_remote_scope(title_l)
+
+    def _is_eu(res: dict | None) -> bool:
+        return bool(res and res["geo_class"] in (GeoClass.EU_MEMBER_STATE, GeoClass.EU_REGION, GeoClass.UK))
+
+    def _is_non_eu(res: dict | None) -> bool:
+        return bool(res and res["geo_class"] == GeoClass.NON_EU)
+
+    def _is_mixed(res: dict | None) -> bool:
+        return bool(res and res.get("reason") == "mixed_region")
+
+    for res in (scope_result, title_result):
+        if _is_mixed(res):
+            found_eu, found_non_eu = True, True
+            eu_result = {"geo_class": GeoClass.EU_REGION, "reason": "mixed_region"}
+        elif _is_eu(res):
+            found_eu = True
+            if not eu_result:
+                eu_result = res
+        elif _is_non_eu(res):
+            found_non_eu = True
+            if not non_eu_reason:
+                non_eu_reason = res["reason"]
+
+    # 2 Evaluate custom region keywords (EMEA vs APAC/LATAM)
     for kw in EU_REGION_CUSTOM:
         if kw in scope_l or kw in title_l:
-            return {"geo_class": GeoClass.EU_REGION, "reason": kw}
+            found_eu = True
+            if not eu_result:
+                eu_result = {"geo_class": GeoClass.EU_REGION, "reason": kw}
 
-    # 3 Structured parsing of remote_scope (most reliable source for countries)
-    scope_result = _classify_from_remote_scope(scope_l)
-    if scope_result:
-        return scope_result
+    for kw in NON_EU_REGION_CUSTOM:
+        if kw in scope_l or kw in title_l:
+            found_non_eu = True
+            if not non_eu_reason:
+                non_eu_reason = kw
 
-    # 3.5 Fallback to structured parsing of title (for cities appended by ATS like "Engineer - Berlin")
-    title_result = _classify_from_remote_scope(title_l)
-    if title_result:
-        return title_result
+    for kw in NON_EU_SCOPE_TITLE_PHRASES:
+        if _contains_phrase(scope_l, kw) or _contains_phrase(title_l, kw):
+            found_non_eu = True
+            if not non_eu_reason:
+                non_eu_reason = kw
 
-    # 4 Fallback to the "Localization" section from description only
+    # 3 Mixed Region Resolution (Prevents False Negatives for "US & EMEA" etc.)
+    if found_eu and found_non_eu:
+        return {"geo_class": GeoClass.EU_REGION, "reason": "mixed_region"}
+    if found_eu and eu_result:
+        return eu_result
+    if found_non_eu:
+        return {"geo_class": GeoClass.NON_EU, "reason": non_eu_reason}
+
+    # 4 Fallback to the "Localization" section from description
     localization_result = _classify_from_localization_section(description or "")
     if localization_result:
         return localization_result
