@@ -120,3 +120,34 @@ def test_run_company_source_discovery_head_timeout(monkeypatch):
 
     assert metrics["companies_found"] == 1
     assert metrics["companies_inserted"] == 0
+
+
+def test_fetch_company_sources_timeout(monkeypatch):
+    """Handle requests timeout in company_sources."""
+    import requests
+    from app.workers.discovery import company_sources
+
+    def mock_get_timeout(*args, **kwargs):
+        raise requests.exceptions.Timeout("Connection timed out")
+
+    monkeypatch.setattr(requests, "get", mock_get_timeout)
+
+    result = company_sources._fetch_github_remote_companies()
+    assert result == []
+
+
+def test_fetch_company_sources_missing_zip_data(monkeypatch):
+    """Handle missing zip data in company_sources."""
+    import requests
+    from app.workers.discovery import company_sources
+
+    def mock_get_empty(*args, **kwargs):
+        response = requests.Response()
+        response.status_code = 200
+        response._content = b""
+        return response
+
+    monkeypatch.setattr(requests, "get", mock_get_empty)
+
+    result = company_sources._fetch_github_remote_companies()
+    assert result == []

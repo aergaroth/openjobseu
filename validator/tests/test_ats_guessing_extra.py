@@ -1,16 +1,28 @@
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch, MagicMock
 
-from app.workers.discovery.ats_guessing import _is_recent, run_ats_guessing
+from app.workers.discovery import ats_guessing
+from app.workers.discovery.ats_guessing import run_ats_guessing, _is_recent
 
 
-def test_is_recent_edge_cases():
-    # Sprawdza odporność na błędne wartości zwracane przez API (stringi bez formatu daty)
-    assert _is_recent("not-a-date") is True
+def test_ats_guessing_date_parsing_edge_cases():
+    """Test edge cases for date parsing in ats_guessing."""
+
+    # Puste wartości i błędne formaty domyślnie przepuszczamy (jako recent)
+    assert _is_recent("") is True
+    assert _is_recent(None) is True
+    assert _is_recent("invalid-date-string") is True
+
+    # Skrajne przypadki wykraczające poza kalendarz rzucają ValueError, więc przepuszczamy
+    assert _is_recent("2026-99-99T00:00:00Z") is True
+
+    # Prawidłowa obsługa starej daty (powinna zostać odrzucona)
+    old_date = (datetime.now(timezone.utc) - timedelta(days=150)).isoformat()
+    assert _is_recent(old_date) is False
 
     # Sprawdza zachowanie dla dat bez tzinfo
-    dt = datetime.now() - timedelta(days=10)
-    assert _is_recent(dt) is True
+    dt_naive = datetime.now() - timedelta(days=10)
+    assert _is_recent(dt_naive) is True
 
 
 @patch("app.workers.discovery.ats_guessing.get_engine")
@@ -33,12 +45,8 @@ def test_run_ats_guessing_row_parsing(mock_load, mock_get_engine, monkeypatch):
         {"company_id": "1", "brand_name": "A", "careers_url": "url"},
         MockRowTuple(["2", "B", "url"]),
     ]
-
-    import app.workers.discovery.ats_guessing as ats_guessing
-
     monkeypatch.setattr(ats_guessing, "PROVIDERS_TO_PROBE", [])
     monkeypatch.setattr(ats_guessing, "update_discovery_last_checked_at", MagicMock())
-
     res = run_ats_guessing()
     assert res["companies_scanned"] == 2
 
@@ -49,9 +57,6 @@ def test_run_ats_guessing_row_parsing(mock_load, mock_get_engine, monkeypatch):
 @patch("app.workers.discovery.ats_guessing.insert_discovered_company_ats")
 def test_run_ats_guessing_exceptions_and_duplicates(mock_insert, mock_probe, mock_load, mock_engine, monkeypatch):
     mock_load.return_value = [{"company_id": "1", "brand_name": "Acme", "careers_url": "url"}]
-
-    import app.workers.discovery.ats_guessing as ats_guessing
-
     monkeypatch.setattr(ats_guessing, "PROVIDERS_TO_PROBE", ["lever", "greenhouse", "workable"])
     monkeypatch.setattr(ats_guessing, "update_discovery_last_checked_at", MagicMock())
 
@@ -67,9 +72,7 @@ def test_run_ats_guessing_exceptions_and_duplicates(mock_insert, mock_probe, moc
     mock_probe.side_effect = mock_probe_side_effect
     # Symulujemy próbę wstawienia zduplikowanego ATS-a do bazy, co powinno objawić się flagą 'ats_duplicates'
     mock_insert.return_value = False
-
     res = run_ats_guessing()
-
     assert res["companies_scanned"] == 1
     assert res["ats_detected"] >= 1
     assert res.get("ats_duplicates", 0) == 1
