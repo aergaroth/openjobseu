@@ -9,7 +9,7 @@ from urllib3.util.retry import Retry
 from requests.exceptions import JSONDecodeError
 
 from app.adapters.ats.utils import to_utc_datetime
-from app.utils.cleaning import normalize_remote_scope as _normalize_remote_scope
+from app.domain.jobs.cleaning import normalize_remote_scope as _normalize_remote_scope
 
 logger = logging.getLogger(__name__)
 

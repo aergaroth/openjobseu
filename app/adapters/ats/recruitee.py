@@ -3,7 +3,7 @@ from typing import Any, Dict, List
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
-from app.utils.cleaning import clean_description
+
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,6 @@ class RecruiteeAdapter(ATSAdapter):
                 ("requirements", "Requirements"),
             ],
         )
-        cleaned_description = clean_description(description, source=self.source_name)
 
         is_remote_location = "remote" in (location or "").lower()
         is_remote = self.detect_remote(title, location, explicit_flag=(remote is True or is_remote_location))
@@ -105,7 +104,7 @@ class RecruiteeAdapter(ATSAdapter):
             "source_job_id": job_id,
             "title": title,
             "company_name": company_name,
-            "description": cleaned_description.strip(),
+            "description": description.strip(),
             "remote_scope": normalized_remote_scope,
             "remote_source_flag": is_remote,
             "source_url": url,

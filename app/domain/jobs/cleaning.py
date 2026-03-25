@@ -32,40 +32,68 @@ def clean_html(text: str) -> str:
     # Usuwanie tagów <script> i <style> wraz z całą ich zawartością (kod JS/CSS)
     text = re.sub(r"<(script|style)[^>]*>.*?</\1>", "", text, flags=re.IGNORECASE | re.DOTALL)
 
+    # Wycinka "szumu" rekrutacyjnego ATS (np. RODO, EEO, boilerplate o firmie)
+    # Klasa "content-conclusion" (Greenhouse) pojawia się na końcu, więc tniemy aż do końca tekstu
+    text = re.sub(
+        r"<div[^>]*class=[\"'][^\"']*content-conclusion[^\"']*[\"'][^>]*>.*", "", text, flags=re.IGNORECASE | re.DOTALL
+    )
+    # Klasa "content-intro" (Greenhouse) jest często u góry, wycinamy pierwszego diva
+    text = re.sub(
+        r"<div[^>]*class=[\"'][^\"']*content-intro[^\"']*[\"'][^>]*>.*?</div\s*>",
+        "",
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
     # Usuwanie pustych paragrafów, divów i spanów (w tym zawierających tylko spacje, &nbsp; lub <br>)
     # Puszczamy to dwukrotnie, aby wyłapać zagnieżdżone przypadki
     empty_tag_pattern = r"<(p|div|span)[^>]*>(?:&nbsp;|\u00A0|<br\s*/?>|\s)*</\1>"
     text = re.sub(empty_tag_pattern, "", text, flags=re.IGNORECASE)
     text = re.sub(empty_tag_pattern, "", text, flags=re.IGNORECASE)
 
-    text = re.sub(r"</p\s*>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"<p\s*>", "\n", text, flags=re.IGNORECASE)
+    # Formatowanie strukturalne do czystego Markdown-like
+    text = re.sub(r"</p\s*>", "\n\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<p[^>]*>", "", text, flags=re.IGNORECASE)
     text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<hr[^>]*>", "\n---\n", text, flags=re.IGNORECASE)
     text = re.sub(r"<h1[^>]*>", "\n# ", text, flags=re.IGNORECASE)
     text = re.sub(r"<h2[^>]*>", "\n## ", text, flags=re.IGNORECASE)
     text = re.sub(r"<h3[^>]*>", "\n### ", text, flags=re.IGNORECASE)
     text = re.sub(r"<h4[^>]*>", "\n#### ", text, flags=re.IGNORECASE)
     text = re.sub(r"<h5[^>]*>", "\n##### ", text, flags=re.IGNORECASE)
     text = re.sub(r"<h6[^>]*>", "\n###### ", text, flags=re.IGNORECASE)
-    text = re.sub(r"</h[1-6]\s*>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</h[1-6]\s*>", "\n\n", text, flags=re.IGNORECASE)
+
     text = re.sub(r"<blockquote[^>]*>", "\n> ", text, flags=re.IGNORECASE)
-    text = re.sub(r"</blockquote\s*>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</blockquote\s*>", "\n\n", text, flags=re.IGNORECASE)
+
     text = re.sub(r"<li[^>]*>", "\n- ", text, flags=re.IGNORECASE)
-    text = re.sub(r"</li\s*>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</li\s*>", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"</(ul|ol)\s*>", "\n\n", text, flags=re.IGNORECASE)
+
     text = re.sub(r"<(b|strong)[^>]*>", "**", text, flags=re.IGNORECASE)
     text = re.sub(r"</(b|strong)\s*>", "**", text, flags=re.IGNORECASE)
     text = re.sub(r"<(i|em|u)[^>]*>", "_", text, flags=re.IGNORECASE)
     text = re.sub(r"</(i|em|u)\s*>", "_", text, flags=re.IGNORECASE)
+
+    # Upraszczanie linków - wyciągamy tylko Anchor Text (usuwamy szum samych URL pod LLM)
     text = re.sub(
-        r"<a[^>]+href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>",
-        r"[\2](\1)",
+        r"<a[^>]*>(.*?)</a>",
+        r"\1",
         text,
         flags=re.IGNORECASE | re.DOTALL,
     )
-    text = re.sub(r"</div\s*>", "\n", text, flags=re.IGNORECASE)
+
+    text = re.sub(r"</div\s*>", "\n\n", text, flags=re.IGNORECASE)
+
+    # Ostateczne usunięcie pozostałych tagów HTML (takich jak <span>, <article>, osierocone atrybuty)
     text = re.sub(r"<[^>]+>", "", text)
     text = html.unescape(text)
-    return text
+
+    # Wstępna redukcja wielu pustych linii po wyrzucaniu divów
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
+    return text.strip()
 
 
 def normalize_whitespace(text: str) -> str:

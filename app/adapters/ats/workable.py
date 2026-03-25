@@ -11,7 +11,6 @@ from app.adapters.ats.utils import (
     sanitize_url,
     to_utc_datetime,
 )
-from app.utils.cleaning import clean_description
 
 logger = logging.getLogger(__name__)
 
@@ -136,8 +135,6 @@ class WorkableAdapter(ATSAdapter):
         if not raw_id or not title or not source_url:
             return None
 
-        cleaned_description = clean_description(description, source=self.source_name)
-
         is_remote_location = "remote" in (location or "").lower()
         is_remote = self.detect_remote(
             title,
@@ -164,7 +161,7 @@ class WorkableAdapter(ATSAdapter):
             "source_url": source_url,
             "title": title,
             "company_name": company_name,
-            "description": cleaned_description.strip(),
+            "description": description.strip(),
             "remote_source_flag": is_remote,
             "remote_scope": normalized_remote_scope,
             "department": department or None,

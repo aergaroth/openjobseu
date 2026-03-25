@@ -4,7 +4,6 @@ from typing import Any, Dict, List
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
-from app.utils.cleaning import clean_description
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +87,6 @@ class PersonioAdapter(ATSAdapter):
         description = raw_job.get("description", "")
         location = raw_job.get("office", "")
 
-        cleaned_description = clean_description(description, source=self.source_name)
         normalized_remote_scope = self.normalize_remote_scope(location)
 
         is_remote_office = "remote" in location.lower()
@@ -102,7 +100,7 @@ class PersonioAdapter(ATSAdapter):
             "source_job_id": job_id,
             "title": title,
             "company_name": company_name,
-            "description": cleaned_description.strip(),
+            "description": description.strip(),
             "remote_scope": normalized_remote_scope,
             "remote_source_flag": remote_source_flag,
             "source_url": "",  # No URL in Personio XML feed

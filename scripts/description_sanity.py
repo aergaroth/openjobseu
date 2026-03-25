@@ -15,7 +15,7 @@ if PROJECT_ROOT not in sys.path:
 
 from sqlalchemy import text
 from storage.db_engine import get_engine
-from app.utils.cleaning import SPAM_PATTERNS
+from app.domain.jobs.cleaning import SPAM_PATTERNS, clean_html
 
 engine = get_engine()
 
@@ -28,6 +28,13 @@ def clean_description_text(description: str) -> tuple[str, list[str]]:
     cleaned = description
     applied_fixes = []
 
+    # 1. Czyszczenie HTML do Markdown (nowy, ulepszony silnik)
+    new_cleaned = clean_html(cleaned)
+    if new_cleaned != cleaned:
+        cleaned = new_cleaned
+        applied_fixes.append("html_to_markdown")
+
+    # 2. Usuwanie specyficznego spamu (np. tracking pixeli)
     for name, pattern in SPAM_PATTERNS.items():
         if pattern.search(cleaned):
             cleaned = pattern.sub("", cleaned)
@@ -66,18 +73,15 @@ def find_suspicious_rows(conn, source: str = None) -> list[dict]:
 
 
 def apply_safe_fixes(conn, suspicious_rows: list[dict]) -> int:
-    fixed = 0
-    for row in suspicious_rows:
-        conn.execute(
-            text("""
-                UPDATE jobs
-                SET description = :desc
-                WHERE job_id = :job_id
-            """),
-            {"desc": row["cleaned_description"], "job_id": row["job_id"]},
-        )
-        fixed += 1
-    return fixed
+    if not suspicious_rows:
+        return 0
+
+    # Przygotowanie danych do zbiorczego update'u (Bulk Update)
+    update_data = [{"desc": row["cleaned_description"], "job_id": row["job_id"]} for row in suspicious_rows]
+
+    # Wykonanie wszystkich zmian w jednym zapytaniu do bazy (executemany)
+    conn.execute(text("UPDATE jobs SET description = :desc WHERE job_id = :job_id"), update_data)
+    return len(update_data)
 
 
 def main() -> int:
