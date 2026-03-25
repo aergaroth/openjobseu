@@ -10,6 +10,22 @@ V2_NEGATIVE_STRONG = [
     "office-based",
     "this role is based in",
     "full-time position in",
+    "fully onsite",
+    "fully on-site",
+    "100% onsite",
+    "100% on-site",
+    "in-person",
+    "in person",
+    "work from the office",
+    "return to office",
+    "not a remote",
+    "not remote",
+    "#li-onsite",
+    "li-onsite",
+    "office-only",
+    "office only",
+    "no remote",
+    "non-remote",
 ]
 
 V2_HYBRID_SIGNALS = [
@@ -18,6 +34,8 @@ V2_HYBRID_SIGNALS = [
     "days a week in the office",
     "partially remote",
     "partly remote",
+    "#li-hybrid",
+    "li-hybrid",
 ]
 
 V2_REMOTE_STRONG = [
@@ -32,6 +50,17 @@ V2_REMOTE_STRONG = [
     "home based",
     "remote job",
     "work from home",
+    "#li-remote",
+    "li-remote",
+    "distributed team",
+    "fully distributed",
+]
+
+V2_REMOTE_REGION_LOCKED_SIGNALS = [
+    "remotely in ",
+    "based remotely",
+    "remote in ",
+    "remotely from ",
 ]
 
 V2_REMOTE_OPTIONAL_SIGNALS = [
@@ -116,6 +145,13 @@ def classify_remote(
     if any(k in desc_l for k in V2_REMOTE_STRONG):
         return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": "desc_remote_strong"}
 
+    # 4.5 Region-locked remote in description
+    if any(k in desc_l for k in V2_REMOTE_REGION_LOCKED_SIGNALS):
+        return {
+            "remote_model": RemoteClass.REMOTE_REGION_LOCKED,
+            "reason": "desc_remote_region_locked",
+        }
+
     # 5 Hybrid detection (moved below Strong Remote to avoid false negatives)
     if any(k in desc_l for k in V2_HYBRID_SIGNALS):
         return {"remote_model": RemoteClass.NON_REMOTE, "reason": "hybrid_signal"}
@@ -171,6 +207,14 @@ def classify_remote_model(title: str, description: str, remote_scope: str = "") 
             "remote_model": "remote_but_geo_restricted",
             "confidence": 0.8,
             "signals": ["remote_scope_region_locked"],
+        }
+
+    # 3.5 Region-locked remote in text
+    if _contains_any(text, V2_REMOTE_REGION_LOCKED_SIGNALS):
+        return {
+            "remote_model": RemoteClass.REMOTE_REGION_LOCKED.value,
+            "confidence": 0.85,
+            "signals": ["text_region_locked"],
         }
 
     # 4 Fully remote
