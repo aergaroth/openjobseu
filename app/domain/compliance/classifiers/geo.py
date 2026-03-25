@@ -194,7 +194,6 @@ def classify_geo(
 ) -> dict:
     title_l = (title or "").lower()
     scope_l = (remote_scope or "").lower()
-    desc_l = (description or "").lower()
 
     found_eu = False
     found_non_eu = False
@@ -258,26 +257,6 @@ def classify_geo(
     localization_result = _classify_from_localization_section(description or "")
     if localization_result:
         return localization_result
-
-    # 4.5 Safe regional and explicit fallback in full description
-    # Catches strong constraints missed when remote_scope is empty
-    for kw in EU_REGION_KEYWORDS:
-        if _contains_phrase(desc_l, kw):
-            return {"geo_class": GeoClass.EU_REGION, "reason": f"desc_{kw.replace(' ', '_')}"}
-
-    for kw in EU_REGION_CUSTOM:
-        if _contains_phrase(desc_l, kw):
-            return {"geo_class": GeoClass.EU_REGION, "reason": f"desc_{kw.replace(' & ', '_').replace(' ', '_')}"}
-
-    # Safely match explicit UK restrictions in text without triggering generic words like "London"
-    for kw in ("uk only", "uk-based", "uk based", "remote in the uk", "remote uk", "remotely in the uk"):
-        if _contains_phrase(desc_l, kw):
-            return {"geo_class": GeoClass.UK, "reason": f"desc_{kw.replace(' ', '_')}"}
-
-    # Hidden gem: Timezones commonly used for European roles
-    for kw in ("cet", "cest", "utc+1", "utc +1", "utc+2", "utc +2"):
-        if _contains_phrase(desc_l, kw):
-            return {"geo_class": GeoClass.EU_REGION, "reason": f"desc_timezone_{kw.replace(' ', '')}"}
 
     # 5 UK fallback - apply ONLY to scope and title, NOT full description
     # (prevents false positives from generic text like "Our HQ is in London")

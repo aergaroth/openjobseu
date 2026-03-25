@@ -27,21 +27,6 @@ HARD_GEO_PATTERNS = [
     r"\bus permanent resident required\b",
     r"\bgreen card required\b",
     r"\bmust have us work authorization\b",
-    r"\bcanadian residents only\b",
-    r"\bmust reside in canada\b",
-    r"\bmust be located in canada\b",
-    r"\beligible to work in canada only\b",
-    r"\bcanada work authorization required\b",
-    r"\bapac only\b",
-    r"\basia pacific only\b",
-    r"\bmust reside in apac\b",
-    r"\bwithin apac only\b",
-    r"\baustralia only\b",
-    r"\baustralian residents only\b",
-    r"\bmust reside in australia\b",
-    r"\bindia only\b",
-    r"\bindian residents only\b",
-    r"\bmust reside in india\b",
 ]
 
 COMPILED_PATTERNS = [re.compile(p, re.IGNORECASE) for p in HARD_GEO_PATTERNS]
