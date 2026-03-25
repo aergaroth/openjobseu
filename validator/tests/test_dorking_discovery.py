@@ -144,3 +144,16 @@ def test_run_dorking_discovery_google_api_error(monkeypatch):
     # najistotniejsze jest to, żeby funkcja zwróciła słownik metryk, a nie spowodowała hard-crash.
     assert "status" in result
     assert result.get("discovered_slugs", 0) == 0
+
+
+def test_dorking_handles_google_api_quota_exhaustion(monkeypatch):
+    """Simulate Google Custom Search API quotas in dorking."""
+    from app.workers.discovery import dorking
+
+    def mock_search(*args, **kwargs):
+        raise Exception("Quota exceeded for quota metric")
+
+    monkeypatch.setattr(dorking, "google_custom_search", mock_search)
+
+    result = dorking.run_dorking_discovery()
+    assert result["status"] == "ok"
