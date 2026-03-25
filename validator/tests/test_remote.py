@@ -53,3 +53,18 @@ def test_classify_remote_hybrid_ats_tags():
     res1 = classify_remote(title="Designer", description="Join our team. #li-hybrid", remote_scope="")
     assert res1["remote_model"] == RemoteClass.NON_REMOTE
     assert res1["reason"] == "hybrid_signal"
+
+
+def test_classify_remote_remotely_scope():
+    """Weryfikuje bezpieczne wycinanie słowa 'remotely' w polu scope (negative lookarounds)."""
+    from app.domain.jobs.enums import RemoteClass
+    from app.domain.compliance.classifiers.remote import classify_remote
+
+    res1 = classify_remote(title="Dev", description="", remote_scope="Remotely in Poland")
+    # Zostaje 'in Poland', co jest poprawnym restrykcyjnym regionem
+    assert res1["remote_model"] == RemoteClass.REMOTE_REGION_LOCKED
+    assert res1["reason"] == "scope_region"
+
+    res2 = classify_remote(title="Dev", description="", remote_scope="Remotely")
+    # Zostaje ucięte w 100%, dając czyste zdalne
+    assert res2["remote_model"] == RemoteClass.REMOTE_ONLY
