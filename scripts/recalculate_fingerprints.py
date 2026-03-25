@@ -1,6 +1,6 @@
 import logging
 import sys
-from aiofiles import os
+import os
 
 # Zapewnienie dostępu do modułów projektu
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
