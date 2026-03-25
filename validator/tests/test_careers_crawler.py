@@ -161,3 +161,47 @@ def test_run_careers_discovery_happy_path(monkeypatch):
     assert metrics["ats_detected"] == 1
     assert metrics["ats_probed"] == 1
     assert metrics["ats_inserted"] == 1
+
+
+def test_run_careers_discovery_handles_company_processing_error(monkeypatch):
+    # Sprawdzamy czy nieobsłużony wyjątek dla jednej firmy (np. błąd parsera, nieoczekiwany błąd bazy) nie zablokuje reszty
+    mock_companies = [
+        {"company_id": "bad_1", "careers_url": "https://fail.com"},
+        {"company_id": "good_2", "careers_url": "https://ok.com"},
+    ]
+    monkeypatch.setattr(crawler_module, "load_discovery_companies", lambda *a, **kw: mock_companies)
+
+    class DummyCtx:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr(
+        crawler_module, "get_engine", lambda: MagicMock(connect=lambda: DummyCtx(), begin=lambda: DummyCtx())
+    )
+
+    def mock_fetch(url):
+        if "fail" in url:
+            raise RuntimeError("Simulated hard crash during fetch")
+        mock_resp = MagicMock()
+        mock_resp.url = url
+        mock_resp.text = "<html>valid</html>"
+        mock_resp.history = []
+        return mock_resp, None
+
+    monkeypatch.setattr(crawler_module, "_fetch_careers_page", mock_fetch)
+    monkeypatch.setattr(crawler_module, "_detect_provider_from_redirects", lambda r: ("lever", "ok-slug"))
+    monkeypatch.setattr(
+        crawler_module,
+        "probe_ats",
+        lambda p, s: {"jobs_total": 2, "remote_hits": 1, "recent_job_at": "2026-03-01T00:00:00Z"},
+    )
+    monkeypatch.setattr(crawler_module, "insert_discovered_company_ats", lambda *a, **kw: True)
+    monkeypatch.setattr(crawler_module, "update_discovery_last_checked_at", lambda *a, **kw: None)
+
+    metrics = crawler_module.run_careers_discovery()
+
+    assert metrics["companies_scanned"] == 2
+    assert metrics["ats_inserted"] == 1  # Jedna z firm poprawnie doszła do końca procedury pomimo awarii pierwszej!
