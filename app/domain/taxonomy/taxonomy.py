@@ -125,7 +125,7 @@ def _normalize_title(title: str) -> str:
     }
 
     for src, dst in replacements.items():
-        title = title.replace(src, dst)
+        title = re.sub(rf"\b{re.escape(src)}\b", dst, title)
 
     return title
 

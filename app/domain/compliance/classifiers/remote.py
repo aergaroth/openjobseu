@@ -1,3 +1,4 @@
+import re
 from app.domain.jobs.enums import RemoteClass
 
 V2_NEGATIVE_STRONG = [
@@ -72,6 +73,8 @@ V2_REMOTE_OPTIONAL_SIGNALS = [
     "remote-friendly",
 ]
 
+REMOTE_CLEANUP_RE = re.compile(r"(?<![a-z])remote(?:ly)?(?![a-z])")
+
 
 def _contains_any(text: str, keywords: list[str]) -> bool:
     return any(k in text for k in keywords)
@@ -86,7 +89,7 @@ def is_region_locked(remote_scope: str | None) -> bool:
     if "remote" not in text:
         return False
 
-    cleaned = text.replace("remote", "").replace(",", "").strip()
+    cleaned = REMOTE_CLEANUP_RE.sub("", text).replace(",", "").strip()
     return len(cleaned) > 0
 
 
@@ -126,7 +129,11 @@ def classify_remote(
         found_keyword = "remote"
 
     if found_keyword:
-        cleaned = scope_l.replace(found_keyword, "").replace("-", "").replace(",", "").strip()
+        if found_keyword == "remote":
+            cleaned = REMOTE_CLEANUP_RE.sub("", scope_l)
+        else:
+            cleaned = re.sub(rf"(?<![a-z]){re.escape(found_keyword)}(?![a-z])", "", scope_l)
+        cleaned = cleaned.replace("-", "").replace(",", "").strip()
         if cleaned and cleaned not in ("yes", "true", "1", "anywhere", "worldwide"):
             return {
                 "remote_model": RemoteClass.REMOTE_REGION_LOCKED,
