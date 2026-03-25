@@ -1,5 +1,6 @@
 import zipfile
 import io
+import requests
 from unittest.mock import MagicMock
 from app.workers.discovery.company_sources import (
     _guess_careers,
@@ -32,6 +33,16 @@ def test_fetch_github_remote_companies(monkeypatch):
     assert len(companies) == 1
     assert companies[0]["name"] == "Acme Corp"
     assert companies[0]["url"] == "https://acme.com"
+
+
+def test_fetch_github_remote_companies_network_error(monkeypatch):
+    # Symulujemy niedostępność GitHuba
+    monkeypatch.setattr(
+        cs_module.requests, "get", MagicMock(side_effect=requests.RequestException("Connection refused"))
+    )
+    # Zabezpieczenie przed rzuceniem błędem dalej w stos aplikacji
+    companies = _fetch_github_remote_companies()
+    assert companies == []
 
 
 def test_run_company_source_discovery(monkeypatch):
@@ -80,3 +91,32 @@ def test_run_company_source_discovery(monkeypatch):
     assert metrics["companies_found"] == 2
     assert metrics["companies_skipped"] == 1
     assert metrics["companies_inserted"] == 1
+
+
+def test_run_company_source_discovery_head_timeout(monkeypatch):
+    # Sprawdzenie zachowania kiedy strona firmy odpowiada bardzo wolno (timeout)
+    monkeypatch.setattr(
+        cs_module,
+        "_fetch_github_remote_companies",
+        lambda: [{"name": "TimeoutCo", "url": "https://timeout.com"}],
+    )
+
+    class DummyCtx:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr(
+        cs_module, "get_engine", lambda: MagicMock(connect=lambda: DummyCtx(), begin=lambda: DummyCtx())
+    )
+    monkeypatch.setattr(cs_module, "get_existing_brand_names", lambda conn: set())
+
+    # Rzucamy Timeout podczas próby sprawdzenia adresu careers_url
+    monkeypatch.setattr(cs_module.requests, "head", MagicMock(side_effect=requests.Timeout("Read timeout")))
+
+    metrics = run_company_source_discovery()
+
+    assert metrics["companies_found"] == 1
+    assert metrics["companies_inserted"] == 0

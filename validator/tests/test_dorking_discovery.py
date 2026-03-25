@@ -123,3 +123,24 @@ def test_run_dorking_discovery_success_path(monkeypatch):
 
     # Weryfikacja throttling'u (2 strony z wynikami wywołują sleep + 1 pauza po zakończeniu providera)
     assert mock_sleep.call_count == 3
+
+
+def test_run_dorking_discovery_google_api_error(monkeypatch):
+    mock_list_providers = MagicMock(return_value=["greenhouse"])
+
+    class MockGreenhouseAdapter:
+        dorking_target = "boards.greenhouse.io"
+
+    monkeypatch.setattr(dorking_module, "list_providers", mock_list_providers)
+    monkeypatch.setattr(dorking_module, "get_adapter", lambda p: MockGreenhouseAdapter())
+
+    # Symulujemy nagłą awarię API (np. wyczerpanie dziennego limitu Google Custom Search)
+    monkeypatch.setattr(dorking_module, "google_custom_search", MagicMock(side_effect=RuntimeError("Quota exceeded")))
+
+    # Upewniamy się, że środowisko potrafi bezpiecznie złapać wyjątek z API bez wysadzania całego Workera
+    result = run_dorking_discovery()
+
+    # Status zazwyczaj zależy od implementacji logiki obsługi błędu w dorking.py,
+    # najistotniejsze jest to, żeby funkcja zwróciła słownik metryk, a nie spowodowała hard-crash.
+    assert "status" in result
+    assert result.get("discovered_slugs", 0) == 0
