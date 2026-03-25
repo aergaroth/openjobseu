@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.1](https://github.com/aergaroth/openjobseu/compare/v2.4.0...v2.4.1) (2026-03-25)
+
+
+### Bug Fixes
+
+* **classifiers:** prevent orphaned substrings using word boundaries ([d1659e9](https://github.com/aergaroth/openjobseu/commit/d1659e9f323a8ec7f57837ead1a35cc67fcb6759))
+
 ## [2.4.0](https://github.com/aergaroth/openjobseu/compare/v2.3.1...v2.4.0) (2026-03-25)
 
 
