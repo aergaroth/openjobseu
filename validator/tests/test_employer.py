@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from app.domain.taxonomy.enums import RemoteClass
+from app.domain.jobs.enums import RemoteClass
 from app.workers.ingestion.employer import ingest_company, run_employer_ingestion
 from app.workers.ingestion.fetch import FetchCompanyJobsError
 

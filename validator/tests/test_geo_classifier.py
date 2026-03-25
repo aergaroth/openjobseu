@@ -1,4 +1,4 @@
-from app.domain.taxonomy.enums import GeoClass
+from app.domain.jobs.enums import GeoClass
 from app.domain.compliance.classifiers.geo import classify_geo_scope, classify_geo_v3
 from app.domain.compliance.classifiers.remote import classify_remote_v3
 from app.domain.compliance.engine import apply_policy

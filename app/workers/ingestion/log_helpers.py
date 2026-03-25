@@ -1,6 +1,6 @@
 import logging
 
-from app.domain.taxonomy.enums import RemoteClass
+from app.domain.jobs.enums import RemoteClass
 
 logger = logging.getLogger("openjobseu.ingestion")
 

@@ -1,6 +1,7 @@
 from typing import Dict, List
 
-from app.domain.taxonomy.enums import ComplianceStatus, GeoClass, RemoteClass
+from app.domain.jobs.enums import GeoClass, RemoteClass
+from app.domain.compliance.classifiers.enums import ComplianceStatus
 
 # Canonical filter values used by the internal audit panel.
 AUDIT_FILTER_REGISTRY: Dict[str, List[str]] = {

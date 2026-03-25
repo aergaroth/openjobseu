@@ -1,4 +1,4 @@
-from app.domain.taxonomy.enums import RemoteClass
+from app.domain.jobs.enums import RemoteClass
 
 
 def _normalize_remote_model_for_metrics(remote_model: str | None) -> str:

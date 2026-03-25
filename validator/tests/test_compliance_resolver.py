@@ -1,6 +1,6 @@
 import pytest
 
-from app.domain.taxonomy.enums import GeoClass, RemoteClass
+from app.domain.jobs.enums import GeoClass, RemoteClass
 from app.domain.compliance.engine import apply_policy
 
 

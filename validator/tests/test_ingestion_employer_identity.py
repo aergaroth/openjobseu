@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from app.domain.taxonomy.enums import GeoClass, RemoteClass
+from app.domain.jobs.enums import GeoClass, RemoteClass
 from app.domain.jobs.identity import (
     compute_job_fingerprint,
     compute_job_uid,
