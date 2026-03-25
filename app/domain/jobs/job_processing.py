@@ -1,6 +1,6 @@
 from typing import Optional, Tuple
 
-from app.domain.taxonomy.mappers import normalize_geo_class, normalize_remote_class
+from app.domain.jobs.mappers import normalize_geo_class, normalize_remote_class
 from app.domain.taxonomy.taxonomy import classify_taxonomy
 from app.domain.compliance.engine import ENGINE_POLICY_VERSION, apply_policy
 from app.domain.jobs.identity import (

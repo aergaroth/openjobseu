@@ -6,7 +6,7 @@ from typing import Iterator
 
 import app.adapters.ats as ats  # noqa: F401
 from app.adapters.ats.registry import get_adapter
-from app.domain.taxonomy.enums import RemoteClass
+from app.domain.jobs.enums import RemoteClass
 
 from storage.db_engine import get_engine
 from storage.repositories.ats_repository import (

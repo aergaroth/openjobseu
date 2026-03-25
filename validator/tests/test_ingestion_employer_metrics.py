@@ -1,5 +1,5 @@
 from app.workers.ingestion import employer
-from app.domain.taxonomy.enums import RemoteClass
+from app.domain.jobs.enums import RemoteClass
 
 
 class _NoopConnectCtx:

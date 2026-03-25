@@ -1,4 +1,5 @@
-from app.domain.taxonomy.enums import ComplianceStatus, GeoClass, RemoteClass
+from app.domain.jobs.enums import GeoClass, RemoteClass
+from app.domain.compliance.classifiers.enums import ComplianceStatus
 from app.domain.compliance.engine import apply_policy
 
 

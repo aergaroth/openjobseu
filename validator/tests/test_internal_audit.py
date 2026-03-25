@@ -9,7 +9,8 @@ from fastapi.testclient import TestClient
 
 import app.api.system as system_api
 import app.api.discovery as discovery_api
-from app.domain.taxonomy.enums import ComplianceStatus, GeoClass, RemoteClass
+from app.domain.jobs.enums import GeoClass, RemoteClass
+from app.domain.compliance.classifiers.enums import ComplianceStatus
 from app.main import app
 from storage.repositories.jobs_repository import upsert_job
 from storage.db_engine import get_engine

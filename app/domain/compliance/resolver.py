@@ -1,6 +1,7 @@
-from app.domain.taxonomy.constants import EU_ELIGIBLE_GEO_CLASSES
-from app.domain.taxonomy.enums import ComplianceStatus, GeoClass, RemoteClass
-from app.domain.taxonomy.mappers import normalize_geo_class, normalize_remote_class
+from app.domain.jobs.constants import EU_ELIGIBLE_GEO_CLASSES
+from app.domain.compliance.classifiers.enums import ComplianceStatus
+from app.domain.jobs.enums import GeoClass, RemoteClass
+from app.domain.jobs.mappers import normalize_geo_class, normalize_remote_class
 
 
 def _resolve_score_and_status(
