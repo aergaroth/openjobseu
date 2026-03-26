@@ -309,6 +309,7 @@ Per job in `process_company_jobs`:
 1. `adapter.normalize(raw_job)`
 2. `compute_schema_hash(raw)` (`app/domain/jobs/identity.py`)
 3. `process_ingested_job(normalized, source)` (`app/domain/jobs/job_processing.py`), which performs:
+   - **Data Cleaning**: The raw HTML/text description is cleaned and standardized by `app.domain.jobs.cleaning.clean_description`. This happens first, ensuring all subsequent steps (like fingerprinting and keyword analysis) operate on clean data.
    - canonical ID: `compute_canonical_job_id`
    - job UID/fingerprint: `compute_job_uid`, `compute_job_fingerprint`
    - compliance policy: `apply_policy` (`app/domain/compliance/engine.py`)
