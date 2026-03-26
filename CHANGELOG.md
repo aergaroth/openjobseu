@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.0](https://github.com/aergaroth/openjobseu/compare/v2.4.1...v2.5.0) (2026-03-26)
+
+
+### Features
+
+* enhance text cleaning with boilerplate removal and markdown artifact handling ([760a485](https://github.com/aergaroth/openjobseu/commit/760a485a894d342fdbba0edf9b576adfcb7241fd))
+
 ## [2.4.1](https://github.com/aergaroth/openjobseu/compare/v2.4.0...v2.4.1) (2026-03-25)
 
 
