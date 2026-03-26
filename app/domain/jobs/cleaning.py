@@ -90,19 +90,46 @@ def clean_html(text: str) -> str:
     text = re.sub(r"<[^>]+>", "", text)
     text = html.unescape(text)
 
+    # Semantyczna wycinka boilerplate'u po konwersji na tekst
+    for name, pattern in BOILERPLATE_PATTERNS.items():
+        text = pattern.sub("", text)
+
     # Wstępna redukcja wielu pustych linii po wyrzucaniu divów
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()
 
 
+BOILERPLATE_PATTERNS = {
+    "eeo_statement": re.compile(
+        r"(?i)\s*.*(is proud to be an equal opportunity employer|is an equal opportunity employer|is committed to working with the broadest talent pool|We hire for skills and potential)[\s\S]*?(?=\n\s*\n|$)",
+        re.IGNORECASE,
+    ),
+    "privacy_notice": re.compile(
+        r"(?i)\s*.*(Please review our Candidate Privacy Notice|For information about our privacy practices, please visit)[\s\S]*?(?=\n\s*\n|$)",
+        re.IGNORECASE,
+    ),
+}
+
+
 def normalize_whitespace(text: str) -> str:
     if not text:
         return text
 
+    # Standardize all forms of newlines and non-breaking spaces
     text = text.replace("\r\n", "\n")
+    text = text.replace("\r", "\n")
+    text = text.replace("\xa0", " ")
+
+    # Trim whitespace at the end of lines
+    text = re.sub(r"[ \t]+\n", "\n", text)
+
+    # Collapse multiple spaces/tabs into a single space
     text = re.sub(r"[ \t]+", " ", text)
+
+    # Collapse multiple newlines into a maximum of two
     text = re.sub(r"\n{3,}", "\n\n", text)
+
     return text.strip()
 
 
@@ -133,10 +160,33 @@ def clean_description(text: str, source: str) -> str:
 
     text = fix_encoding(text)
     text = clean_html(text)
+    text = _clean_markdown_artifacts(text)
 
     if source == "remoteok":
         for name, pattern in SPAM_PATTERNS.items():
             text = pattern.sub("", text)
 
     text = normalize_whitespace(text)
+    return text
+
+
+def _clean_markdown_artifacts(text: str) -> str:
+    if not text:
+        return text
+
+    # Fix for ATS converting numbers with dots into malformed links
+    text = re.sub(r"\[([0-9\.]+)\]\(http://[0-9\.]+\)", r"\1", text)
+
+    # Remove empty markdown formatting like ****, __, ** **, etc.
+    # by replacing them with a single space to avoid joining words.
+    text = re.sub(r"\*+\s*\*+", " ", text)
+    text = re.sub(r"_+\s*_+", " ", text)
+
+    # Remove empty lines that are just markdown symbols (e.g., "- ", "# ", "_")
+    # This handles empty list items, headers, and standalone formatting characters.
+    text = re.sub(r"^\s*([#*_-]+|>{1,})\s*$", "", text, flags=re.MULTILINE)
+
+    # Clean up leftover empty bold/italic markers, often on their own lines
+    text = re.sub(r"^\s*(\*\*|__)\s*$", "", text, flags=re.MULTILINE)
+
     return text

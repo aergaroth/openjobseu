@@ -105,3 +105,18 @@ The remaining application secrets (`DEV_GOOGLE_CLIENT_SECRET`, `PROD_GOOGLE_API_
 2. Copy the Terraform outputs into the GitHub repository variables listed above.
 3. Trigger `terraform-plan.yml`, `dev_flow.yml`, and `prod_flow.yml` once to confirm OIDC authentication works end to end.
 4. After successful verification, delete the legacy GitHub Secrets `GCP_SA_KEY_DEV` and `GCP_SA_KEY_PROD`.
+
+## Testing
+
+Most tests expect PostgreSQL. CI starts `postgres:16` and uses:
+- `DB_MODE=standard`
+- `DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/testdb`
+
+*Note: The test suite explicitly blocks external HTTP requests to prevent accidental hangs or timeouts. Fast `DELETE` sweeps are used over `TRUNCATE CASCADE` for near-instant teardowns.*
+
+Local pattern:
+
+```bash
+# start postgres
+docker run --rm --name openjobspg -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=testdb -p 5432:5432 -d postgres:16
