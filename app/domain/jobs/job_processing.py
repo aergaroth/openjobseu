@@ -12,7 +12,7 @@ from app.domain.money.salary_parser import extract_salary
 from app.domain.money.structured_salary import extract_structured_salary
 from app.domain.money.transparency import detect_salary_transparency
 from app.domain.jobs.quality_score import compute_job_quality_score
-from app.domain.jobs.cleaning import clean_html
+from app.domain.jobs.cleaning import clean_description
 
 
 def _string_like(value: object | None) -> str | None:
@@ -44,7 +44,7 @@ def process_ingested_job(job: dict, source: str) -> Tuple[Optional[dict], dict]:
 
     # Czyszczenie opisu przed generowaniem fingerprintu i analizą (np. wynagrodzeń)
     if description:
-        description = clean_html(description)
+        description = clean_description(description, source=source)
         job["description"] = description
 
     # Canonical cross-ATS identity for persisted jobs
