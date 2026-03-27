@@ -34,7 +34,8 @@ This field is written exclusively by the **Lifecycle Worker**. It represents the
 
 From an API perspective:
 - `/jobs` with `status=visible` maps to **NEW + ACTIVE**
-- `/jobs/feed` uses visible jobs and additionally applies compliance-score filtering
+- the application-level feed view applies visible-job filtering plus the compliance threshold
+- the public dataset contract is the static `feed.json` export served from GCS/CDN
 
 ---
 

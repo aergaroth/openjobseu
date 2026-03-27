@@ -14,10 +14,11 @@ Order (`app/workers/pipeline.py`):
 2. `run_lifecycle_pipeline` (`app/workers/lifecycle.py`)
 3. `run_availability_pipeline` (`app/workers/availability.py`)
 4. `run_market_metrics_worker` (`app/workers/market_metrics.py`)
-5. `run_frontend_export` (`app/workers/frontend_exporter.py`)
+5. `run_maintenance_pipeline` (`app/workers/maintenance.py`)
+6. `run_frontend_export` (`app/workers/frontend_exporter.py`)
 
 Flow:
-`ATS adapters -> normalize + policy -> DB upsert -> lifecycle/availability -> daily metrics -> GCS Feed Export`
+`ATS adapters -> normalize + policy -> DB upsert -> lifecycle/availability -> market+company maintenance -> GCS Feed Export`
 
 ### B. Discovery pipeline (isolated)
 Entrypoint: `app/workers/discovery/pipeline.py`
@@ -78,6 +79,10 @@ Goal:
   - Reads: `jobs`, `job_sources`
   - Writes: `market_daily_stats`, `market_daily_stats_segments`
 
+- **Maintenance worker** (`app/workers/maintenance.py`)
+  - Reads/Writes: `companies`, `jobs`
+  - Recomputes: company job stats, remote posture, signal scores
+
 - **Frontend exporter** (`app/workers/frontend_exporter.py`)
   - Reads: `jobs`
   - Writes: `feed.json` to GCS during runtime ticks
@@ -88,9 +93,9 @@ Goal:
 - `run_ats_guessing` (`app/workers/discovery/ats_guessing.py`)
 
 ### Utility/backfill workers (internal ops)
-- compliance backfill: `POST /internal/tasks/backfill-compliance`
-- salary backfill: `POST /internal/tasks/backfill-salary`
-- discovery trigger: `POST /internal/tasks/discovery`
+- direct system ops: `POST /internal/backfill-compliance`, `POST /internal/backfill-salary`, `POST /internal/backfill-department`
+- async task router: `POST /internal/tasks/{task_name}`
+- strict task execution router: `POST /internal/tasks/{task_name}/execute`
 
 ---
 
@@ -104,7 +109,7 @@ Goal:
 | `GET /feed.json` | Public | GCS + CDN |
 | `GET /health`, `GET /ready` | Internal/admin | Private Cloud Run |
 | `GET /jobs`, `GET /companies`, `GET /jobs/stats/compliance-7d` | Internal/admin | Private Cloud Run |
-| `POST /internal/tick`, `GET /internal/audit*`, `POST /internal/tasks/*` | Internal/admin | Private Cloud Run |
+| `POST /internal/tick`, `POST /internal/tick/execute`, `GET /internal/audit*`, `POST /internal/tasks/*`, `POST /internal/backfill-*` | Internal/admin | Private Cloud Run |
 
 Notes:
 - `GET /jobs`, `GET /companies`, and `GET /jobs/stats/compliance-7d` exist in FastAPI, but are not public internet endpoints in `dev` or `prod` because Cloud Run invocation is restricted via IAM.
@@ -114,4 +119,4 @@ Notes:
 
 ## Minimal big picture
 
-`External ATS -> Adapters -> Ingestion Worker -> jobs/job_sources/compliance_reports -> Lifecycle+Availability -> Market Metrics -> Public/Internal APIs`
+`External ATS -> Adapters -> Ingestion Worker -> jobs/job_sources/compliance_reports -> Lifecycle+Availability+Maintenance -> Market/Public/Internal surfaces`

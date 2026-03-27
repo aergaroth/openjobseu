@@ -14,16 +14,21 @@ The platform is optimized for zero-maintenance operation, high scalability durin
 
 Pipeline mode flow:
 
-`Cloud Scheduler` -> `Cloud Tasks` -> `Ingestion Worker` -> `DB Upsert` -> `Post-Ingestion Workers` -> `Feed Exporter (GCS)` -> `Public (CDN)`
+`Cloud Scheduler` -> `Cloud Tasks` -> `Ingestion Worker` -> `DB Upsert` -> `Lifecycle/Availability/Market/Maintenance` -> `Feed Exporter (GCS)` -> `Public (CDN)`
 
 ---
 
 ## Runtime Orchestration
 
-- Runtime entrypoint: `POST /internal/tick/execute` (via Cloud Tasks) -> `app.workers.pipeline.run_pipeline`
+- Trigger endpoints live in `app/api/system.py` and route through `app/api/router.py` under `/internal`.
+- Runtime execution entrypoint: `POST /internal/tick/execute` (via Cloud Tasks) -> `app.workers.pipeline.run_pipeline`
+- Hybrid/manual trigger: `POST /internal/tick` decides between direct execution and Cloud Tasks enqueue depending on queue configuration.
 - Tick pipeline orchestration:
   - runs `run_employer_ingestion()`
-  - runs `run_post_ingestion()`
+  - runs `run_lifecycle_pipeline()`
+  - runs `run_availability_pipeline()`
+  - runs `run_market_metrics_worker()`
+  - runs `run_maintenance_pipeline()`
   - runs `run_frontend_export()`
 - Ingestion worker is single-source and ATS-backed (`employer_ing`)
 
@@ -44,6 +49,7 @@ Runtime path:
   - `app/adapters/ats/ashby.py`
   - `app/adapters/ats/personio.py`
   - `app/adapters/ats/recruitee.py`
+  - `app/adapters/ats/smartrecruiters.py`
 - normalization happens inside adapters (`normalize()`)
 - policy tagging uses `app/domain/compliance/engine.py` (`apply_policy`)
 
@@ -59,7 +65,7 @@ Database modes:
 - `DB_MODE=standard` + `DATABASE_URL=postgresql+psycopg://...`
 - `DB_MODE=cloudsql` + Cloud SQL connector settings (`INSTANCE_CONNECTION_NAME`, `DB_NAME`, `DB_USER`)
 
-Schema initialization is migration-file based (`storage/migrations/*.sql`) and tracked in `schema_migrations`.
+Schema initialization is Alembic-based (`storage/alembic/`, `alembic.ini`) and applied at startup via `alembic upgrade head`.
 
 Core tables:
 - `jobs`
@@ -79,11 +85,12 @@ Compliance policy is applied during ingestion before persistence.
 
 ## Post-Ingestion Workers
 
-`run_post_ingestion()` executes:
-- availability checks (`app/workers/availability.py` - uses adaptive time-budgeting to maximize throughput)
+Maintenance/runtime steps executed after ingestion:
 - lifecycle transitions (`app/workers/lifecycle.py`)
+- availability checks (`app/workers/availability.py` - uses adaptive time-budgeting to maximize throughput)
 - daily market metrics (`app/workers/market_metrics.py`)
-- static frontend and feed JSON generation to Cloud Storage (`app/workers/frontend_exporter.py`)
+- company maintenance/stat refresh (`app/workers/maintenance.py`)
+- static frontend feed generation to Cloud Storage (`app/workers/frontend_exporter.py`)
 
 Lifecycle states in runtime:
 - `new`, `active`, `stale`, `expired`, `unreachable`
@@ -219,17 +226,17 @@ OpenJobsEU is a backend-first FastAPI service that ingests remote job offers fro
 
 Primary runtime flow in code:
 - API service bootstrap and readiness gate: `app/main.py`
-- Internal tick trigger: `app/internal.py`
+- Internal route composition and auth split: `app/api/router.py`
+- Tick trigger/execution endpoints: `app/api/system.py`
 - Tick orchestration: `app/workers/pipeline.py`
 - Main ingestion worker: `app/workers/ingestion/employer.py`
-- Post-ingestion workers: `app/workers/lifecycle.py`, `app/workers/availability.py`, `app/workers/market_metrics.py`
+- Maintenance/runtime workers: `app/workers/lifecycle.py`, `app/workers/availability.py`, `app/workers/market_metrics.py`, `app/workers/maintenance.py`, `app/workers/frontend_exporter.py`
 
 ### 2. Repository structure
 
 #### `app/` (application runtime)
-- `app/main.py` – FastAPI app, DB bootstrap (`init_db`), readiness middleware, router registration.
-- `app/internal.py` – internal/ops endpoints (`/internal/tick`, audit and backfill endpoints).
-- `app/api/` – runtime read/query routers mounted on the private Cloud Run service (`app/api/jobs.py`, `app/api/companies.py`).
+- `app/main.py` – FastAPI app, Alembic bootstrap/readiness middleware, router registration.
+- `app/api/` – runtime routers, including public-code/private-runtime read endpoints (`jobs.py`, `companies.py`) and internal/admin routers (`router.py`, `system.py`, `tasks.py`, `audit.py`, `discovery.py`).
 - `app/workers/` – runtime workers and orchestrators.
 - `app/adapters/` – ATS adapter abstraction and implementations.
 - `app/domain/` – pure business logic (compliance, identity, taxonomy, salary, company logic).
@@ -238,7 +245,7 @@ Primary runtime flow in code:
 #### `storage/` (data access + schema)
 - `storage/db_engine.py` – SQLAlchemy engine factory/DB mode handling.
 - `storage/repositories/` – table-level access and mutation logic.
-- `storage/migrations/` – SQL migrations (`001`–`021`).
+- `storage/alembic/` – Alembic environment and revision history.
 
 #### `infra/` (Terraform)
 - `infra/gcp/dev/` – Cloud Run dev service and state backend.
@@ -260,12 +267,13 @@ Primary runtime flow in code:
 
 #### Runtime start
 1. FastAPI app starts (`app/main.py`), runs asynchronous DB bootstrap loop:
-   - `_run_db_bootstrap_once()` calls `init_db()` + `db_healthcheck()`.
+   - `_run_db_bootstrap_once()` runs `alembic upgrade head` and `db_healthcheck()`.
 2. Readiness is enforced by middleware until bootstrap succeeds (`/health` and `/ready` are exempt).
 
 #### Tick trigger and orchestration
-- Trigger path: `POST /internal/tick` in `app/internal.py`.
-- Endpoint configures global variables for incremental fetch/limits and calls `run_pipeline()` from `app/workers/pipeline.py`.
+- Trigger paths: `POST /internal/tick` (hybrid/manual) and `POST /internal/tick/execute` (Cloud Tasks execution) in `app/api/system.py`.
+- `POST /internal/tick` builds tick context, decides between enqueue and direct execution, and passes `group`, `incremental`, and `limit`.
+- `POST /internal/tick/execute` reconstructs execution context from request body/headers and calls `run_pipeline()` from `app/workers/pipeline.py`.
 
 #### Execution order (`PIPELINE_STEPS`)
 Defined in `app/workers/pipeline.py`:
@@ -273,6 +281,8 @@ Defined in `app/workers/pipeline.py`:
 2. `run_lifecycle_pipeline` (`app/workers/lifecycle.py`)
 3. `run_availability_pipeline` (`app/workers/availability.py`)
 4. `run_market_metrics_worker` (`app/workers/market_metrics.py`)
+5. `run_maintenance_pipeline` (`app/workers/maintenance.py`)
+6. `run_frontend_export` (`app/workers/frontend_exporter.py`)
 
 The orchestrator aggregates `actions` and step-level `metrics`; failures are captured per step as `{"status": "error"}` while the pipeline continues to next steps.
 
@@ -281,6 +291,8 @@ The orchestrator aggregates `actions` and step-level `metrics`; failures are cap
 - Lifecycle updates statuses and repost markers on `jobs`.
 - Availability checks selected jobs and updates `availability_status`, `last_verified_at`, `verification_failures`.
 - Market metrics reads operational tables and writes daily aggregates to `market_daily_stats` and `market_daily_stats_segments`.
+- Maintenance refreshes company aggregates and signal/posture fields.
+- Frontend export publishes the latest `feed.json` snapshot.
 
 ### 4. Ingestion architecture
 
@@ -294,6 +306,7 @@ The orchestrator aggregates `actions` and step-level `metrics`; failures are cap
   - `app/adapters/ats/ashby.py`
   - `app/adapters/ats/personio.py`
   - `app/adapters/ats/recruitee.py`
+  - `app/adapters/ats/smartrecruiters.py`
 
 #### Ingestion runtime flow
 Main worker: `app/workers/ingestion/employer.py`
@@ -330,13 +343,14 @@ Executed after ingestion by main pipeline:
 - lifecycle transitions (`app/workers/lifecycle.py`)
 - availability verification (`app/workers/availability.py`)
 - daily market aggregations (`app/workers/market_metrics.py`)
+- company maintenance/stat refresh (`app/workers/maintenance.py`)
 - static feed generation (`app/workers/frontend_exporter.py`)
 
 #### Text diagram
 `ATS adapter` → `normalize` → `compliance` → `persistence` → `lifecycle workers` → `GCS Export`
 
 Expanded path in code:
-`adapter.fetch` → `adapter.normalize` → `process_ingested_job` → `upsert_job + insert_compliance_report` → `run_lifecycle_pipeline/run_availability_pipeline/run_market_metrics_worker/run_frontend_export`
+`adapter.fetch` → `adapter.normalize` → `process_ingested_job` → `upsert_job + insert_compliance_report` → `run_lifecycle_pipeline/run_availability_pipeline/run_market_metrics_worker/run_maintenance_pipeline/run_frontend_export`
 
 ### 5. Discovery architecture
 
@@ -363,7 +377,7 @@ Discovery orchestrator: `app/workers/discovery/pipeline.py`
 
 #### ATS guessing flow (`app/workers/discovery/ats_guessing.py`)
 1. Generate slug candidates from company name.
-2. Probe providers in fixed list (`greenhouse`, `lever`, `workable`, `ashby`, `personio`, `recruitee`).
+2. Probe providers in fixed list (`greenhouse`, `lever`, `workable`, `ashby`, `personio`, `recruitee`, `smartrecruiters`).
 3. Apply same quality thresholds as crawler.
 4. Insert candidate into `company_ats` on successful probe.
 5. Update `companies.ats_guess_last_checked_at`.
@@ -387,7 +401,11 @@ Discovery orchestrator: `app/workers/discovery/pipeline.py`
    - Reads: `jobs`, `job_sources`
    - Writes: `market_daily_stats`, `market_daily_stats_segments`
 
-5. **Frontend Exporter worker** – `app/workers/frontend_exporter.py`
+5. **Maintenance worker** – `app/workers/maintenance.py`
+   - Reads/Writes: `companies`, `jobs`
+   - Operations: recompute company stats, remote posture, and signal scores
+
+6. **Frontend Exporter worker** – `app/workers/frontend_exporter.py`
    - Reads: `jobs`
    - Writes: `feed.json` to the public GCS bucket during runtime ticks
    - Can also sync `frontend/*` when explicitly invoked by deploy tooling with `sync_assets=True`
@@ -398,16 +416,16 @@ Discovery orchestrator: `app/workers/discovery/pipeline.py`
   - Writes: `company_ats`, `companies.discovery_last_checked_at`
 
 #### Utility/backfill workers exposed via internal API
-- `POST /internal/tasks/backfill-compliance` → `app/utils/backfill_compliance.py`
-- `POST /internal/tasks/backfill-salary` → `app/utils/backfill_salary.py`
+- Direct ops endpoints in `app/api/system.py`: `POST /internal/backfill-compliance`, `POST /internal/backfill-salary`, `POST /internal/backfill-department`
+- Async task router in `app/api/tasks.py`: `POST /internal/tasks/{task_name}` and `POST /internal/tasks/{task_name}/execute`
 
 ### 7. Data model overview
 
-Schema source: `storage/migrations/*.sql` + repository usage in `storage/repositories/*.py`.
+Schema source: Alembic revisions under `storage/alembic/versions/` + repository usage in `storage/repositories/*.py`.
 
 #### `jobs`
 - Purpose: canonical job record used by feed, policy outputs, lifecycle and analytics.
-- Defined in: `001_initial_jobs.sql`, extended by `003`, `009`, `010`, `011`, `018` and indexes in `021`.
+- Defined and evolved via Alembic revisions under `storage/alembic/versions/`.
 - Main fields (selected):
   - identity/source: `job_id` (PK), `source`, `source_job_id`, `source_url`, `job_uid`, `job_fingerprint`, `source_schema_hash`
   - content: `title`, `company_name`, `description`, `remote_scope`
@@ -419,34 +437,34 @@ Schema source: `storage/migrations/*.sql` + repository usage in `storage/reposit
 
 #### `companies`
 - Purpose: company registry used for ingestion and discovery candidate selection.
-- Defined in: `002_companies.sql`, extended by `022_split_discovery_timestamps.sql` and `024_company_job_stats.sql`.
+- Defined and evolved via Alembic revisions under `storage/alembic/versions/`.
 - Main fields: `company_id` (PK), `legal_name`, `brand_name`, `hq_country`, `remote_posture`, `ats_provider`, `ats_slug`, `careers_url`, `is_active`, `bootstrap`, `careers_last_checked_at`, `ats_guess_last_checked_at`, aggregated stats (`total_jobs_count`, `rejected_jobs_count`, `last_active_job_at`), timestamps.
 
 #### `company_ats`
 - Purpose: normalized mapping of company to ATS endpoints/configurations (multi-ATS structure).
-- Defined in: `003_ingestion_and_compliance.sql`; unique provider+slug in `016`.
+- Defined and evolved via Alembic revisions under `storage/alembic/versions/`.
 - Main fields: `company_ats_id` (PK), `company_id` (FK), `provider`, `ats_slug`, `ats_api_url`, `careers_url`, `is_active`, `last_sync_at` (incremental cursor), `updated_at` (queue ordering), timestamps.
 
 #### `job_sources`
 - Purpose: source-to-canonical mapping and source-level lifecycle visibility.
-- Defined in: `005_job_sources_and_fingerprint_uniqueness.sql`, extended by `017_job_sources_seen_count.sql`.
+- Defined and evolved via Alembic revisions under `storage/alembic/versions/`.
 - Main fields: composite PK (`source`, `source_job_id`), `job_id` (FK → jobs), `source_url`, `first_seen_at`, `last_seen_at`, `seen_count`, timestamps.
 
 #### `job_snapshots`
 - Purpose: historical snapshots when job fingerprint/content changes during upsert.
-- Defined in: `014_job_snapshots.sql`.
+- Defined and evolved via Alembic revisions under `storage/alembic/versions/`.
 - Main fields: `snapshot_id` (PK), `job_id`, `job_fingerprint`, `title`, `company_name`, salary fields, `captured_at`.
 
 #### `compliance_reports`
 - Purpose: persisted policy decision output per canonical identity and policy version.
-- Defined in: `003_ingestion_and_compliance.sql`, uniqueness strengthened in `008_compliance_reports_unique_index.sql`.
+- Defined and evolved via Alembic revisions under `storage/alembic/versions/`.
 - Main fields: `report_id` (PK), `job_id` (FK → jobs), `job_uid`, `policy_version`, `remote_class`, `geo_class`, `hard_geo_flag`, scoring fields, `decision_vector`, `created_at`.
 - Constraint: unique index on `(job_uid, policy_version)`.
 
 #### Additional analytics/audit tables present
-- `salary_parsing_cases` (`012_salary_parsing_cases.sql`)
-- `market_daily_stats` (`019_market_daily_stats.sql`)
-- `market_daily_stats_segments` (`020_market_daily_stats_segments.sql`)
+- `salary_parsing_cases`
+- `market_daily_stats`
+- `market_daily_stats_segments`
 
 ### 8. API layer
 
@@ -454,7 +472,7 @@ Schema source: `storage/migrations/*.sql` + repository usage in `storage/reposit
 - Routers mounted in `app/main.py`:
   - `app/api/jobs.py` under `/jobs`
   - `app/api/companies.py` under `/companies`
-  - `app/internal.py` under `/internal`
+  - `app/api/router.py` under `/internal`
 
 #### Public interfaces
 - Static frontend assets from GCS/CDN – read-only website for browsing the exported dataset.
@@ -469,12 +487,17 @@ Schema source: `storage/migrations/*.sql` + repository usage in `storage/reposit
 
 #### Internal endpoints
 - `POST /internal/tick` – execute full runtime pipeline (supports batched processing via `limit` and `incremental` flags).
+- `POST /internal/tick/execute` – Cloud Tasks execution handler for the tick pipeline.
+- `GET /internal/metrics` – system metrics snapshot from `storage.repositories.system_repository`.
+- `POST /internal/preview-job` – adapter/debug preview for a single ATS job flow.
 - `GET /internal/audit` – HTML audit panel (`audit_tool/offer_audit_panel.html`).
 - `GET /internal/audit/jobs` – audit listing and counts (reads `jobs` + `job_sources`).
 - `GET /internal/audit/filters` – filter registry + dynamic source list.
 - `GET /internal/audit/stats/company` – company compliance ratios (`jobs` + `companies`).
 - `GET /internal/audit/stats/source-7d` – source compliance ratios (`jobs` + `job_sources`).
 - `POST /internal/audit/tick-dev` – tick endpoint with forced text output.
+- `POST /internal/backfill-compliance`, `POST /internal/backfill-salary`, `POST /internal/backfill-department` – direct ops/backfill endpoints.
+- `POST /internal/discovery/*` – discovery phase triggers and admin discovery endpoints.
 - `POST /internal/tasks/{task_name}` – async worker triggers (Cloud Tasks).
 - `POST /internal/tasks/{task_name}/execute` – Cloud Tasks execution handlers.
 
@@ -533,7 +556,7 @@ This forms the current base for a broader analytics layer, while the public surf
 - **Adapter layer (`app/adapters/ats`)**: provider-specific fetch/normalize/probe logic only.
 - **Domain layer (`app/domain`)**: pure transformations/classification/scoring, no DB IO.
 - **Worker layer (`app/workers`)**: orchestration and transaction-scoped execution.
-- **Data layer (`storage/repositories`, `storage/migrations`)**: SQL persistence, retrieval, schema evolution.
-- **API layer (`app/api`, `app/internal`, `app/main`)**: HTTP contracts and operational control surface.
+- **Data layer (`storage/repositories`, `storage/alembic`)**: SQL persistence, retrieval, schema evolution.
+- **API layer (`app/api`, `app/main`)**: HTTP contracts and operational control surface.
 
 The key separation visible in code is: workers call domain logic and repositories; domain logic does not call storage directly.

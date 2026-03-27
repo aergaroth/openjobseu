@@ -16,12 +16,12 @@ Non-goals remain unchanged:
 ### Runtime and ingestion
 - [x] Tick-based runtime with local and pipeline modes
 - [x] Active handler: `employer_ing`
-- [x] Curated employer ATS ingestion (Greenhouse)
+- [x] Curated employer ATS ingestion via the ATS adapter registry
 - [x] Source-specific normalization and policy signal stages
 - [x] Legacy source runtime modules (`remotive`, `remoteok`, `weworkremotely`) removed
 
 ### Data platform
-- [x] PostgreSQL schema with migration files (`jobs`, `companies`)
+- [x] PostgreSQL schema managed with Alembic migrations
 - [x] SQLAlchemy Core storage backend
 - [x] `DB_MODE=standard` and `DB_MODE=cloudsql`
 - [x] Idempotent upsert and lifecycle timestamps
@@ -33,8 +33,8 @@ Non-goals remain unchanged:
 - [x] Availability and lifecycle workers (`new|active|stale|expired|unreachable`)
 
 ### API and audit
-- [x] Public read API: `/jobs`, `/jobs/feed`
-- [x] Public 7-day compliance snapshot endpoint: `/jobs/stats/compliance-7d`
+- [x] Private runtime read APIs: `/jobs`, `/companies`, `/jobs/stats/compliance-7d`
+- [x] Public static dataset/feed export via `feed.json`
 - [x] Feed threshold: `min_compliance_score=80`
 - [x] Internal tick endpoint with text/json formatting
 - [x] Internal audit panel and filterable audit API
