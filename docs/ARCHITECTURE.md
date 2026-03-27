@@ -152,8 +152,11 @@ Internal endpoints:
 - `POST /internal/backfill-compliance`
 - `POST /internal/tasks/{task_name}` (Delegates async processes to Cloud Tasks via Hybrid Router)
 - `POST /internal/tasks/{task_name}/execute` (Strictly Machine-to-Machine Cloud Tasks handler with OIDC `audience` validation; legacy `X-Internal-Secret` fallback strictly disabled outside `APP_RUNTIME=local`)
+- `POST /internal/discovery/company-sources`
 - `POST /internal/discovery/careers`
+- `POST /internal/discovery/ats-reverse`
 - `POST /internal/discovery/guess`
+- `POST /internal/discovery/dorking`
 - `POST /internal/discovery/run`
 
 Audit panel data shape:
@@ -355,12 +358,19 @@ Expanded path in code:
 ### 5. Discovery architecture
 
 Discovery orchestrator: `app/workers/discovery/pipeline.py`
+- manual operator entrypoint: `POST /internal/discovery/run` (synchronous end-to-end run)
+- automated scheduler entrypoints: `POST /internal/tasks/company-sources`, `POST /internal/tasks/careers`, `POST /internal/tasks/ats-reverse`, `POST /internal/tasks/guess`
+- scheduled order in `dev` and `prod`: `company-sources -> careers -> ats-reverse -> guess`
+- shared Cloud Tasks queue is intentional; staggered scheduler windows preserve phase ordering without a separate discovery queue
+
+Discovery worker set:
+- `run_company_source_discovery()` (`company_sources.py`)
 - `run_careers_discovery()` (`careers_crawler.py`)
+- `run_ats_reverse_discovery()` (`ats_reverse.py`)
 - `run_ats_guessing()` (`ats_guessing.py`)
 
 #### Careers crawler flow (`app/workers/discovery/careers_crawler.py`)
 1. Load candidate companies via `load_discovery_companies` where:
-   - `bootstrap = FALSE`
    - `is_active = TRUE`
    - `ats_provider IS NULL`
    - `careers_url IS NOT NULL`
@@ -369,11 +379,11 @@ Discovery orchestrator: `app/workers/discovery/pipeline.py`
 4. Validate slug (`_is_valid_slug`).
 5. Probe ATS via `probe_ats` (`app/workers/discovery/ats_probe.py`, adapter `probe_jobs`).
 6. Apply quality filters:
-   - `jobs_total >= 5`
+   - `jobs_total >= 1`
    - `remote_hits >= 1`
    - `recent_job_at` within 120 days
 7. Insert into `company_ats` via `insert_discovered_company_ats`.
-8. Update `companies.discovery_last_checked_at`.
+8. Update `companies.careers_last_checked_at`.
 
 #### ATS guessing flow (`app/workers/discovery/ats_guessing.py`)
 1. Generate slug candidates from company name.
@@ -381,6 +391,17 @@ Discovery orchestrator: `app/workers/discovery/pipeline.py`
 3. Apply same quality thresholds as crawler.
 4. Insert candidate into `company_ats` on successful probe.
 5. Update `companies.ats_guess_last_checked_at`.
+
+#### Company sources flow (`app/workers/discovery/company_sources.py`)
+1. Fetch external seed companies (currently RemoteInTech).
+2. Guess candidate careers URLs from the company homepage.
+3. Insert newly discovered companies into `companies`.
+
+#### ATS reverse flow (`app/workers/discovery/ats_reverse.py`)
+1. Load a curated slug list plus optional external slug source.
+2. Probe supported ATS providers directly by provider/slug combinations.
+3. Create placeholder companies when a provider/slug pair passes quality checks.
+4. Insert matching rows into `company_ats`.
 
 ### 6. Worker system
 
@@ -411,9 +432,18 @@ Discovery orchestrator: `app/workers/discovery/pipeline.py`
    - Can also sync `frontend/*` when explicitly invoked by deploy tooling with `sync_assets=True`
 
 #### Discovery workers (separate discovery pipeline)
-- `run_careers_discovery` and `run_ats_guessing`
+- `run_company_source_discovery`
+  - Reads: external source registries
+  - Writes: `companies`
+- `run_careers_discovery`
   - Reads: `companies`
-  - Writes: `company_ats`, `companies.discovery_last_checked_at`
+  - Writes: `company_ats`, `companies.careers_last_checked_at`
+- `run_ats_reverse_discovery`
+  - Reads: static/external slug dictionaries
+  - Writes: `companies`, `company_ats`
+- `run_ats_guessing`
+  - Reads: `companies`
+  - Writes: `company_ats`, `companies.ats_guess_last_checked_at`
 
 #### Utility/backfill workers exposed via internal API
 - Direct ops endpoints in `app/api/system.py`: `POST /internal/backfill-compliance`, `POST /internal/backfill-salary`, `POST /internal/backfill-department`

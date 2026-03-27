@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -50,6 +51,40 @@ def test_cloud_tasks_enqueuing_behavior(monkeypatch):
     data = response.json()
     assert data["status"] == "enqueued"
     assert data["cloud_task_name"] is not None
+
+
+@pytest.mark.parametrize(
+    ("task_name", "path"),
+    [
+        ("company-sources", "/internal/tasks/company-sources"),
+        ("careers", "/internal/tasks/careers"),
+        ("ats-reverse", "/internal/tasks/ats-reverse"),
+        ("guess", "/internal/tasks/guess"),
+    ],
+)
+def test_discovery_task_endpoints_enqueue_expected_handlers(monkeypatch, task_name, path):
+    monkeypatch.setattr(tasks_api, "is_tick_queue_configured", lambda: True)
+
+    def mock_create_tick_task(task_id, handler_url, payload, headers):
+        assert task_id
+        assert handler_url.endswith(f"/internal/tasks/{task_name}/execute")
+        assert payload == {"incremental": True, "limit": 100}
+        assert headers == {"Content-Type": "application/json"}
+        return {"name": f"projects/xyz/locations/xyz/queues/xyz/tasks/{task_name}"}
+
+    monkeypatch.setattr(tasks_api, "create_tick_task", mock_create_tick_task)
+
+    response = client.post(path)
+    assert response.status_code == 202
+
+    data = response.json()
+    assert data["task"] == task_name
+    assert data["status"] == "enqueued"
+    assert data["cloud_task_name"].endswith(task_name)
+
+
+def test_task_map_includes_split_discovery_phases():
+    assert {"company-sources", "careers", "ats-reverse", "guess"}.issubset(tasks_api.TASK_MAP)
 
 
 def test_cloud_tasks_enqueuing_error_handling(monkeypatch):

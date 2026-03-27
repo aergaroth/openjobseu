@@ -48,7 +48,7 @@ Non-goals remain unchanged:
 - [x] CI test workflow with PostgreSQL service
 - [x] Runtime-aware logging (text local, JSON in containers)
 - [x] Reorganized ATS adapters into `app/adapters/ats/` structure
-- [x] Cloud Tasks for robust async execution (backfills, discovery)
+- [x] Cloud Tasks for robust async execution (backfills, async tick execution, staggered discovery phases)
 - [x] OIDC authentication for M2M communication (Scheduler, Tasks)
 - [x] Modular Monolith routing groups for strict access control
 - [x] Strict OIDC audience validation for Cloud Tasks execution

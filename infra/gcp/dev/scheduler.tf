@@ -29,10 +29,10 @@ resource "google_cloud_tasks_queue" "tick_pipeline" {
 }
 
 resource "google_cloud_scheduler_job" "tick_ingestion" {
-  name      = "openjobseu-tick-ingestion"
-  region    = var.scheduler_region
-  schedule  = "0 * * * *" # co godzinę (np. 12:00, 13:00)
-  time_zone = "UTC"
+  name             = "openjobseu-tick-ingestion"
+  region           = var.scheduler_region
+  schedule         = "0 * * * *" # co godzinę (np. 12:00, 13:00)
+  time_zone        = "UTC"
   attempt_deadline = "30s"
 
   http_target {
@@ -51,10 +51,10 @@ resource "google_cloud_scheduler_job" "tick_ingestion" {
 }
 
 resource "google_cloud_scheduler_job" "ping_ingestion" {
-  name      = "openjobseu-ping-ingestion"
-  region    = var.scheduler_region
-  schedule  = "55 * * * *" # co godzinę (np. 12:55, 13:55)
-  time_zone = "UTC"
+  name             = "openjobseu-ping-ingestion"
+  region           = var.scheduler_region
+  schedule         = "55 * * * *" # co godzinę (np. 12:55, 13:55)
+  time_zone        = "UTC"
   attempt_deadline = "30s"
 
   http_target {
@@ -69,10 +69,10 @@ resource "google_cloud_scheduler_job" "ping_ingestion" {
 }
 
 resource "google_cloud_scheduler_job" "dorking_discovery" {
-  name      = "openjobseu-dorking"
-  region    = var.scheduler_region
-  schedule  = "15 2 * * *" # o 02:15 w nocy każdego dnia
-  time_zone = "UTC"
+  name             = "openjobseu-dorking"
+  region           = var.scheduler_region
+  schedule         = "15 2 * * *" # o 02:15 w nocy każdego dnia
+  time_zone        = "UTC"
   attempt_deadline = "30s"
 
   http_target {
@@ -91,10 +91,10 @@ resource "google_cloud_scheduler_job" "dorking_discovery" {
 }
 
 resource "google_cloud_scheduler_job" "tick_maintenance" {
-  name      = "openjobseu-tick-maintenance"
-  region    = var.scheduler_region
-  schedule  = "5 4 * * *" # o 04:05 rano każdego dnia
-  time_zone = "UTC"
+  name             = "openjobseu-tick-maintenance"
+  region           = var.scheduler_region
+  schedule         = "5 4 * * *" # o 04:05 rano każdego dnia
+  time_zone        = "UTC"
   attempt_deadline = "30s"
 
   http_target {
@@ -112,16 +112,82 @@ resource "google_cloud_scheduler_job" "tick_maintenance" {
   }
 }
 
-resource "google_cloud_scheduler_job" "discovery" {
-  name      = "openjobseu-discovery"
-  region    = var.scheduler_region
-  schedule  = "10 6 * * *" # o 06:10 rano każdego dnia
-  time_zone = "UTC"
+resource "google_cloud_scheduler_job" "discovery_company_sources" {
+  name             = "openjobseu-discovery-company-sources"
+  region           = var.scheduler_region
+  schedule         = "10 6 * * *" # o 06:10 rano każdego dnia
+  time_zone        = "UTC"
   attempt_deadline = "30s"
 
   http_target {
     http_method = "POST"
-    uri         = "${local.run_uri}/internal/discovery/run"
+    uri         = "${local.run_uri}/internal/tasks/company-sources"
+
+    headers = {
+      Content-Type = "application/json"
+    }
+
+    oidc_token {
+      service_account_email = google_service_account.scheduler_sa.email
+      audience              = local.run_uri
+    }
+  }
+}
+
+resource "google_cloud_scheduler_job" "discovery_careers" {
+  name             = "openjobseu-discovery-careers"
+  region           = var.scheduler_region
+  schedule         = "30 6 * * *" # o 06:30 rano każdego dnia
+  time_zone        = "UTC"
+  attempt_deadline = "30s"
+
+  http_target {
+    http_method = "POST"
+    uri         = "${local.run_uri}/internal/tasks/careers"
+
+    headers = {
+      Content-Type = "application/json"
+    }
+
+    oidc_token {
+      service_account_email = google_service_account.scheduler_sa.email
+      audience              = local.run_uri
+    }
+  }
+}
+
+resource "google_cloud_scheduler_job" "discovery_ats_reverse" {
+  name             = "openjobseu-discovery-ats-reverse"
+  region           = var.scheduler_region
+  schedule         = "50 6 * * *" # o 06:50 rano każdego dnia
+  time_zone        = "UTC"
+  attempt_deadline = "30s"
+
+  http_target {
+    http_method = "POST"
+    uri         = "${local.run_uri}/internal/tasks/ats-reverse"
+
+    headers = {
+      Content-Type = "application/json"
+    }
+
+    oidc_token {
+      service_account_email = google_service_account.scheduler_sa.email
+      audience              = local.run_uri
+    }
+  }
+}
+
+resource "google_cloud_scheduler_job" "discovery_guess" {
+  name             = "openjobseu-discovery-guess"
+  region           = var.scheduler_region
+  schedule         = "10 7 * * *" # o 07:10 rano każdego dnia
+  time_zone        = "UTC"
+  attempt_deadline = "30s"
+
+  http_target {
+    http_method = "POST"
+    uri         = "${local.run_uri}/internal/tasks/guess"
 
     headers = {
       Content-Type = "application/json"
@@ -135,10 +201,10 @@ resource "google_cloud_scheduler_job" "discovery" {
 }
 
 resource "google_cloud_scheduler_job" "ping_discovery" {
-  name      = "openjobseu-ping-discovery"
-  region    = var.scheduler_region
-  schedule  = "5 6 * * *" # o 06:05 rano każdego dnia
-  time_zone = "UTC"
+  name             = "openjobseu-ping-discovery"
+  region           = var.scheduler_region
+  schedule         = "5 6 * * *" # o 06:05 rano każdego dnia
+  time_zone        = "UTC"
   attempt_deadline = "30s"
 
   http_target {

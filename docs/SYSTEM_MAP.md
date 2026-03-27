@@ -22,13 +22,20 @@ Flow:
 
 ### B. Discovery pipeline (isolated)
 Entrypoint: `app/workers/discovery/pipeline.py`
+- `run_company_source_discovery`
 - `run_careers_discovery`
+- `run_ats_reverse_discovery`
 - `run_ats_guessing`
 
 Goal:
 - detecting ATS/provider+slug for companies,
 - populating `company_ats`,
-- updating `companies.discovery_last_checked_at`.
+- updating `companies.careers_last_checked_at` / `companies.ats_guess_last_checked_at`.
+
+Automation path:
+- manual all-in-one run: `POST /internal/discovery/run`
+- scheduled async phases: `POST /internal/tasks/company-sources` -> `POST /internal/tasks/careers` -> `POST /internal/tasks/ats-reverse` -> `POST /internal/tasks/guess`
+- all scheduled phases share the same Cloud Tasks queue and rely on staggered cron windows plus queue concurrency `1`
 
 ---
 
@@ -89,7 +96,9 @@ Goal:
   - Can also sync static frontend files during deploy-time publication when `sync_assets=True`
 
 ### Discovery workers
+- `run_company_source_discovery` (`app/workers/discovery/company_sources.py`)
 - `run_careers_discovery` (`app/workers/discovery/careers_crawler.py`)
+- `run_ats_reverse_discovery` (`app/workers/discovery/ats_reverse.py`)
 - `run_ats_guessing` (`app/workers/discovery/ats_guessing.py`)
 
 ### Utility/backfill workers (internal ops)
@@ -114,6 +123,7 @@ Goal:
 Notes:
 - `GET /jobs`, `GET /companies`, and `GET /jobs/stats/compliance-7d` exist in FastAPI, but are not public internet endpoints in `dev` or `prod` because Cloud Run invocation is restricted via IAM.
 - `GET /feed.json` remains the public dataset contract used by the static frontend.
+- Production and dev schedulers use `POST /internal/tasks/*` for automated discovery phases; `POST /internal/discovery/run` remains a manual synchronous operator endpoint.
 
 ---
 
