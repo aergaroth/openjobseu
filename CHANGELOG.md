@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.7.0](https://github.com/aergaroth/openjobseu/compare/v2.6.0...v2.7.0) (2026-03-27)
+
+
+### Features
+
+* **tests:** add comprehensive tests for Cloud Tasks and Google Search functionality ([02bbd97](https://github.com/aergaroth/openjobseu/commit/02bbd97481397141e57a2a53ba2052fd88c48a89))
+* **tests:** skip local Docker management for PostgreSQL in GitHub Actions ([ebcc4b0](https://github.com/aergaroth/openjobseu/commit/ebcc4b0a60bd9168c78c4a54b7fe1c459e376ef8))
+
+
+### Bug Fixes
+
+* **Dockerfile:** update base image to use public ECR for Python 3.13-slim ([0da0b4d](https://github.com/aergaroth/openjobseu/commit/0da0b4d3def33fea5a8afd303ecbecb7b801dc75))
+
 ## [2.6.0](https://github.com/aergaroth/openjobseu/compare/v2.5.0...v2.6.0) (2026-03-27)
 
 
