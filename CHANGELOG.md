@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.0](https://github.com/aergaroth/openjobseu/compare/v2.5.0...v2.6.0) (2026-03-27)
+
+
+### Features
+
+* **scheduler:** add ping ingestion and discovery jobs with health check ([00f7b89](https://github.com/aergaroth/openjobseu/commit/00f7b8985f70187697de508e3c6cdc08b9cd5d19))
+
 ## [2.5.0](https://github.com/aergaroth/openjobseu/compare/v2.4.1...v2.5.0) (2026-03-26)
 
 
