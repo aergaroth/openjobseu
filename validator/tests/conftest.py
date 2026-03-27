@@ -1,11 +1,12 @@
 import os
-import uuid
-import pytest
 from datetime import datetime, timezone
-from sqlalchemy import text
-from sqlalchemy.exc import InterfaceError, OperationalError, ProgrammingError
+import uuid
+
+import pytest
 import requests
 from faker import Faker
+from sqlalchemy import text
+from sqlalchemy.exc import InterfaceError, OperationalError, ProgrammingError
 
 # tests should run against PostgreSQL rather than SQLite.  the CI workflow
 # already exports a suitable `DATABASE_URL`; when running locally you can
