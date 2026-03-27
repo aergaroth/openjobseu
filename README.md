@@ -9,7 +9,7 @@ The project is backend-first and infrastructure-oriented. It leverages a modern 
 ## Core Features
 
 - **Compliance First**: Deterministic policy engine grading jobs by remote purity and EU geo-restrictions.
-- **Zero-Compute Public Feed**: The public frontend is 100% static. `feed.json` is refreshed by the runtime maintenance pipeline, while `frontend/index.html`, `frontend/style.css`, and `frontend/feed.js` are published separately by CI after a successful production deploy. Both are served from Google Cloud Storage/CDN, and runtime endpoints such as `/jobs`, `/companies`, and `/jobs/stats/compliance-7d` are not part of the public surface in production.
+- **Zero-Compute Public Feed**: The public frontend is 100% static. `feed.json` is refreshed by the runtime maintenance pipeline, while `frontend/index.html`, `frontend/style.css`, and `frontend/feed.js` are published separately by CI after a successful production deploy. Both are served from Google Cloud Storage/CDN, and runtime endpoints such as `/jobs`, `/companies`, and `/jobs/stats/compliance-7d` remain private Cloud Run interfaces in production rather than public internet APIs.
 - **Modular Monolith**: Cleanly separated domains (Ingestion, Compliance, Operations) within a single Python FastAPI application.
 - **Robust Async Processing**: Leverages Google Cloud Tasks and Cloud Scheduler for time-budgeted, idempotent, and heavily retried worker execution.
 - **Strict Security**: Endpoints split between UI (Session-based via Google OAuth) and M2M routes (OIDC tokens with strict Audience validation). For local development (`APP_RUNTIME=local`), the system falls back to dummy placeholders to ensure low friction.
@@ -33,8 +33,10 @@ Detailed documentation detailing the design decisions and data flows is located 
 
 - **Merge gatekeeper:** `ci.yml` runs the full `pytest` suite for pull requests targeting `main` and `develop`. This is the required status check that should block merges until green.
 - **Additional PR quality checks:** `pre-commit.yml` continues to validate pre-commit hooks and Commitizen commit-message compliance on pull requests.
+- **Infra PRs:** `terraform-plan.yml` runs `terraform validate` and `terraform plan` on pull requests that touch `infra/**`.
 - **Deploy only:** `dev_flow.yml` deploys after pushes to `develop` (typically after merge), and `prod_flow.yml` handles release/deploy steps after pushes to `main`. Neither workflow runs on pull requests.
 - **No duplicated full flow:** feature-branch pushes do not trigger the deploy workflows, while PRs trigger only `ci.yml`/`pre-commit.yml`. The deploy workflows run only after the merge commit lands on `develop` or `main`.
+- **Branch-maintenance automation:** `sync_main_to_develop.yml` keeps `develop` aligned with release changes merged to `main`, and `protect_develop.yml` recreates `develop` if the branch is deleted.
 - **Branch protection:** configure GitHub branch protection for both `main` and `develop` so the required status check includes `CI / pytest` before merge.
 
 ## Public frontend publishing model

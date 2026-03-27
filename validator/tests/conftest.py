@@ -166,10 +166,14 @@ class DbFactory:
 
     def create_ats(self, company_id: str, **overrides) -> dict:
         data = {
+            "company_ats_id": overrides.get("company_ats_id", str(uuid.uuid4())),
             "company_id": company_id,
             "provider": "greenhouse",
             "ats_slug": f"slug-{company_id[:8]}",
+            "ats_api_url": None,
             "careers_url": f"https://example.com/careers/{company_id[:8]}",
+            "is_active": True,
+            "last_sync_at": None,
             "created_at": datetime.now(timezone.utc),
             "updated_at": datetime.now(timezone.utc),
         }
@@ -178,8 +182,30 @@ class DbFactory:
         with self.engine.begin() as conn:
             conn.execute(
                 text("""
-                    INSERT INTO company_ats (company_id, provider, ats_slug, careers_url, created_at, updated_at)
-                    VALUES (:company_id, :provider, :ats_slug, :careers_url, :created_at, :updated_at)
+                    INSERT INTO company_ats (
+                        company_ats_id,
+                        company_id,
+                        provider,
+                        ats_slug,
+                        ats_api_url,
+                        careers_url,
+                        is_active,
+                        last_sync_at,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (
+                        :company_ats_id,
+                        :company_id,
+                        :provider,
+                        :ats_slug,
+                        :ats_api_url,
+                        :careers_url,
+                        :is_active,
+                        :last_sync_at,
+                        :created_at,
+                        :updated_at
+                    )
                 """),
                 data,
             )
@@ -238,6 +264,28 @@ class DbFactory:
             )
         return data
 
+    def create_job_source(self, job_id: str, **overrides) -> dict:
+        now = datetime.now(timezone.utc)
+        data = {
+            "job_id": job_id,
+            "source": overrides.get("source", "greenhouse:test"),
+            "source_job_id": overrides.get("source_job_id", f"src-{job_id}"),
+            "source_url": overrides.get("source_url", f"https://example.com/jobs/{job_id}"),
+            "first_seen_at": overrides.get("first_seen_at", now),
+            "last_seen_at": overrides.get("last_seen_at", now),
+            "seen_count": overrides.get("seen_count", 1),
+            "created_at": overrides.get("created_at", now),
+            "updated_at": overrides.get("updated_at", now),
+        }
+        data.update(overrides)
+
+        columns = ", ".join(data.keys())
+        placeholders = ", ".join(f":{k}" for k in data.keys())
+
+        with self.engine.begin() as conn:
+            conn.execute(text(f"INSERT INTO job_sources ({columns}) VALUES ({placeholders})"), data)
+        return data
+
     def create_company_with_jobs(
         self,
         num_jobs: int = 3,
@@ -278,6 +326,18 @@ class DbFactory:
                 conn.execute(
                     text("SELECT * FROM companies WHERE company_id = :company_id"),
                     {"company_id": company_id},
+                )
+                .mappings()
+                .one_or_none()
+            )
+            return dict(row) if row else None
+
+    def get_job(self, job_id: str) -> dict | None:
+        with self.engine.connect() as conn:
+            row = (
+                conn.execute(
+                    text("SELECT * FROM jobs WHERE job_id = :job_id"),
+                    {"job_id": job_id},
                 )
                 .mappings()
                 .one_or_none()

@@ -41,8 +41,8 @@ resource "google_secret_manager_secret_iam_member" "cloud_run_google_cse_id" {
 
 
 resource "google_cloud_run_v2_service" "this" {
-  name     = var.service_name
-  location = var.region
+  name                = var.service_name
+  location            = var.region
   deletion_protection = false
 
   lifecycle {
@@ -53,7 +53,7 @@ resource "google_cloud_run_v2_service" "this" {
 
     service_account = data.google_service_account.cloud_run_runtime.email
 
-    timeout = "180s"
+    timeout = "1800s"
 
     containers {
       image = var.image
@@ -128,7 +128,7 @@ resource "google_cloud_run_v2_service" "this" {
       }
       env {
         name  = "TICK_TASK_DISPATCH_DEADLINE"
-        value = "180s"
+        value = "1800s"
       }
       env {
         name = "GOOGLE_API_KEY"

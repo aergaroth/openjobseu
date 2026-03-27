@@ -128,6 +128,16 @@ def trigger_async_task(
             logger.error(f"Failed to enqueue task {task_name}", extra={"error": str(e)})
             raise HTTPException(status_code=500, detail="Failed to enqueue task in Cloud Tasks")
 
+        logger.info(
+            "task_enqueued",
+            extra={
+                "task": task_name,
+                "task_id": task_id,
+                "handler_url": handler_url,
+                "cloud_task_name": task_response.get("name"),
+            },
+        )
+
         return Response(
             content=json.dumps(
                 {
