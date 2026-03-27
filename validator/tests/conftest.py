@@ -1,7 +1,4 @@
-import logging
 import os
-import subprocess
-import time
 from datetime import datetime, timezone
 import uuid
 
@@ -53,79 +50,6 @@ from alembic import command
 from alembic.config import Config
 
 _engine = None
-logger = logging.getLogger(__name__)
-
-
-@pytest.fixture(scope="session", autouse=True)
-def postgres_container(request):
-    """
-    Manages the PostgreSQL test container. Starts it if not running,
-    and stops it after the test session.
-    """
-    container_name = "openjobspg"
-    running_in_github_actions = os.getenv("GITHUB_ACTIONS", "").lower() == "true"
-
-    if running_in_github_actions:
-        logger.info("Running in GitHub Actions; skipping local Docker management for PostgreSQL")
-        yield
-        return
-
-    def stop_container():
-        logger.info("Stopping test PostgreSQL container %s", container_name)
-        subprocess.run(["docker", "stop", container_name], check=False, capture_output=True)
-        subprocess.run(["docker", "rm", container_name], check=False, capture_output=True)
-
-    try:
-        inspect_result = subprocess.run(
-            ["docker", "inspect", "-f", "{{.State.Running}}", container_name],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        if "true" in inspect_result.stdout:
-            logger.info(
-                "Test PostgreSQL container %s is already running; reusing it for this session",
-                container_name,
-            )
-            yield
-            return
-    except subprocess.CalledProcessError:
-        pass  # Container not running, proceed to start it
-
-    logger.info("Starting test PostgreSQL container %s", container_name)
-    docker_command = [
-        "docker",
-        "run",
-        "--rm",
-        "--name",
-        container_name,
-        "-e",
-        "POSTGRES_PASSWORD=postgres",
-        "-e",
-        "POSTGRES_DB=testdb",
-        "-p",
-        "5432:5432",
-        "-d",
-        "postgres:16",
-    ]
-    subprocess.run(docker_command, check=True, capture_output=True)
-    request.addfinalizer(stop_container)
-
-    logger.info("Waiting for PostgreSQL test container to become ready")
-    retries = 10
-    for i in range(retries):
-        try:
-            engine = get_engine()
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-            logger.info("PostgreSQL test container is ready")
-            break
-        except Exception:
-            time.sleep(i * 2)
-    else:
-        pytest.fail("Could not connect to the PostgreSQL container after several retries.")
-
-    yield
 
 
 @pytest.fixture(autouse=True)
@@ -159,7 +83,7 @@ def block_external_httpx_requests(respx_mock):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def db_engine_setup(postgres_container):
+def db_engine_setup():
     """Inicjalizuje bazę i uruchamia migracje dokładnie raz na sesję testową."""
     global _engine
     try:
