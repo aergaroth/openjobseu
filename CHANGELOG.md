@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.8.0](https://github.com/aergaroth/openjobseu/compare/v2.7.0...v2.8.0) (2026-03-27)
+
+
+### Features
+
+* Enhance task management with logging and new discovery endpoints ([2b750e2](https://github.com/aergaroth/openjobseu/commit/2b750e298186dfa10f3ef0d40e733a07cd5d2732))
+
 ## [2.7.0](https://github.com/aergaroth/openjobseu/compare/v2.6.0...v2.7.0) (2026-03-27)
 
 
