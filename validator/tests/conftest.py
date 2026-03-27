@@ -63,6 +63,12 @@ def postgres_container(request):
     and stops it after the test session.
     """
     container_name = "openjobspg"
+    running_in_github_actions = os.getenv("GITHUB_ACTIONS", "").lower() == "true"
+
+    if running_in_github_actions:
+        logger.info("Running in GitHub Actions; skipping local Docker management for PostgreSQL")
+        yield
+        return
 
     def stop_container():
         logger.info("Stopping test PostgreSQL container %s", container_name)
