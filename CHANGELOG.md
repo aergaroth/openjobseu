@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.9.0](https://github.com/aergaroth/openjobseu/compare/v2.8.0...v2.9.0) (2026-03-28)
+
+
+### Features
+
+* Add logging and enhance HTML cleaning in cleaning module; introduce new test cases for cleaning functions ([2267078](https://github.com/aergaroth/openjobseu/commit/2267078902d6a3fa8e1e43bc6200d7d4e4eca890))
+
 ## [2.8.0](https://github.com/aergaroth/openjobseu/compare/v2.7.0...v2.8.0) (2026-03-27)
 
 
