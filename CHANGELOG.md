@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.10.0](https://github.com/aergaroth/openjobseu/compare/v2.9.0...v2.10.0) (2026-03-28)
+
+
+### Features
+
+* **cleaning:** enhance HTML cleaning and encoding functions ([f59d969](https://github.com/aergaroth/openjobseu/commit/f59d969ec06b53ef547fd863fb52c9722b22ddf5))
+
+
+### Bug Fixes
+
+* **cleaning:** format regex patterns for HTML cleaning consistency ([1a08922](https://github.com/aergaroth/openjobseu/commit/1a089223564ec1af99aa4aa65a224d7ddc115fa8))
+
 ## [2.9.0](https://github.com/aergaroth/openjobseu/compare/v2.8.0...v2.9.0) (2026-03-28)
 
 
