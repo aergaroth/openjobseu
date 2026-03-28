@@ -26,8 +26,18 @@ BOILERPLATE_PATTERNS = {
 
 HTML_CLEANING_PATTERNS = [
     (re.compile(r"<(script|style)[^>]*>.*?</\1>", flags=re.IGNORECASE | re.DOTALL), ""),
-    (re.compile(r"<div[^>]*class=[\"'][^\"']*content-conclusion[^\"']*[\"'][^>]*>.*", flags=re.IGNORECASE | re.DOTALL), ""),
-    (re.compile(r"<div[^>]*class=[\"'][^\"']*content-intro[^\"']*[\"'][^>]*>.*?</div\s*>", flags=re.IGNORECASE | re.DOTALL), ""),
+    (
+        re.compile(
+            r"<div[^>]*class=[\"'][^\"']*content-conclusion[^\"']*[\"'][^>]*>.*", flags=re.IGNORECASE | re.DOTALL
+        ),
+        "",
+    ),
+    (
+        re.compile(
+            r"<div[^>]*class=[\"'][^\"']*content-intro[^\"']*[\"'][^>]*>.*?</div\s*>", flags=re.IGNORECASE | re.DOTALL
+        ),
+        "",
+    ),
 ]
 
 # Wymaga przechwytywania (p|div|span), żeby zamknąć poprawny tag w </\1>
