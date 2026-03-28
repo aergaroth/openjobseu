@@ -1,6 +1,7 @@
 import html
 import re
 import logging
+import charset_normalizer
 
 logger = logging.getLogger(__name__)
 
@@ -10,29 +11,111 @@ SPAM_PATTERNS = {
         r"(?i)please mention the word\s+[a-z0-9]+\s+(?:when applying|in your application)[^\n]*\n?"
     ),
     "beta_spam": re.compile(r"(?i)(?:this is a\s+)?beta feature to avoid spam[^\n]*\n?"),
-    "rmt_tag": re.compile(r"RMTg[a-zA-Z0-9+/]+={0,2}\s*\n?"),
+    "rmt_tag": re.compile(r"(?i)rmtg[-a-z0-9+/]+={0,2}\s*\n?"),
     "tracking_pixel": re.compile(r"(?i)<img[^>]+src=[\"'][^\"']*tracking[^\"']*[\"'][^>]*>"),
 }
 
 BOILERPLATE_PATTERNS = {
     "eeo_statement": re.compile(
-        r"(?i)\s*.*(is proud to be an equal opportunity employer|is an equal opportunity employer|is committed to working with the broadest talent pool|We hire for skills and potential)[\s\S]*?(?=\n\s*\n|$)"
+        r"(?i)(?:\n\n|^)[^\n]*(?:is proud to be an equal opportunity employer|is an equal opportunity employer|is committed to working with the broadest talent pool|We hire for skills and potential)[\s\S]*?(?=\n\s*\n|$)"
     ),
     "privacy_notice": re.compile(
-        r"(?i)\s*.*(Please review our Candidate Privacy Notice|For information about our privacy practices, please visit)[\s\S]*?(?=\n\s*\n|$)"
+        r"(?i)(?:\n\n|^)[^\n]*(?:Please review our Candidate Privacy Notice|For information about our privacy practices, please visit)[\s\S]*?(?=\n\s*\n|$)"
     ),
 }
+
+HTML_CLEANING_PATTERNS = [
+    (re.compile(r"<(script|style)[^>]*>.*?</\1>", flags=re.IGNORECASE | re.DOTALL), ""),
+    (
+        re.compile(
+            r"<div[^>]*class=[\"'][^\"']*content-conclusion[^\"']*[\"'][^>]*>.*", flags=re.IGNORECASE | re.DOTALL
+        ),
+        "",
+    ),
+    (
+        re.compile(
+            r"<div[^>]*class=[\"'][^\"']*content-intro[^\"']*[\"'][^>]*>.*?</div\s*>", flags=re.IGNORECASE | re.DOTALL
+        ),
+        "",
+    ),
+]
+
+# Wymaga przechwytywania (p|div|span), żeby zamknąć poprawny tag w </\1>
+EMPTY_TAG_PATTERN = re.compile(r"<(p|div|span)[^>]*>(?:&nbsp;|\u00A0|<br\s*/?>|\s)*</\1>", flags=re.IGNORECASE)
+
+HTML_FORMATTING_PATTERNS = [
+    (re.compile(r"</p\s*>", flags=re.IGNORECASE), "\n\n"),
+    (re.compile(r"<p[^>]*>", flags=re.IGNORECASE), ""),
+    (re.compile(r"<br\s*/?>", flags=re.IGNORECASE), "\n"),
+    (re.compile(r"<hr[^>]*>", flags=re.IGNORECASE), "\n---\n"),
+    (re.compile(r"<h1[^>]*>", flags=re.IGNORECASE), "\n# "),
+    (re.compile(r"<h2[^>]*>", flags=re.IGNORECASE), "\n## "),
+    (re.compile(r"<h3[^>]*>", flags=re.IGNORECASE), "\n### "),
+    (re.compile(r"<h4[^>]*>", flags=re.IGNORECASE), "\n#### "),
+    (re.compile(r"<h5[^>]*>", flags=re.IGNORECASE), "\n##### "),
+    (re.compile(r"<h6[^>]*>", flags=re.IGNORECASE), "\n###### "),
+    (re.compile(r"</h[1-6]\s*>", flags=re.IGNORECASE), "\n\n"),
+    (re.compile(r"<blockquote[^>]*>", flags=re.IGNORECASE), "\n> "),
+    (re.compile(r"</blockquote\s*>", flags=re.IGNORECASE), "\n\n"),
+    (re.compile(r"<li[^>]*>", flags=re.IGNORECASE), "\n- "),
+    (re.compile(r"</li\s*>", flags=re.IGNORECASE), ""),
+    (re.compile(r"</(?:ul|ol)\s*>", flags=re.IGNORECASE), "\n\n"),
+    (re.compile(r"<(?:b|strong)[^>]*>", flags=re.IGNORECASE), "**"),
+    (re.compile(r"</(?:b|strong)\s*>", flags=re.IGNORECASE), "**"),
+    (re.compile(r"<(?:i|em|u)[^>]*>", flags=re.IGNORECASE), "_"),
+    (re.compile(r"</(?:i|em|u)\s*>", flags=re.IGNORECASE), "_"),
+    (re.compile(r"<a[^>]*>(.*?)</a>", flags=re.IGNORECASE | re.DOTALL), r"\1"),
+    (re.compile(r"</div\s*>", flags=re.IGNORECASE), "\n\n"),
+]
+
+REMAINING_HTML_TAGS = re.compile(r"<[^>]+>")
+
+# Używany w clean_html (po wyrzuceniu divów) i normalize_whitespace (finalna normalizacja).
+COLLAPSE_NEWLINES = re.compile(r"\n{3,}")
+
+WHITESPACE_TRIM_END_LINES = re.compile(r"[ \t]+\n")
+WHITESPACE_COLLAPSE_SPACES = re.compile(r"[ \t]+")
+
+MD_MALFORMED_LINKS = re.compile(r"\[([0-9\.]+)\]\(https?://[0-9\.]+\)")
+MD_EMPTY_BOLD = re.compile(r"\*+\s*\*+")
+MD_EMPTY_ITALIC = re.compile(r"_+\s*_+")
+# Usuwa linie złożone wyłącznie z symboli markdown (puste nagłówki, listy, kursywa),
+# ale zachowuje separatory poziome `---` i `***` wstawione przez konwersję <hr>.
+MD_EMPTY_LINES = re.compile(r"^\s*(?!-{3,}$|\*{3,}$)([#*_-]+|>{1,})\s*$", flags=re.MULTILINE)
+MD_LEFTOVER_MARKERS = re.compile(r"^\s*(\*\*|__)\s*$", flags=re.MULTILINE)
+
+# Znaki charakterystyczne dla mojibake UTF-8 zdekodowanego jako latin1.
+# Sprawdzamy tylko znaki spoza ASCII, żeby uniknąć kosztownej ścieżki dla czystego tekstu.
+_MOJIBAKE_CHARS = frozenset("â\x80\x99Ã\x82ð\x9f")
 
 
 def fix_encoding(text: str) -> str:
     if not text:
         return text
 
-    if any(bad in text for bad in ("â", "Ã", "ð")):
-        try:
-            return text.encode("latin1").decode("utf-8")
-        except Exception:
-            return text
+    # Szybki pre-check: jeśli tekst jest czystym ASCII lub nie zawiera podejrzanych
+    # sekwencji, pomijamy kosztowne encode/decode przez charset_normalizer.
+    if text.isascii() or not any(c in text for c in _MOJIBAKE_CHARS):
+        return text
+
+    try:
+        # Mojibake składa się ze znaków jednobajtowych.
+        # Rzutujemy tekst na latin1, by uzyskać pierwotne bajty przed błędnym dekodowaniem.
+        raw_bytes = text.encode("latin1")
+
+        # charset_normalizer bada bajty i zwraca najlepsze dopasowanie (najczęściej utf-8).
+        match = charset_normalizer.from_bytes(raw_bytes).best()
+        if match is not None:
+            decoded = str(match)
+            # Podmieniamy tylko gdy wynik faktycznie różni się od wejścia —
+            # zapobiega uszkodzeniu poprawnych tekstów przez błędne zgadywanie kodowania.
+            if decoded != text:
+                return decoded
+    except UnicodeEncodeError:
+        # Tekst zawiera znaki spoza zakresu latin1 (np. emoji) — na pewno nie mojibake.
+        pass
+    except Exception as e:
+        logger.debug("Failed to fix encoding with charset_normalizer: %s", e)
 
     return text
 
@@ -41,73 +124,26 @@ def clean_html(text: str) -> str:
     if not text:
         return text
 
-    # Usuwanie tagów <script> i <style> wraz z całą ich zawartością (kod JS/CSS)
-    text = re.sub(r"<(script|style)[^>]*>.*?</\1>", "", text, flags=re.IGNORECASE | re.DOTALL)
+    for pattern, repl in HTML_CLEANING_PATTERNS:
+        text = pattern.sub(repl, text)
 
-    # Wycinka "szumu" rekrutacyjnego ATS (np. RODO, EEO, boilerplate o firmie)
-    # Klasa "content-conclusion" (Greenhouse) pojawia się na końcu, więc tniemy aż do końca tekstu
-    text = re.sub(
-        r"<div[^>]*class=[\"'][^\"']*content-conclusion[^\"']*[\"'][^>]*>.*", "", text, flags=re.IGNORECASE | re.DOTALL
-    )
-    # Klasa "content-intro" (Greenhouse) jest często u góry, wycinamy pierwszego diva
-    text = re.sub(
-        r"<div[^>]*class=[\"'][^\"']*content-intro[^\"']*[\"'][^>]*>.*?</div\s*>",
-        "",
-        text,
-        flags=re.IGNORECASE | re.DOTALL,
-    )
+    # Usuwanie pustych paragrafów, divów i spanów (podwójny przebieg na zagnieżdżenia)
+    text = EMPTY_TAG_PATTERN.sub("", text)
+    text = EMPTY_TAG_PATTERN.sub("", text)
 
-    # Usuwanie pustych paragrafów, divów i spanów (w tym zawierających tylko spacje, &nbsp; lub <br>)
-    # Puszczamy to dwukrotnie, aby wyłapać zagnieżdżone przypadki
-    empty_tag_pattern = r"<(p|div|span)[^>]*>(?:&nbsp;|\u00A0|<br\s*/?>|\s)*</\1>"
-    text = re.sub(empty_tag_pattern, "", text, flags=re.IGNORECASE)
-    text = re.sub(empty_tag_pattern, "", text, flags=re.IGNORECASE)
-
-    # Formatowanie strukturalne do czystego Markdown-like
-    text = re.sub(r"</p\s*>", "\n\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"<p[^>]*>", "", text, flags=re.IGNORECASE)
-    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"<hr[^>]*>", "\n---\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"<h1[^>]*>", "\n# ", text, flags=re.IGNORECASE)
-    text = re.sub(r"<h2[^>]*>", "\n## ", text, flags=re.IGNORECASE)
-    text = re.sub(r"<h3[^>]*>", "\n### ", text, flags=re.IGNORECASE)
-    text = re.sub(r"<h4[^>]*>", "\n#### ", text, flags=re.IGNORECASE)
-    text = re.sub(r"<h5[^>]*>", "\n##### ", text, flags=re.IGNORECASE)
-    text = re.sub(r"<h6[^>]*>", "\n###### ", text, flags=re.IGNORECASE)
-    text = re.sub(r"</h[1-6]\s*>", "\n\n", text, flags=re.IGNORECASE)
-
-    text = re.sub(r"<blockquote[^>]*>", "\n> ", text, flags=re.IGNORECASE)
-    text = re.sub(r"</blockquote\s*>", "\n\n", text, flags=re.IGNORECASE)
-
-    text = re.sub(r"<li[^>]*>", "\n- ", text, flags=re.IGNORECASE)
-    text = re.sub(r"</li\s*>", "", text, flags=re.IGNORECASE)
-    text = re.sub(r"</(ul|ol)\s*>", "\n\n", text, flags=re.IGNORECASE)
-
-    text = re.sub(r"<(b|strong)[^>]*>", "**", text, flags=re.IGNORECASE)
-    text = re.sub(r"</(b|strong)\s*>", "**", text, flags=re.IGNORECASE)
-    text = re.sub(r"<(i|em|u)[^>]*>", "_", text, flags=re.IGNORECASE)
-    text = re.sub(r"</(i|em|u)\s*>", "_", text, flags=re.IGNORECASE)
-
-    # Upraszczanie linków - wyciągamy tylko Anchor Text (usuwamy szum samych URL pod LLM)
-    text = re.sub(
-        r"<a[^>]*>(.*?)</a>",
-        r"\1",
-        text,
-        flags=re.IGNORECASE | re.DOTALL,
-    )
-
-    text = re.sub(r"</div\s*>", "\n\n", text, flags=re.IGNORECASE)
+    for pattern, repl in HTML_FORMATTING_PATTERNS:
+        text = pattern.sub(repl, text)
 
     # Ostateczne usunięcie pozostałych tagów HTML (takich jak <span>, <article>, osierocone atrybuty)
-    text = re.sub(r"<[^>]+>", "", text)
+    text = REMAINING_HTML_TAGS.sub("", text)
     text = html.unescape(text)
 
     # Semantyczna wycinka boilerplate'u po konwersji na tekst
-    for name, pattern in BOILERPLATE_PATTERNS.items():
+    for _, pattern in BOILERPLATE_PATTERNS.items():
         text = pattern.sub("", text)
 
     # Wstępna redukcja wielu pustych linii po wyrzucaniu divów
-    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = COLLAPSE_NEWLINES.sub("\n\n", text)
 
     return text.strip()
 
@@ -122,13 +158,13 @@ def normalize_whitespace(text: str) -> str:
     text = text.replace("\xa0", " ")
 
     # Trim whitespace at the end of lines
-    text = re.sub(r"[ \t]+\n", "\n", text)
+    text = WHITESPACE_TRIM_END_LINES.sub("\n", text)
 
     # Collapse multiple spaces/tabs into a single space
-    text = re.sub(r"[ \t]+", " ", text)
+    text = WHITESPACE_COLLAPSE_SPACES.sub(" ", text)
 
     # Collapse multiple newlines into a maximum of two
-    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = COLLAPSE_NEWLINES.sub("\n\n", text)
 
     return text.strip()
 
@@ -159,53 +195,41 @@ def clean_description(text: str, source: str) -> str:
         return text
 
     try:
-        # Log the original text length and source
-        logger.debug(f"Starting cleaning for source '{source}' - original length: {len(text)}")
+        logger.debug("Starting cleaning for source '%s' - original length: %d", source, len(text))
 
         # First pass: basic encoding and HTML cleaning
         text = fix_encoding(text)
         text = clean_html(text)
         text = _clean_markdown_artifacts(text)
 
-        # Log after first pass
-        logger.debug(f"After first pass - length: {len(text)}")
+        logger.debug("After first pass - length: %d", len(text))
+
+        # For remoteok source, remove spam patterns BEFORE whitespace normalization
+        if source == "remoteok":
+            for _, pattern in SPAM_PATTERNS.items():
+                text = pattern.sub("", text)
 
         # Validate that no HTML tags remain
-        if re.search(r"<[^>]+>", text):
-            # If HTML tags still exist, use a more aggressive cleaning approach
-            logger.debug("HTML tags still present, using aggressive cleaning")
-            text = re.sub(r"<[^>]+>", "", text)
+        if REMAINING_HTML_TAGS.search(text):
+            logger.warning("HTML tags still present after initial cleaning for source '%s'", source)
+            text = REMAINING_HTML_TAGS.sub("", text)
             text = html.unescape(text)
-            text = re.sub(r"<[^>]+>", "", text)  # Run again to catch nested tags
 
-        # Log after aggressive cleaning
-        logger.debug(f"After aggressive cleaning - length: {len(text)}")
+        logger.debug("After aggressive cleaning - length: %d", len(text))
 
         # Remove any remaining whitespace artifacts
         text = normalize_whitespace(text)
 
-        # Log after whitespace normalization
-        logger.debug(f"After whitespace normalization - length: {len(text)}")
-
-        # For remoteok source, remove spam patterns
-        if source == "remoteok":
-            for name, pattern in SPAM_PATTERNS.items():
-                text = pattern.sub("", text)
-
-        # Final validation
-        if re.search(r"<[^>]+>", text):
-            logger.warning(f"HTML tags still present after cleaning for source '{source}'")
-
-        logger.debug(f"Cleaning completed successfully for source '{source}'")
+        logger.debug("Cleaning completed successfully for source '%s'", source)
         return text.strip()
 
     except Exception:
-        logger.exception(f"Cleaning failed for source '{source}'")
+        logger.exception("Cleaning failed for source '%s'", source)
         # Fallback: remove all HTML tags and return basic cleaned text
-        text = re.sub(r"<[^>]+>", "", text)
+        text = REMAINING_HTML_TAGS.sub("", text)
         text = html.unescape(text)
         text = normalize_whitespace(text)
-        logger.debug(f"Fallback cleaning completed for source '{source}'")
+        logger.debug("Fallback cleaning completed for source '%s'", source)
         return text.strip()
 
 
@@ -214,18 +238,18 @@ def _clean_markdown_artifacts(text: str) -> str:
         return text
 
     # Fix for ATS converting numbers with dots into malformed links
-    text = re.sub(r"\[([0-9\.]+)\]\(https?://[0-9\.]+\)", r"\1", text)
+    text = MD_MALFORMED_LINKS.sub(r"\1", text)
 
     # Remove empty markdown formatting like ****, __, ** **, etc.
     # by replacing them with a single space to avoid joining words.
-    text = re.sub(r"\*+\s*\*+", " ", text)
-    text = re.sub(r"_+\s*_+", " ", text)
+    text = MD_EMPTY_BOLD.sub(" ", text)
+    text = MD_EMPTY_ITALIC.sub(" ", text)
 
     # Remove empty lines that are just markdown symbols (e.g., "- ", "# ", "_")
     # This handles empty list items, headers, and standalone formatting characters.
-    text = re.sub(r"^\s*([#*_-]+|>{1,})\s*$", "", text, flags=re.MULTILINE)
+    text = MD_EMPTY_LINES.sub("", text)
 
     # Clean up leftover empty bold/italic markers, often on their own lines
-    text = re.sub(r"^\s*(\*\*|__)\s*$", "", text, flags=re.MULTILINE)
+    text = MD_LEFTOVER_MARKERS.sub("", text)
 
     return text

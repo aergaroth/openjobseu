@@ -1,4 +1,9 @@
-from app.domain.jobs.cleaning import clean_html
+from app.domain.jobs.cleaning import (
+    clean_html,
+    clean_description,
+    fix_encoding,
+    _clean_markdown_artifacts,
+)
 
 
 def test_clean_html_removes_inline_styles_and_spans():
@@ -88,3 +93,52 @@ def test_clean_html_removes_scripts_and_styles():
     assert "Witaj" in cleaned
     assert "alert" not in cleaned
     assert "color: red" not in cleaned
+
+
+def test_fix_encoding_resolves_mojibake():
+    # Błędnie zdekodowany apostrof (Right Single Quotation Mark) jako latin-1: "Weâ\x80\x99re"
+    raw_mojibake = "We\u00e2\u0080\u0099re looking for engineers."
+    fixed = fix_encoding(raw_mojibake)
+    assert fixed == "We’re looking for engineers."
+
+
+def test_fix_encoding_ignores_valid_utf8_and_emojis():
+    # Poprawny tekst w UTF-8 z polskimi znakami i emoji nie może zostać uszkodzony
+    valid_text = "Zażółć gęślą jaźń 🚀 😊"
+    fixed = fix_encoding(valid_text)
+    assert fixed == valid_text
+
+
+def test_clean_description_removes_remoteok_spam():
+    raw_text = """
+    <p>We are hiring!</p>
+    <p>Please mention the word BANANA when applying to prove you are human.</p>
+    <p>This is a beta feature to avoid spam.</p>
+    <p>RMTgabc123==</p>
+    """
+    cleaned = clean_description(raw_text, source="remoteok")
+    assert "We are hiring!" in cleaned
+    assert "BANANA" not in cleaned
+    assert "beta feature" not in cleaned
+    assert "RMTgabc" not in cleaned
+
+
+def test_clean_description_preserves_spam_patterns_for_other_sources():
+    # Jeśli source nie jest 'remoteok', filtry na specyficzny spam nie powinny się uruchomić
+    raw_text = "<p>Please mention the word BANANA when applying.</p>"
+    cleaned = clean_description(raw_text, source="greenhouse")
+    assert "BANANA" in cleaned
+
+
+def test_clean_markdown_artifacts():
+    raw_md = """
+    # Header
+    ** **
+    __ __
+    [1.2.3](http://1.2.3)
+    """
+    cleaned = _clean_markdown_artifacts(raw_md)
+    assert "** **" not in cleaned
+    assert "__ __" not in cleaned
+    assert "1.2.3" in cleaned  # Malformed link z ATS został odzyskany do czystego tekstu
+    assert "[1.2.3]" not in cleaned
