@@ -1,5 +1,8 @@
 import html
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 SPAM_PATTERNS = {
@@ -9,6 +12,15 @@ SPAM_PATTERNS = {
     "beta_spam": re.compile(r"(?i)(?:this is a\s+)?beta feature to avoid spam[^\n]*\n?"),
     "rmt_tag": re.compile(r"RMTg[a-zA-Z0-9+/]+={0,2}\s*\n?"),
     "tracking_pixel": re.compile(r"(?i)<img[^>]+src=[\"'][^\"']*tracking[^\"']*[\"'][^>]*>"),
+}
+
+BOILERPLATE_PATTERNS = {
+    "eeo_statement": re.compile(
+        r"(?i)\s*.*(is proud to be an equal opportunity employer|is an equal opportunity employer|is committed to working with the broadest talent pool|We hire for skills and potential)[\s\S]*?(?=\n\s*\n|$)"
+    ),
+    "privacy_notice": re.compile(
+        r"(?i)\s*.*(Please review our Candidate Privacy Notice|For information about our privacy practices, please visit)[\s\S]*?(?=\n\s*\n|$)"
+    ),
 }
 
 
@@ -100,18 +112,6 @@ def clean_html(text: str) -> str:
     return text.strip()
 
 
-BOILERPLATE_PATTERNS = {
-    "eeo_statement": re.compile(
-        r"(?i)\s*.*(is proud to be an equal opportunity employer|is an equal opportunity employer|is committed to working with the broadest talent pool|We hire for skills and potential)[\s\S]*?(?=\n\s*\n|$)",
-        re.IGNORECASE,
-    ),
-    "privacy_notice": re.compile(
-        r"(?i)\s*.*(Please review our Candidate Privacy Notice|For information about our privacy practices, please visit)[\s\S]*?(?=\n\s*\n|$)",
-        re.IGNORECASE,
-    ),
-}
-
-
 def normalize_whitespace(text: str) -> str:
     if not text:
         return text
@@ -158,16 +158,55 @@ def clean_description(text: str, source: str) -> str:
     if not text:
         return text
 
-    text = fix_encoding(text)
-    text = clean_html(text)
-    text = _clean_markdown_artifacts(text)
+    try:
+        # Log the original text length and source
+        logger.debug(f"Starting cleaning for source '{source}' - original length: {len(text)}")
 
-    if source == "remoteok":
-        for name, pattern in SPAM_PATTERNS.items():
-            text = pattern.sub("", text)
+        # First pass: basic encoding and HTML cleaning
+        text = fix_encoding(text)
+        text = clean_html(text)
+        text = _clean_markdown_artifacts(text)
 
-    text = normalize_whitespace(text)
-    return text
+        # Log after first pass
+        logger.debug(f"After first pass - length: {len(text)}")
+
+        # Validate that no HTML tags remain
+        if re.search(r"<[^>]+>", text):
+            # If HTML tags still exist, use a more aggressive cleaning approach
+            logger.debug("HTML tags still present, using aggressive cleaning")
+            text = re.sub(r"<[^>]+>", "", text)
+            text = html.unescape(text)
+            text = re.sub(r"<[^>]+>", "", text)  # Run again to catch nested tags
+
+        # Log after aggressive cleaning
+        logger.debug(f"After aggressive cleaning - length: {len(text)}")
+
+        # Remove any remaining whitespace artifacts
+        text = normalize_whitespace(text)
+
+        # Log after whitespace normalization
+        logger.debug(f"After whitespace normalization - length: {len(text)}")
+
+        # For remoteok source, remove spam patterns
+        if source == "remoteok":
+            for name, pattern in SPAM_PATTERNS.items():
+                text = pattern.sub("", text)
+
+        # Final validation
+        if re.search(r"<[^>]+>", text):
+            logger.warning(f"HTML tags still present after cleaning for source '{source}'")
+
+        logger.debug(f"Cleaning completed successfully for source '{source}'")
+        return text.strip()
+
+    except Exception:
+        logger.exception(f"Cleaning failed for source '{source}'")
+        # Fallback: remove all HTML tags and return basic cleaned text
+        text = re.sub(r"<[^>]+>", "", text)
+        text = html.unescape(text)
+        text = normalize_whitespace(text)
+        logger.debug(f"Fallback cleaning completed for source '{source}'")
+        return text.strip()
 
 
 def _clean_markdown_artifacts(text: str) -> str:
@@ -175,7 +214,7 @@ def _clean_markdown_artifacts(text: str) -> str:
         return text
 
     # Fix for ATS converting numbers with dots into malformed links
-    text = re.sub(r"\[([0-9\.]+)\]\(http://[0-9\.]+\)", r"\1", text)
+    text = re.sub(r"\[([0-9\.]+)\]\(https?://[0-9\.]+\)", r"\1", text)
 
     # Remove empty markdown formatting like ****, __, ** **, etc.
     # by replacing them with a single space to avoid joining words.
