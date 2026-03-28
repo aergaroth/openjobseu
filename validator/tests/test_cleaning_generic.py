@@ -80,3 +80,11 @@ def test_clean_html_removes_excessive_whitespace():
     assert "\n\n\n" not in cleaned
     assert "First line." in cleaned
     assert "Second line." in cleaned
+
+
+def test_clean_html_removes_scripts_and_styles():
+    raw_html = "<div>Witaj<script>alert('spam');</script><style>body {color: red;}</style></div>"
+    cleaned = clean_html(raw_html)
+    assert "Witaj" in cleaned
+    assert "alert" not in cleaned
+    assert "color: red" not in cleaned
