@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.10.1](https://github.com/aergaroth/openjobseu/compare/v2.10.0...v2.10.1) (2026-03-28)
+
+
+### Bug Fixes
+
+* change non_eu countries to lower case ([40f5c20](https://github.com/aergaroth/openjobseu/commit/40f5c202e668c3695e8d786a3d8ab79b16428845))
+* Expand geo_data with additional countries ([0cc9a9e](https://github.com/aergaroth/openjobseu/commit/0cc9a9ee80c1ce55cd1919a7cf8b7ca307fd62da))
+
 ## [2.10.0](https://github.com/aergaroth/openjobseu/compare/v2.9.0...v2.10.0) (2026-03-28)
 
 
