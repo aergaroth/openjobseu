@@ -1,9 +1,12 @@
 from datetime import datetime, timezone
 import logging
-from sqlalchemy import text
 from app.domain.compliance.engine import apply_policy, ENGINE_POLICY_VERSION
 from storage.db_engine import get_engine
-from storage.repositories.compliance_repository import insert_compliance_reports
+from storage.repositories.compliance_repository import (
+    get_jobs_for_compliance_backfill,
+    insert_compliance_reports,
+    update_job_compliance_data,
+)
 
 logger = logging.getLogger("openjobseu.backfill")
 
@@ -15,31 +18,10 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
 
     logger.info("Starting compliance backfill...")
 
-    # 1. Fetch jobs missing compliance data or with outdated policy
-    query = text("""
-        SELECT
-            job_id, job_uid, title, description, remote_scope, source,
-            company_id, company_name, remote_source_flag,
-            remote_class, geo_class, compliance_status, compliance_score, policy_version
-        FROM jobs
-        WHERE compliance_status IS NULL
-           OR compliance_score IS NULL
-           OR policy_version IS NULL
-           OR policy_version != :current_policy_version
-        ORDER BY COALESCE(last_seen_at, '1970-01-01T00:00:00+00:00') DESC
-        LIMIT :limit
-    """)
-
     rows = []
-    with engine.connect() as conn:
-        rows = (
-            conn.execute(
-                query,
-                {"limit": limit, "current_policy_version": ENGINE_POLICY_VERSION.value},
-            )
-            .mappings()
-            .all()
-        )
+    # FIX 1: Wrap initial data fetch in a transaction for consistency
+    with engine.begin() as conn:
+        rows = get_jobs_for_compliance_backfill(conn, limit=limit, current_policy_version=ENGINE_POLICY_VERSION.value)
 
     total_found = len(rows)
     logger.info(f"Found {total_found} jobs to backfill")
@@ -60,12 +42,22 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
             job_id = job_data["job_id"]
             job_uid = job_data["job_uid"]
 
-            job_input = dict(job_data)
+            # FIX 2: Use explicit mapping for data passed to apply_policy
+            job_input = {
+                "title": job_data["title"],
+                "description": job_data["description"],
+                "company_name": job_data["company_name"],
+                "remote_scope": job_data["remote_scope"],
+                "remote_source_flag": job_data["remote_source_flag"],
+                "remote_class": job_data["remote_class"],
+                "geo_class": job_data["geo_class"],
+            }
 
             try:
                 job_with_compliance, reason = apply_policy(job_input, source=job_data["source"] or "unknown")
 
-                # Zabezpieczenie przed rzucaniem AttributeError dla odrzuconych ofert (None)
+                # FIX 3: Correct misleading comment
+                # Safely get compliance payload, falling back to an empty dict if the job was rejected.
                 compliance_payload = (job_with_compliance or job_input).get("_compliance", {})
 
                 compliance_status = compliance_payload.get("compliance_status")
@@ -98,6 +90,7 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
                     }
                 )
 
+                # FIX 4: Map penalties/bonuses from compliance payload if available
                 report_entries.append(
                     {
                         "job_id": job_id,
@@ -107,42 +100,33 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
                         "geo_class": geo_class_val,
                         "hard_geo_flag": bool(compliance_payload.get("policy_reason") == "geo_restriction_hard"),
                         "base_score": compliance_score,
-                        "penalties": None,
-                        "bonuses": None,
+                        "penalties": compliance_payload.get("penalties"),
+                        "bonuses": compliance_payload.get("bonuses"),
                         "final_score": compliance_score,
                         "final_status": compliance_status,
                         "decision_vector": decision_trace,
                     }
                 )
 
-            except Exception as e:
-                logger.error(f"Failed to process job {job_id}: {e}")
+            except Exception:
+                # FIX 6: Use exc_info=True for proper traceback logging
+                logger.error("Failed to process job %s", job_id, exc_info=True)
                 continue
 
         if job_updates:
             try:
                 with engine.begin() as conn:
-                    conn.execute(
-                        text("""
-                            UPDATE jobs
-                            SET
-                                remote_class = :remote_class,
-                                geo_class = :geo_class,
-                                compliance_status = :compliance_status,
-                                compliance_score = :compliance_score,
-                                policy_version = :policy_version,
-                                updated_at = :updated_at
-                            WHERE job_id = :job_id
-                        """),
-                        job_updates,
-                    )
+                    update_job_compliance_data(conn, job_updates)
 
                     if report_entries:
                         insert_compliance_reports(conn, report_entries)
 
                     updated += len(job_updates)
-            except Exception as e:
-                logger.error(f"Failed to update batch: {e}")
+            except Exception:
+                # FIX 5 & 6: Log failed IDs and use exc_info
+                failed_ids = [j["job_id"] for j in job_updates]
+                logger.warning("Failed to update batch. Job IDs: %s", failed_ids)
+                logger.error("Batch update failed", exc_info=True)
 
         processed += len(batch)
         pct = int((processed / total_found) * 100)

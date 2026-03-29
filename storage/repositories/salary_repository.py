@@ -89,3 +89,44 @@ def insert_salary_parsing_cases(conn: Connection, cases: list[dict]) -> None:
     """)
 
     conn.execute(stmt, cases)
+
+
+def get_jobs_with_missing_salary(conn: Connection, limit: int) -> list[dict]:
+    """
+    Fetches jobs that are missing salary data (both min and max are NULL).
+    """
+    query = text("""
+        SELECT
+            job_id, title, description
+        FROM jobs
+        WHERE salary_min IS NULL AND salary_max IS NULL
+        ORDER BY COALESCE(last_seen_at, '1970-01-01T00:00:00+00:00') DESC
+        LIMIT :limit
+    """)
+    rows = conn.execute(query, {"limit": limit}).mappings().all()
+    return [dict(row) for row in rows]
+
+
+def update_job_salaries_bulk(conn: Connection, job_updates: list[dict]) -> None:
+    """
+    Bulk updates jobs with new salary data from the backfill process.
+    """
+    if not job_updates:
+        return
+
+    conn.execute(
+        text("""
+            UPDATE jobs
+            SET
+                salary_min = :salary_min,
+                salary_max = :salary_max,
+                salary_currency = :salary_currency,
+                salary_period = :salary_period,
+                salary_source = :salary_source,
+                salary_min_eur = :salary_min_eur,
+                salary_max_eur = :salary_max_eur,
+                updated_at = :updated_at
+            WHERE job_id = :job_id
+        """),
+        job_updates,
+    )

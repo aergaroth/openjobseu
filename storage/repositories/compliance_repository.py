@@ -203,3 +203,54 @@ def update_jobs_compliance_resolution(
         """),
         normalized_updates,
     )
+
+
+def get_jobs_for_compliance_backfill(conn: Connection, *, limit: int, current_policy_version: str) -> list[dict]:
+    """
+    Fetches jobs that are missing compliance data or have an outdated policy version.
+    """
+    query = text("""
+        SELECT
+            job_id, job_uid, title, description, remote_scope, source,
+            company_id, company_name, remote_source_flag,
+            remote_class, geo_class, compliance_status, compliance_score, policy_version
+        FROM jobs
+        WHERE compliance_status IS NULL
+           OR compliance_score IS NULL
+           OR policy_version IS NULL
+           OR policy_version != :current_policy_version
+        ORDER BY COALESCE(last_seen_at, '1970-01-01T00:00:00+00:00') DESC
+        LIMIT :limit
+    """)
+    rows = (
+        conn.execute(
+            query,
+            {"limit": limit, "current_policy_version": current_policy_version},
+        )
+        .mappings()
+        .all()
+    )
+    return [dict(row) for row in rows]
+
+
+def update_job_compliance_data(conn: Connection, job_updates: list[dict]) -> None:
+    """
+    Bulk updates jobs with new compliance data from the backfill process.
+    """
+    if not job_updates:
+        return
+
+    conn.execute(
+        text("""
+            UPDATE jobs
+            SET
+                remote_class = :remote_class,
+                geo_class = :geo_class,
+                compliance_status = :compliance_status,
+                compliance_score = :compliance_score,
+                policy_version = :policy_version,
+                updated_at = :updated_at
+            WHERE job_id = :job_id
+        """),
+        job_updates,
+    )

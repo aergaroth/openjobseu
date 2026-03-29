@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from sqlalchemy import text
 from storage.db_engine import get_engine
+from app.workers import maintenance as maintenance_module
 from app.workers.maintenance import run_maintenance_pipeline
 
 
@@ -190,3 +191,61 @@ def test_maintenance_pipeline_updates_company_stats(db_factory):
         assert rows[3]["rejected_jobs_count"] == 0
         assert str(rows[3]["last_active_job_at"]).startswith("2023-01-05")
         assert rows[3]["signal_score"] == 15
+
+
+def test_maintenance_logs_warning_on_performance_lag(monkeypatch):
+    # Ensure predictable, fast in-memory execution for this behavioral test.
+    monkeypatch.setattr(maintenance_module, "_update_company_remote_posture", lambda: 1)
+    monkeypatch.setattr(maintenance_module, "_update_company_job_stats", lambda: 1)
+    monkeypatch.setattr(maintenance_module, "_update_company_signal_scores", lambda: 1)
+    monkeypatch.setattr(maintenance_module, "_run_backfill_salary", lambda: 0)
+    monkeypatch.setattr(maintenance_module, "_run_backfill_department", lambda: 0)
+    monkeypatch.setattr(maintenance_module, "_run_backfill_compliance", lambda: 0)
+
+    # Force duration above threshold deterministically.
+    perf_values = iter([100.0, 100.25])
+    monkeypatch.setattr(maintenance_module, "perf_counter", lambda: next(perf_values))
+    monkeypatch.setattr(maintenance_module, "_lag_warning_threshold_ms", lambda: 100)
+
+    warnings: list[dict] = []
+    monkeypatch.setattr(
+        maintenance_module.logger,
+        "warning",
+        lambda message, extra=None: warnings.append({"message": message, "extra": extra or {}}),
+    )
+
+    result = run_maintenance_pipeline()
+
+    assert result["metrics"]["status"] == "ok"
+    assert result["metrics"]["duration_ms"] == 250
+    assert any(w["message"] == "maintenance_pipeline_performance_lag" for w in warnings)
+
+
+def test_maintenance_logs_critical_on_failure(monkeypatch):
+    monkeypatch.setattr(
+        maintenance_module, "_update_company_remote_posture", lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+    )
+
+    critical_calls: list[dict] = []
+    monkeypatch.setattr(
+        maintenance_module.logger,
+        "critical",
+        lambda message, extra=None: critical_calls.append({"message": message, "extra": extra or {}}),
+    )
+
+    result = run_maintenance_pipeline()
+
+    assert result["metrics"]["status"] == "error"
+    assert result["metrics"]["error"] == "boom"
+    assert any(c["message"] == "maintenance_pipeline_critical_error" for c in critical_calls)
+
+
+def test_lag_warning_threshold_parsing(monkeypatch):
+    monkeypatch.setenv("MAINTENANCE_LAG_WARNING_MS", "15000")
+    assert maintenance_module._lag_warning_threshold_ms() == 15000
+
+    monkeypatch.setenv("MAINTENANCE_LAG_WARNING_MS", "invalid")
+    assert maintenance_module._lag_warning_threshold_ms() == 60000
+
+    monkeypatch.setenv("MAINTENANCE_LAG_WARNING_MS", "-5")
+    assert maintenance_module._lag_warning_threshold_ms() == 60000
