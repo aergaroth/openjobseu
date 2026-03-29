@@ -57,6 +57,15 @@ class FeedJobItem(BaseModel):
     url: str
     first_seen_at: datetime
     status: str
+    last_seen_at: Optional[datetime] = None
+    description: Optional[str] = None
+    source_department: Optional[str] = None
+    salary_min: Optional[int] = None
+    salary_max: Optional[int] = None
+    salary_currency: Optional[str] = None
+    salary_period: Optional[str] = None
+    salary_min_eur: Optional[int] = None
+    salary_max_eur: Optional[int] = None
 
 
 class FeedResponse(BaseModel):
@@ -116,6 +125,15 @@ def serialize_feed_job(job: dict) -> dict:
         "url": job["source_url"],
         "first_seen_at": job["first_seen_at"],
         "status": job["status"],
+        "last_seen_at": job.get("last_seen_at"),
+        "description": job.get("description"),
+        "source_department": job.get("source_department"),
+        "salary_min": job.get("salary_min"),
+        "salary_max": job.get("salary_max"),
+        "salary_currency": job.get("salary_currency"),
+        "salary_period": job.get("salary_period"),
+        "salary_min_eur": job.get("salary_min_eur"),
+        "salary_max_eur": job.get("salary_max_eur"),
     }
 
 

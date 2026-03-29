@@ -105,7 +105,15 @@ def get_jobs(
             remote_scope,
             status,
             first_seen_at,
-            last_seen_at
+            last_seen_at,
+            description,
+            source_department,
+            salary_min,
+            salary_max,
+            salary_currency,
+            salary_period,
+            salary_min_eur,
+            salary_max_eur
         FROM jobs
         {where_clause}
         ORDER BY {order_by_sql}
