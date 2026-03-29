@@ -2,65 +2,63 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>OpenJobsEU</title>
+  <title>OpenJobsEU — EU Remote Job Board</title>
+  <meta name="description" content="An open-source, compliance-first project aggregating legally accessible, EU-wide remote job offers." />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./style.css">
   <script src="./feed.js" defer></script>
 </head>
 
 <body>
-  <div class="container">
-    <!-- Intro / landing -->
-    <h1>OpenJobsEU</h1>
-    <p>
-      OpenJobsEU is an open-source, compliance-first project focused on aggregating
-      legally accessible, EU-wide remote job offers.
-    </p>
-    <p>
-      The project is backend-first and infrastructure-oriented. User-facing
-      features are intentionally minimal at this stage.
-    </p>
+  <div class="layout">
+    <header class="sidebar">
+      <div class="sidebar-inner">
+        <div class="brand">
+          <span class="brand-dot"></span>
+          <span class="brand-name">OpenJobsEU</span>
+        </div>
+        <p class="brand-tagline">
+          Open-source EU remote job aggregator. Compliance-first, no scraping noise.
+        </p>
+        <a class="github-link" href="https://github.com/aergaroth/openjobseu" target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.745 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+          </svg>
+          aergaroth/openjobseu
+        </a>
+        <div class="sidebar-meta" id="meta">—</div>
+        <div class="sidebar-footer">
+          Early-stage project. Stability over features.
+        </div>
+      </div>
+    </header>
 
-    <p>
-      <a href="https://github.com/aergaroth/openjobseu" target="_blank" rel="noopener">
-        View project on GitHub
-      </a>
-    </p>
+    <main class="content">
+      <div class="table-toolbar">
+        <h2 class="table-title">Job feed <span class="feed-live">● live</span></h2>
+        <input class="search-input" id="search" type="search" placeholder="Filter by title or company…" aria-label="Filter jobs" />
+      </div>
 
-    <hr />
-
-    <!-- Feed preview -->
-    <section>
-      <h2>Public job feed (preview)</h2>
-      <p>
-        Below is a minimal, read-only preview of the public job feed.
-        It serves as a reference consumer of the API rather than a full job board.
-      </p>
-
-      <table id="jobs-table">
-        <thead>
-          <tr>
-            <th>Title</th>
-            <th>Company</th>
-            <th>Source</th>
-            <th>First seen</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td colspan="4" style="text-align: center; padding: 3rem 0; color: #777;">Loading jobs...</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div class="meta" id="meta">Loading feed…</div>
-    </section>
-
-    <footer>
-      OpenJobsEU is an early-stage project. Stability and correctness take priority
-      over UI features.
-    </footer>
+      <div class="table-wrap">
+        <table id="jobs-table" aria-label="EU remote jobs">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Company</th>
+              <th>First seen</th>
+            </tr>
+          </thead>
+          <tbody id="jobs-body">
+            <tr class="placeholder-row">
+              <td colspan="3">Loading jobs…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
   </div>
-
 </body>
 </html>
