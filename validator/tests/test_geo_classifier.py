@@ -203,3 +203,13 @@ def test_geo_v3_mixed_region_resolves_to_eu_region():
     )
     assert result["geo_class"] == GeoClass.EU_REGION
     assert result["reason"] == "mixed_region"
+
+
+def test_geo_v3_non_eu_scope_title_phrase_overrides_emea_mixed_region():
+    result = classify_geo_v3(
+        title="HR Experience Specialist | Israel",
+        description="",
+        remote_scope="EMEA",
+    )
+    assert result["geo_class"] == GeoClass.NON_EU
+    assert result["reason"] == "israel"

@@ -200,6 +200,8 @@ def classify_geo(
     found_non_eu = False
     eu_result = None
     non_eu_reason = None
+    non_eu_scope_title_phrase_hit = False
+    non_eu_scope_title_phrase_reason = None
 
     # 1 Evaluate structural parse of scope and title together
     scope_result = _classify_from_remote_scope(scope_l)
@@ -245,9 +247,17 @@ def classify_geo(
             found_non_eu = True
             if not non_eu_reason:
                 non_eu_reason = kw
+            non_eu_scope_title_phrase_hit = True
+            if not non_eu_scope_title_phrase_reason:
+                non_eu_scope_title_phrase_reason = kw
 
     # 3 Mixed Region Resolution (Prevents False Negatives for "US & EMEA" etc.)
     if found_eu and found_non_eu:
+        if non_eu_scope_title_phrase_hit:
+            return {
+                "geo_class": GeoClass.NON_EU,
+                "reason": non_eu_scope_title_phrase_reason or non_eu_reason,
+            }
         return {"geo_class": GeoClass.EU_REGION, "reason": "mixed_region"}
     if found_eu and eu_result:
         return eu_result
