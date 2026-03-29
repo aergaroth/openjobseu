@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.11.1](https://github.com/aergaroth/openjobseu/compare/v2.11.0...v2.11.1) (2026-03-29)
+
+
+### Bug Fixes
+
+* update job rendering logic to use filter function after fetching jobs ([9e263f1](https://github.com/aergaroth/openjobseu/commit/9e263f177570dbde314e59a998ea567662807681))
+
 ## [2.11.0](https://github.com/aergaroth/openjobseu/compare/v2.10.1...v2.11.0) (2026-03-29)
 
 
