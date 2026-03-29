@@ -1,70 +1,17 @@
 import json
 from datetime import datetime, timezone
+
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
-from storage.db_engine import get_engine
+
 from storage.common import _require_open_conn
 
-engine = get_engine()
 
+def _get_engine():
+    """Lazy engine getter — avoids import-time side effects during testing."""
+    from storage.db_engine import get_engine
 
-def insert_compliance_report(
-    conn: Connection,
-    *,
-    job_id: str,
-    job_uid: str,
-    policy_version: str,
-    remote_class: str | None,
-    geo_class: str | None,
-    hard_geo_flag: bool,
-    base_score: int,
-    penalties: dict | None = None,
-    bonuses: dict | None = None,
-    final_score: int,
-    final_status: str,
-    decision_vector: dict | None = None,
-) -> None:
-    """Insert a compliance report for a job."""
-    conn.execute(
-        text("""
-            INSERT INTO compliance_reports (
-                job_id, job_uid, policy_version, remote_class, geo_class,
-                hard_geo_flag, base_score, penalties, bonuses,
-                final_score, final_status, decision_vector, created_at
-            )
-            VALUES (
-                :job_id, :job_uid, :policy_version, :remote_class, :geo_class,
-                :hard_geo_flag, :base_score, :penalties, :bonuses,
-                :final_score, :final_status, :decision_vector, NOW()
-            )
-            ON CONFLICT (job_uid, policy_version) DO UPDATE SET
-                job_id = EXCLUDED.job_id,
-                remote_class = EXCLUDED.remote_class,
-                geo_class = EXCLUDED.geo_class,
-                hard_geo_flag = EXCLUDED.hard_geo_flag,
-                base_score = EXCLUDED.base_score,
-                penalties = EXCLUDED.penalties,
-                bonuses = EXCLUDED.bonuses,
-                final_score = EXCLUDED.final_score,
-                final_status = EXCLUDED.final_status,
-                decision_vector = EXCLUDED.decision_vector,
-                created_at = NOW()
-        """),
-        {
-            "job_id": job_id,
-            "job_uid": job_uid,
-            "policy_version": policy_version,
-            "remote_class": remote_class,
-            "geo_class": geo_class,
-            "hard_geo_flag": hard_geo_flag,
-            "base_score": base_score,
-            "penalties": json.dumps(penalties, default=str) if penalties is not None else None,
-            "bonuses": json.dumps(bonuses, default=str) if bonuses is not None else None,
-            "final_score": final_score,
-            "final_status": final_status,
-            "decision_vector": json.dumps(decision_vector, default=str) if decision_vector is not None else None,
-        },
-    )
+    return get_engine()
 
 
 def insert_compliance_reports(conn: Connection, reports: list[dict]) -> None:
@@ -109,8 +56,49 @@ def insert_compliance_reports(conn: Connection, reports: list[dict]) -> None:
     )
 
 
+def insert_compliance_report(
+    conn: Connection,
+    *,
+    job_id: str,
+    job_uid: str,
+    policy_version: str,
+    remote_class: str | None,
+    geo_class: str | None,
+    hard_geo_flag: bool,
+    base_score: int,
+    penalties: dict | None = None,
+    bonuses: dict | None = None,
+    final_score: int,
+    final_status: str,
+    decision_vector: dict | None = None,
+) -> None:
+    """Insert a single compliance report. Delegates to bulk insert.
+
+    Remove when all callers are migrated to insert_compliance_reports directly.
+    """
+    insert_compliance_reports(
+        conn,
+        [
+            {
+                "job_id": job_id,
+                "job_uid": job_uid,
+                "policy_version": policy_version,
+                "remote_class": remote_class,
+                "geo_class": geo_class,
+                "hard_geo_flag": hard_geo_flag,
+                "base_score": base_score,
+                "penalties": penalties,
+                "bonuses": bonuses,
+                "final_score": final_score,
+                "final_status": final_status,
+                "decision_vector": decision_vector,
+            }
+        ],
+    )
+
+
 def count_jobs_missing_compliance() -> int:
-    with engine.connect() as conn:
+    with _get_engine().connect() as conn:
         row = conn.execute(
             text("""
                 SELECT COUNT(*) AS count
@@ -118,7 +106,7 @@ def count_jobs_missing_compliance() -> int:
                 WHERE compliance_status IS NULL OR compliance_score IS NULL
             """)
         ).fetchone()
-    return int(row[0]) if row else 0
+        return int(row[0]) if row else 0
 
 
 def get_jobs_for_compliance_resolution(
@@ -140,7 +128,7 @@ def get_jobs_for_compliance_resolution(
         LIMIT :limit
     """
 
-    with engine.connect() as conn:
+    with _get_engine().connect() as conn:
         rows = (
             conn.execute(
                 text(query),
@@ -149,8 +137,7 @@ def get_jobs_for_compliance_resolution(
             .mappings()
             .all()
         )
-
-    return [dict(row) for row in rows]
+        return [dict(row) for row in rows]
 
 
 def update_job_compliance_resolution(
@@ -206,9 +193,7 @@ def update_jobs_compliance_resolution(
 
 
 def get_jobs_for_compliance_backfill(conn: Connection, *, limit: int, current_policy_version: str) -> list[dict]:
-    """
-    Fetches jobs that are missing compliance data or have an outdated policy version.
-    """
+    """Fetch jobs missing compliance data or with an outdated policy version."""
     query = text("""
         SELECT
             job_id, job_uid, title, description, remote_scope, source,
@@ -222,6 +207,7 @@ def get_jobs_for_compliance_backfill(conn: Connection, *, limit: int, current_po
         ORDER BY COALESCE(last_seen_at, '1970-01-01T00:00:00+00:00') DESC
         LIMIT :limit
     """)
+
     rows = (
         conn.execute(
             query,
@@ -234,9 +220,7 @@ def get_jobs_for_compliance_backfill(conn: Connection, *, limit: int, current_po
 
 
 def update_job_compliance_data(conn: Connection, job_updates: list[dict]) -> None:
-    """
-    Bulk updates jobs with new compliance data from the backfill process.
-    """
+    """Bulk update jobs with new compliance data from the backfill process."""
     if not job_updates:
         return
 
