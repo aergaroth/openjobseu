@@ -68,7 +68,7 @@
       }
 
       allJobs = data.jobs;
-      renderJobs(allJobs);
+      filterJobs(searchEl ? searchEl.value.trim() : "");
 
       const generated = new Date(data.meta.generated_at);
       metaEl.innerHTML =
