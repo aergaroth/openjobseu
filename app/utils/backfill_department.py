@@ -16,8 +16,18 @@ def _fetch_and_process_company(company: dict) -> list[dict]:
     """
     Fetches and processes jobs for a single company, returning a list of updates.
     """
+    # Provider must come from company_ats.provider.
     provider = company.get("provider")
-    logger.info(f"Fetching jobs for {company.get('name')} ({provider})...")
+    company_name = company.get("legal_name") or company.get("name") or company.get("company_id")
+
+    if not provider:
+        logger.warning(
+            "backfill_department_skipped_missing_provider",
+            extra={"company_id": company.get("company_id")},
+        )
+        return []
+
+    logger.info(f"Fetching jobs for {company_name} ({provider})...")
 
     try:
         adapter = get_adapter(provider)
@@ -77,7 +87,8 @@ def backfill_missing_departments() -> int:
         future_to_company = {executor.submit(_fetch_and_process_company, dict(c)): c for c in companies}
 
         for i, future in enumerate(as_completed(future_to_company), 1):
-            company_name = future_to_company[future].get("name")
+            company_row = future_to_company[future]
+            company_name = company_row.get("legal_name") or company_row.get("name") or company_row.get("company_id")
             try:
                 company_updates = future.result()
                 if company_updates:
