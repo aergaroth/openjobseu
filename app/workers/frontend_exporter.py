@@ -80,6 +80,7 @@ def _upload_frontend_assets(bucket, *, asset_version: str | None = None) -> int:
 
 
 def _export_feed(bucket) -> tuple[int, int]:
+    from collections import Counter
     from storage.repositories.jobs_repository import get_jobs
     from app.api.jobs import (
         serialize_feed_job,
@@ -95,6 +96,13 @@ def _export_feed(bucket) -> tuple[int, int]:
         offset=0,
     )
 
+    # Agregaty dla UI
+    departments = Counter(job["source_department"] for job in jobs if job.get("source_department"))
+    departments_list = [{"name": name, "count": count} for name, count in departments.items()]
+
+    all_salaries_eur = [job["salary_min_eur"] for job in jobs if job.get("salary_min_eur")]
+    salary_range_eur = {"min": min(all_salaries_eur), "max": max(all_salaries_eur)} if all_salaries_eur else {}
+
     payload = {
         "meta": {
             "generated_at": datetime.now(timezone.utc),
@@ -102,6 +110,8 @@ def _export_feed(bucket) -> tuple[int, int]:
             "status": "visible",
             "limit": FEED_LIMIT,
             "version": FEED_VERSION,
+            "departments": departments_list,
+            "salary_range_eur": salary_range_eur,
         },
         "jobs": [serialize_feed_job(job) for job in jobs],
     }

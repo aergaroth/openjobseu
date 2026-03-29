@@ -37,26 +37,24 @@
     </header>
 
     <main class="content">
-      <div class="table-toolbar">
-        <h2 class="table-title">Job feed <span class="feed-live">● live</span></h2>
-        <input class="search-input" id="search" type="search" placeholder="Filter by title or company…" aria-label="Filter jobs" />
-      </div>
+      <div class="content-inner">
+        <div class="table-toolbar">
+          <h2 class="table-title">Job feed <span class="feed-live">● live</span></h2>
+          <input class="search-input" id="search" type="search" placeholder="Filter by title or company…" aria-label="Filter jobs" />
+        </div>
 
-      <div class="table-wrap">
-        <table id="jobs-table" aria-label="EU remote jobs">
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Company</th>
-              <th>First seen</th>
-            </tr>
-          </thead>
-          <tbody id="jobs-body">
-            <tr class="placeholder-row">
-              <td colspan="3">Loading jobs…</td>
-            </tr>
-          </tbody>
-        </table>
+        <div id="filters" class="filters-toolbar">
+          <div id="department-filters" class="department-filters"></div>
+          <div id="salary-filters" class="salary-filters">
+            <input type="number" id="salary-min" placeholder="Min salary (EUR)" />
+            <input type="number" id="salary-max" placeholder="Max salary (EUR)" />
+          </div>
+          <button id="reset-filters" class="reset-button">Reset</button>
+        </div>
+
+        <div id="jobs-list" class="jobs-list">
+          <div class="placeholder-row">Loading jobs…</div>
+        </div>
       </div>
     </main>
   </div>
