@@ -80,3 +80,46 @@ def test_backfill_department_endpoint(monkeypatch):
     response = client.post("/internal/backfill-department")
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "updated_jobs_count": 5}
+
+
+def test_backfill_department_skips_company_without_provider(monkeypatch):
+    warnings: list[dict] = []
+
+    monkeypatch.setattr(
+        backfill_department.logger,
+        "warning",
+        lambda message, extra=None, exc_info=False: warnings.append(
+            {"message": message, "extra": extra or {}, "exc_info": exc_info}
+        ),
+    )
+
+    # provider missing should be handled as skip (no traceback flow)
+    updates = backfill_department._fetch_and_process_company({"company_id": "c-1", "provider": None})
+
+    assert updates == []
+    assert any(w["message"] == "backfill_department_skipped_missing_provider" for w in warnings)
+    skip_log = next(w for w in warnings if w["message"] == "backfill_department_skipped_missing_provider")
+    assert skip_log["extra"].get("company_id") == "c-1"
+
+
+def test_backfill_department_does_not_fallback_to_legacy_ats_provider_field(monkeypatch):
+    warnings: list[dict] = []
+
+    monkeypatch.setattr(
+        backfill_department.logger,
+        "warning",
+        lambda message, extra=None, exc_info=False: warnings.append(
+            {"message": message, "extra": extra or {}, "exc_info": exc_info}
+        ),
+    )
+
+    updates = backfill_department._fetch_and_process_company(
+        {
+            "company_id": "c-legacy",
+            "provider": None,  # authoritative company_ats.provider missing
+            "ats_provider": "dummy_ats",  # legacy/compat alias should not be used here
+        }
+    )
+
+    assert updates == []
+    assert any(w["message"] == "backfill_department_skipped_missing_provider" for w in warnings)

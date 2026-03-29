@@ -1,8 +1,12 @@
 from datetime import datetime, timezone
 import logging
-from sqlalchemy import text
+
 from app.domain.money.salary_parser import extract_salary
 from storage.db_engine import get_engine
+from storage.repositories.salary_repository import (
+    get_jobs_with_missing_salary,
+    update_job_salaries_bulk,
+)
 
 logger = logging.getLogger("openjobseu.backfill")
 
@@ -18,18 +22,9 @@ def backfill_missing_salary_fields(limit: int = 1000) -> int:
 
     logger.info("Starting salary backfill...")
 
-    query = text("""
-        SELECT
-            job_id, title, description
-        FROM jobs
-        WHERE salary_min IS NULL AND salary_max IS NULL
-        ORDER BY COALESCE(last_seen_at, '1970-01-01T00:00:00+00:00') DESC
-        LIMIT :limit
-    """)
-
     rows = []
     with engine.connect() as conn:
-        rows = conn.execute(query, {"limit": limit}).mappings().all()
+        rows = get_jobs_with_missing_salary(conn, limit)
 
     total_found = len(rows)
     logger.info(f"Found {total_found} jobs with missing salary to backfill")
@@ -76,32 +71,19 @@ def backfill_missing_salary_fields(limit: int = 1000) -> int:
                             "updated_at": datetime.now(timezone.utc),
                         }
                     )
-            except Exception as e:
-                logger.error(f"Failed to extract salary for job {job_id}: {e}")
+            except Exception:
+                logger.error(f"Failed to extract salary for job {job_id}", exc_info=True)
                 continue
 
         if job_updates:
             try:
                 with engine.begin() as conn:
-                    conn.execute(
-                        text("""
-                            UPDATE jobs
-                            SET
-                                salary_min = :salary_min,
-                                salary_max = :salary_max,
-                                salary_currency = :salary_currency,
-                                salary_period = :salary_period,
-                                salary_source = :salary_source,
-                                salary_min_eur = :salary_min_eur,
-                                salary_max_eur = :salary_max_eur,
-                                updated_at = :updated_at
-                            WHERE job_id = :job_id
-                        """),
-                        job_updates,
-                    )
+                    update_job_salaries_bulk(conn, job_updates)
                 updated += len(job_updates)
-            except Exception as e:
-                logger.error(f"Failed to update salary batch: {e}")
+            except Exception:
+                failed_ids = [j["job_id"] for j in job_updates]
+                logger.warning("Failed to update salary batch. Job IDs: %s", failed_ids)
+                logger.error("Salary batch update failed", exc_info=True)
 
         processed += len(batch)
         pct = int((processed / total_found) * 100)

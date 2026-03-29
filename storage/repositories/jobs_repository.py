@@ -171,6 +171,30 @@ def get_jobs_paginated(
     return [dict(row) for row in rows], total
 
 
+def update_job_department_and_taxonomy_bulk(conn: Connection, updates: list[dict]) -> int:
+    """
+    Bulk updates department and taxonomy fields for multiple jobs
+    if the source_department is currently NULL.
+    Uses 'executemany' for efficiency.
+    Returns the total number of rows updated.
+    """
+    if not updates:
+        return 0
+
+    stmt = text("""
+        UPDATE jobs
+        SET source_department = :source_department,
+            job_family = :job_family,
+            job_role = :job_role,
+            seniority = :seniority,
+            specialization = :specialization
+        WHERE source = :source AND source_job_id = :source_job_id
+          AND source_department IS NULL
+    """)
+    result = conn.execute(stmt, updates)
+    return result.rowcount
+
+
 def _find_job_id_by_source_mapping(conn: Connection, *, source: str, source_job_id: str) -> str | None:
     row = conn.execute(
         text("""

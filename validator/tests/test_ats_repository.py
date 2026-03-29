@@ -41,6 +41,8 @@ def test_load_active_ats_companies_returns_only_active_complete_integrations(db_
 
     assert [str(row["company_ats_id"]) for row in rows] == [active_id]
     assert rows[0]["legal_name"] == "Active Co"
+    assert rows[0]["provider"] == "greenhouse"
+    assert rows[0]["ats_provider"] == "greenhouse"
 
 
 def test_get_mark_and_deactivate_ats_integration(db_factory):
@@ -56,6 +58,7 @@ def test_get_mark_and_deactivate_ats_integration(db_factory):
     with db_factory.engine.begin() as conn:
         loaded = get_ats_integration_by_id(conn, ats["company_ats_id"])
         assert str(loaded["company_ats_id"]) == company_ats_id
+        assert loaded["provider"] == "greenhouse"
         assert loaded["ats_provider"] == "greenhouse"
 
         mark_ats_synced(conn, ats["company_ats_id"], success=True)
