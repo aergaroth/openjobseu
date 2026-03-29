@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.12.0](https://github.com/aergaroth/openjobseu/compare/v2.11.1...v2.12.0) (2026-03-29)
+
+
+### Features
+
+* enhance backfill process to handle missing provider; add tests for skipped companies ([9007e59](https://github.com/aergaroth/openjobseu/commit/9007e596db9c441ef236bdcc8aada4a680db492b))
+* implement backfill processes for salary, department, and compliance data; enhance maintenance pipeline logging ([7f888b6](https://github.com/aergaroth/openjobseu/commit/7f888b663feb80ab72a00377876c01834f2f51ce))
+
 ## [2.11.1](https://github.com/aergaroth/openjobseu/compare/v2.11.0...v2.11.1) (2026-03-29)
 
 
