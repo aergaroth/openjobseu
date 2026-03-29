@@ -13,7 +13,6 @@ from app.domain.compliance.resolver import resolve_compliance
 def _compute_compliance_version() -> str:
     base_version = "v4"
     compliance_dir = Path(__file__).parent
-
     hasher = hashlib.md5()
 
     # Sort files to ensure deterministic hashing across different operating systems
@@ -35,11 +34,15 @@ class PolicyVersion(str, Enum):
 
 
 ENGINE_POLICY_VERSION = PolicyVersion.V4
+
 # Backward-compatible alias.
 ENGINE_VERSION = ENGINE_POLICY_VERSION.value
 
 
 def apply_policy(job: dict, source: str) -> tuple[dict | None, str | None]:
+    # Shallow copy — avoid mutating the caller's dict
+    job = dict(job)
+
     # Ensure _compliance is always initialized
     if "_compliance" not in job:
         job["_compliance"] = {
@@ -53,11 +56,11 @@ def apply_policy(job: dict, source: str) -> tuple[dict | None, str | None]:
     title = str(job.get("title") or "")
     description = str(job.get("description") or "")
     remote_scope = str(job.get("remote_scope") or "")
-
     combined = f"{title} {description} {remote_scope}"
+
     trace = []
 
-    # 1 Hard geo restrictions
+    # 1. Hard geo restrictions
     hard_geo = detect_hard_geo_restriction(combined)
     trace.append({"step": "hard_geo_check", "result": hard_geo})
 
@@ -73,7 +76,7 @@ def apply_policy(job: dict, source: str) -> tuple[dict | None, str | None]:
         }
         return job, "geo_restriction_hard"
 
-    # 2 Remote classification
+    # 2. Remote classification
     remote_result = classify_remote(
         title=title,
         description=description,
@@ -88,7 +91,7 @@ def apply_policy(job: dict, source: str) -> tuple[dict | None, str | None]:
         }
     )
 
-    # 3 Geo classification
+    # 3. Geo classification
     geo_result = classify_geo(
         title=title,
         description=description,
@@ -103,22 +106,21 @@ def apply_policy(job: dict, source: str) -> tuple[dict | None, str | None]:
         }
     )
 
-    # 4 Resolution
+    # 4. Resolution
     resolved = resolve_compliance(remote_model, geo_class)
     score = resolved["compliance_score"]
     status = resolved["compliance_status"]
 
-    # 5 Scoring trace
+    # 5. Scoring trace
     penalties = []
     if remote_model != RemoteClass.REMOTE_ONLY:
         penalties.append(remote_model.value if hasattr(remote_model, "value") else remote_model)
-
     if geo_class not in {GeoClass.EU_MEMBER_STATE, GeoClass.EU_EXPLICIT}:
         penalties.append(geo_class.value if hasattr(geo_class, "value") else geo_class)
 
     trace.append({"step": "scoring", "score": score, "penalties": penalties, "bonuses": []})
 
-    # 6 Resolver trace
+    # 6. Resolver trace
     trace.append({"step": "resolver", "status": status})
 
     job["_compliance"] = {
@@ -135,7 +137,3 @@ def apply_policy(job: dict, source: str) -> tuple[dict | None, str | None]:
     }
 
     return job, None
-
-
-def apply_policy_v3(job: dict, source: str) -> tuple[dict | None, str | None]:
-    return apply_policy(job=job, source=source)
