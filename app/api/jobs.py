@@ -116,7 +116,7 @@ def list_jobs(
 
 
 def serialize_feed_job(job: dict) -> dict:
-    return {
+    payload = {
         "id": job["job_id"],
         "title": job["title"],
         "company": job["company_name"],
@@ -125,16 +125,24 @@ def serialize_feed_job(job: dict) -> dict:
         "url": job["source_url"],
         "first_seen_at": job["first_seen_at"],
         "status": job["status"],
-        "last_seen_at": job.get("last_seen_at"),
-        "description": job.get("description"),
-        "source_department": job.get("source_department"),
-        "salary_min": job.get("salary_min"),
-        "salary_max": job.get("salary_max"),
-        "salary_currency": job.get("salary_currency"),
-        "salary_period": job.get("salary_period"),
-        "salary_min_eur": job.get("salary_min_eur"),
-        "salary_max_eur": job.get("salary_max_eur"),
     }
+
+    optional_fields = [
+        "last_seen_at",
+        "description",
+        "source_department",
+        "salary_min",
+        "salary_max",
+        "salary_currency",
+        "salary_period",
+        "salary_min_eur",
+        "salary_max_eur",
+    ]
+    for field in optional_fields:
+        if job.get(field) is not None:
+            payload[field] = job[field]
+
+    return payload
 
 
 @router.get("/feed", response_model=FeedResponse)
