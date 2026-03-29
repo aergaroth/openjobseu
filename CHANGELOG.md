@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.14.0](https://github.com/aergaroth/openjobseu/compare/v2.13.0...v2.14.0) (2026-03-29)
+
+
+### Features
+
+* enhance job feed UI with filters and improved layout ([c567297](https://github.com/aergaroth/openjobseu/commit/c567297f9187f468e9bac898caae3f89b1e7d640))
+
 ## [2.13.0](https://github.com/aergaroth/openjobseu/compare/v2.12.0...v2.13.0) (2026-03-29)
 
 
