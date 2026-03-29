@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.13.0](https://github.com/aergaroth/openjobseu/compare/v2.12.0...v2.13.0) (2026-03-29)
+
+
+### Features
+
+* **geo:** enhance non-EU classification with scope title phrase handling ([045b644](https://github.com/aergaroth/openjobseu/commit/045b644416f796fd0e2805c86dd62dde1564a983))
+
 ## [2.12.0](https://github.com/aergaroth/openjobseu/compare/v2.11.1...v2.12.0) (2026-03-29)
 
 
