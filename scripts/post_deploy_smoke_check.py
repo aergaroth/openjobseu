@@ -13,6 +13,7 @@ import os
 import sys
 import requests
 import logging
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -58,11 +59,22 @@ def get_auth_headers():
 
 
 def http_check():
-    """Checks the /health endpoint."""
+    """Checks the /health endpoint, allowing time for the service to start."""
     logger.info("→ Health check")
-    r = requests.get(f"{BASE_URL}/health", headers=get_auth_headers(), timeout=10)
-    r.raise_for_status()
-    logger.info("  OK")
+    retries = 10
+    delay = 5
+
+    for attempt in range(1, retries + 1):
+        try:
+            r = requests.get(f"{BASE_URL}/health", headers=get_auth_headers(), timeout=10)
+            r.raise_for_status()
+            logger.info("  OK")
+            return
+        except requests.exceptions.RequestException as e:
+            if attempt == retries:
+                raise e
+            logger.info(f"  (Attempt {attempt}/{retries}) Service not ready yet. Waiting {delay}s...")
+            time.sleep(delay)
 
 
 def run_tick():
