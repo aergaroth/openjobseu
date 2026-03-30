@@ -52,7 +52,7 @@ def get_auth_headers():
 def http_check():
     """Checks the /health endpoint."""
     logger.info("→ Health check")
-    r = requests.get(f"{BASE_URL}/health", timeout=10)
+    r = requests.get(f"{BASE_URL}/health", headers=get_auth_headers(), timeout=10)
     r.raise_for_status()
     logger.info("  OK")
 
