@@ -12,6 +12,13 @@ logger = logging.getLogger("openjobseu.runtime")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = REPO_ROOT / "frontend"
+FRONTEND_EXCLUDE_PATTERNS = [
+    "node_modules/",
+    "tests/",
+    "package.json",
+    "package-lock.json",
+    "playwright.config.ts",
+]
 _DEFAULT_ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable"
 _DEFAULT_HTML_CACHE_CONTROL = "public, max-age=300"
 _DEFAULT_FEED_CACHE_CONTROL = "public, max-age=300"
@@ -59,6 +66,9 @@ def _upload_frontend_assets(bucket, *, asset_version: str | None = None) -> int:
             continue
 
         blob_name = file_path.relative_to(FRONTEND_DIR).as_posix()
+        if any(blob_name.startswith(pattern) for pattern in FRONTEND_EXCLUDE_PATTERNS):
+            continue
+
         file_data = _render_asset_file(file_path, asset_version=asset_version)
 
         local_md5 = base64.b64encode(hashlib.md5(file_data).digest()).decode("utf-8")
