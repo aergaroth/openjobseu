@@ -299,6 +299,8 @@ US_STRONG_SIGNALS = (
     "within united states",
     "u.s.-based",
     "us-based",
+    "usa-based",
+    "usa based",
     "united states",
     "u.s.",
     "usa",

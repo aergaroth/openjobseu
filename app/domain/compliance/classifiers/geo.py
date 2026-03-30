@@ -102,7 +102,7 @@ def _classify_from_remote_scope(scope_l: str) -> dict | None:
         found_non_eu = True
 
     for token in tokens:
-        if token.upper() in US_STATE_CODES:
+        if token in US_STATE_CODES:
             found_non_eu = True
             continue
 
@@ -125,7 +125,7 @@ def _classify_from_remote_scope(scope_l: str) -> dict | None:
         # Handle mixed free-form scopes, e.g. "Remote - US: Select locations".
         token_parts = [_normalize_token(part) for part in re.split(r"[\s:\-]+", token) if part.strip()]
         for token_part in token_parts:
-            if token_part.upper() in US_STATE_CODES:
+            if token_part in US_STATE_CODES:
                 found_non_eu = True
                 continue
             if token_part in NON_EU_SCOPE_TOKENS:

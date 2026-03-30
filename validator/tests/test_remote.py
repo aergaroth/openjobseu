@@ -68,3 +68,17 @@ def test_classify_remote_remotely_scope():
     res2 = classify_remote(title="Dev", description="", remote_scope="Remotely")
     # Zostaje ucięte w 100%, dając czyste zdalne
     assert res2["remote_model"] == RemoteClass.REMOTE_ONLY
+
+
+def test_classify_remote_conflicting_signals_prioritizes_negative():
+    """
+    Weryfikuje, czy negatywne sygnały (in-office) mają wyższy priorytet niż ogólne
+    pozytywne sygnały (remote-first), gdy oba występują w opisie.
+    """
+    description = """
+    We are a remote-first company and believe in flexibility.
+    However, this specific role requires you to be in-office 3 days a week.
+    """
+    res = classify_remote(title="Product Manager", description=description, remote_scope="")
+    assert res["remote_model"] == RemoteClass.NON_REMOTE
+    assert res["reason"] == "desc_negative"
