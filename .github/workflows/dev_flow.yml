@@ -29,7 +29,7 @@ jobs:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_DEV }}
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT_DEV }}
           token_format: id_token
-          token_audience: ${{ vars.DEV_APP_BASE_URL }}
+          id_token_audience: ${{ vars.DEV_APP_BASE_URL }}
 
       - uses: google-github-actions/setup-gcloud@v2
 
