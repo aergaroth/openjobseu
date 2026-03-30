@@ -75,23 +75,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install smoke test dependencies
-        run: pip install requests
+        run: pip install requests google-auth
 
       - name: Run post-deploy smoke test
         run: APP_BASE_URL=${{ env.url }} python scripts/post_deploy_smoke_check.py
-
-      - name: Get deployed service URL
-        id: get_url
-        run: |
-          URL=$(gcloud run services describe dev-openjobseu \
-            --project dev-openjobseu \
-            --region europe-north1 \
-            --format="value(status.url)")
-          echo "url=$URL" >> $GITHUB_ENV
-
-      - name: Post-deploy Smoke Test
-        uses: ./.github/actions/smoke-test
-        with:
-          app_base_url: ${{ env.url }}
-          db_mode: standard
-          database_url: "postgresql+psycopg://postgres:postgres@localhost:5432/testdb"
