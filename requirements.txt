@@ -136,7 +136,7 @@ pydantic-core==2.41.5
     # via pydantic
 python-dateutil==2.9.0.post0
     # via pg8000
-requests==2.32.5
+requests==2.33.0
     # via
     #   -r requirements.in
     #   cloud-sql-python-connector
