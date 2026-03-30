@@ -35,6 +35,14 @@ def get_auth_headers():
         return _AUTH_HEADERS
 
     _AUTH_HEADERS = {}
+
+    # Najpierw sprawdź czy token jest podany z zewnątrz (CI)
+    token = os.environ.get("OIDC_TOKEN")
+    if token:
+        logger.info("  (Using OIDC token from environment)")
+        _AUTH_HEADERS = {"Authorization": f"Bearer {token}"}
+        return _AUTH_HEADERS
+
     try:
         import google.auth.transport.requests
         import google.oauth2.id_token
