@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.16.0](https://github.com/aergaroth/openjobseu/compare/v2.15.0...v2.16.0) (2026-03-30)
+
+
+### Features
+
+* enhance frontend with improved layout, accessibility, and testing ([85be557](https://github.com/aergaroth/openjobseu/commit/85be557aa2490f2c6369083e1351026f821078c6))
+
 ## [2.15.0](https://github.com/aergaroth/openjobseu/compare/v2.14.0...v2.15.0) (2026-03-30)
 
 
