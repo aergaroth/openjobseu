@@ -508,6 +508,27 @@ select:focus  { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,82,22
   line-height: 1.65;
   white-space: pre-wrap;
   word-break: break-word;
+  max-height: 4.95em; /* ~3 lines */
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.job-description.expanded {
+  max-height: 18rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-mid) transparent;
+}
+
+.job-description.expanded::-webkit-scrollbar {
+  width: 4px;
+}
+.job-description.expanded::-webkit-scrollbar-track {
+  background: transparent;
+}
+.job-description.expanded::-webkit-scrollbar-thumb {
+  background: var(--border-mid);
+  border-radius: 2px;
 }
 
 .job-description-toggle {

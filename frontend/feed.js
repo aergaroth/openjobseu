@@ -22,10 +22,6 @@
   // ── State ──────────────────────────────────────────────
   let allJobs = [];
 
-  // Description text stored in a closure map — never in data-* attributes
-  // to avoid HTML injection via untrusted feed content
-  const descriptionMap = new WeakMap();
-
   let activeFilters = {
     search: "",
     departments: new Set(),
@@ -219,33 +215,27 @@
       card.appendChild(metaRow);
 
       // ── Description ──────────────────────────────────
-      const fullText  = job.description || "";
-      const shortText = fullText.length > 220 ? fullText.substring(0, 220) : fullText;
-      const needsToggle = fullText.length > 220;
+      // CSS max-height clips the text; JS only toggles .expanded.
+      const fullText = job.description || "";
+      const CLIP_THRESHOLD = 160;
 
       const descEl = document.createElement("p");
       descEl.className = "job-description";
-      descEl.appendChild(safeText(shortText + (needsToggle ? "…" : "")));
-
-      // Store in WeakMap — not in DOM attributes
-      descriptionMap.set(descEl, { full: fullText, short: shortText });
-
+      descEl.appendChild(safeText(fullText));
       card.appendChild(descEl);
 
-      if (needsToggle) {
+      if (fullText.length > CLIP_THRESHOLD) {
         const toggleBtn = document.createElement("button");
         toggleBtn.className = "job-description-toggle";
         toggleBtn.setAttribute("aria-expanded", "false");
         toggleBtn.appendChild(safeText("Show more"));
 
         toggleBtn.addEventListener("click", () => {
-          const data = descriptionMap.get(descEl);
           const expanded = toggleBtn.getAttribute("aria-expanded") === "true";
-          descEl.textContent = "";
-          descEl.appendChild(safeText(expanded ? data.short + "…" : data.full));
+          descEl.classList.toggle("expanded", !expanded);
+          toggleBtn.setAttribute("aria-expanded", String(!expanded));
           toggleBtn.textContent = "";
           toggleBtn.appendChild(safeText(expanded ? "Show more" : "Show less"));
-          toggleBtn.setAttribute("aria-expanded", String(!expanded));
         });
 
         card.appendChild(toggleBtn);
