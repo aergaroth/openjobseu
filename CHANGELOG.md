@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.15.0](https://github.com/aergaroth/openjobseu/compare/v2.14.0...v2.15.0) (2026-03-30)
+
+
+### Features
+
+* add new strong signals for US-based roles in geo data classifiers ([1fa2f9f](https://github.com/aergaroth/openjobseu/commit/1fa2f9f7152040a6fb293e9e9317b2f4d27b691e))
+* enhance deployment workflow with post-deploy smoke tests and service URL retrieval ([1fa2f9f](https://github.com/aergaroth/openjobseu/commit/1fa2f9f7152040a6fb293e9e9317b2f4d27b691e))
+* enhance post-deploy smoke test with OIDC token support for authentication ([ab0f583](https://github.com/aergaroth/openjobseu/commit/ab0f5836be59a5074b24f0818a313ecad5460ebb))
+* implement post-deploy smoke check script for application health verification ([b82f316](https://github.com/aergaroth/openjobseu/commit/b82f316d5a94179d37484a8ea79db68d06c813d8))
+* update hard geo patterns to include new USA-based role signals ([1fa2f9f](https://github.com/aergaroth/openjobseu/commit/1fa2f9f7152040a6fb293e9e9317b2f4d27b691e))
+
+
+### Bug Fixes
+
+* add authentication headers to health check request ([9217fdd](https://github.com/aergaroth/openjobseu/commit/9217fdda88c2c18df9ab44c6c724d058adee5588))
+* correct token audience key in authentication step ([38027fc](https://github.com/aergaroth/openjobseu/commit/38027fce0f03e42cb109528503ef7b635a3a446a))
+* enhance health check with retry logic for service readiness ([c49f82b](https://github.com/aergaroth/openjobseu/commit/c49f82bb94a0adc194fe08d0d998e62959cc2a56))
+* refactor authentication step and streamline post-deploy smoke test execution ([61c601c](https://github.com/aergaroth/openjobseu/commit/61c601c2dce386715b6f6935e368cba640fd3af7))
+* update smoke test dependencies and remove redundant steps in deployment workflow ([fe3925e](https://github.com/aergaroth/openjobseu/commit/fe3925ee0b6575b9c998882e68a0d1c2d7778331))
+
 ## [2.14.0](https://github.com/aergaroth/openjobseu/compare/v2.13.0...v2.14.0) (2026-03-29)
 
 
