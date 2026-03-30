@@ -1,0 +1,14 @@
+{
+  "name": "openjobseu-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for OpenJobsEU",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "serve": "http-server -c-1 ."
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.42.1",
+    "http-server": "^14.1.1"
+  }
+}
