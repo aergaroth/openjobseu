@@ -7,6 +7,8 @@ HARD_GEO_PATTERNS = [
     r"\bmust reside in the us\b",
     r"\bus residents only\b",
     r"\bus applicants only\b",
+    r"\busa-based roles only\b",
+    r"\busa based roles only\b",
     r"\bmust be authorized to work in the us\b",
     r"\bus work authorization required\b",
     r"\beligible to work in the us only\b",

@@ -148,18 +148,11 @@ def classify_remote(
     if any(k in title_l for k in V2_REMOTE_STRONG):
         return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": "title_remote_strong"}
 
-    # 4 Strong Remote in description (Allows bypassing Hybrid if description explicitly says '100% remote')
-    if any(k in desc_l for k in V2_REMOTE_STRONG):
-        return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": "desc_remote_strong"}
+    # 4 Explicit negative in description
+    if any(k in desc_l for k in V2_NEGATIVE_STRONG):
+        return {"remote_model": RemoteClass.NON_REMOTE, "reason": "desc_negative"}
 
-    # 4.5 Region-locked remote in description
-    if any(k in desc_l for k in V2_REMOTE_REGION_LOCKED_SIGNALS):
-        return {
-            "remote_model": RemoteClass.REMOTE_REGION_LOCKED,
-            "reason": "desc_remote_region_locked",
-        }
-
-    # 5 Hybrid detection (moved below Strong Remote to avoid false negatives)
+    # 5 Hybrid detection
     if any(k in desc_l for k in V2_HYBRID_SIGNALS):
         return {"remote_model": RemoteClass.NON_REMOTE, "reason": "hybrid_signal"}
 
@@ -167,9 +160,16 @@ def classify_remote(
     if "remote" in title_l:
         return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": "title_remote"}
 
-    # 6 Explicit negative in description
-    if any(k in desc_l for k in V2_NEGATIVE_STRONG):
-        return {"remote_model": RemoteClass.NON_REMOTE, "reason": "desc_negative"}
+    # 6 Strong Remote in description
+    if any(k in desc_l for k in V2_REMOTE_STRONG):
+        return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": "desc_remote_strong"}
+
+    # 6.5 Region-locked remote in description
+    if any(k in desc_l for k in V2_REMOTE_REGION_LOCKED_SIGNALS):
+        return {
+            "remote_model": RemoteClass.REMOTE_REGION_LOCKED,
+            "reason": "desc_remote_region_locked",
+        }
 
     # 7 Optional remote (benefit)
     if any(k in desc_l for k in V2_REMOTE_OPTIONAL_SIGNALS):
