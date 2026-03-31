@@ -136,7 +136,10 @@ def clean_html(text: str) -> str:
 
     # Ostateczne usunięcie pozostałych tagów HTML (takich jak <span>, <article>, osierocone atrybuty)
     text = REMAINING_HTML_TAGS.sub("", text)
+    # Unescape po strippowaniu tagów — może odtworzyć <tag> z encji (&lt;code&gt; → <code>),
+    # dlatego drugi przebieg usuwający tagi jest konieczny.
     text = html.unescape(text)
+    text = REMAINING_HTML_TAGS.sub("", text)
 
     # Semantyczna wycinka boilerplate'u po konwersji na tekst
     for _, pattern in BOILERPLATE_PATTERNS.items():
