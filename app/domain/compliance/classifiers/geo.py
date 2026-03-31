@@ -275,9 +275,19 @@ def classify_geo(
         return localization_result
 
     # 4.5 Safe regional and explicit fallback in full description
-    # Catches strong constraints missed when remote_scope is empty
+    # Catches strong constraints missed when remote_scope is empty.
+    #
+    # Guard for "europe" keyword: only skip when the description contains broad multi-region
+    # boilerplate signals (e.g. "offices in north america, europe, and asia pacific").
+    # We deliberately exclude single-region phrases like "latam" to avoid false negatives
+    # on jobs that explicitly hire in "latam or europe" as a direct candidate location.
+    _multi_region_boilerplate_in_desc = any(
+        _contains_phrase(desc_l, kw) for kw in ("north america", "americas", "asia pacific", "apac")
+    )
     for kw in EU_REGION_KEYWORDS:
         if _contains_phrase(desc_l, kw):
+            if _multi_region_boilerplate_in_desc:
+                break  # Global company boilerplate, not an EU-targeted job constraint
             return {"geo_class": GeoClass.EU_REGION, "reason": f"desc_{kw.replace(' ', '_')}"}
 
     for kw in EU_REGION_CUSTOM:
