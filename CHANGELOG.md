@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.17.0](https://github.com/aergaroth/openjobseu/compare/v2.16.0...v2.17.0) (2026-03-31)
+
+
+### Features
+
+* add market statistics export functionality ([a88ee36](https://github.com/aergaroth/openjobseu/commit/a88ee368f8434fdca931eb039afde7521cc4716e))
+* enhance geo classification logic for global roles and non-EU regions ([ef99a44](https://github.com/aergaroth/openjobseu/commit/ef99a442a5e4a711efc423fcffa39688479e34af))
+
+
+### Bug Fixes
+
+* correct typos in non-EU scope title phrases and update .gitignore to include CLAUDE.md ([6ed31ef](https://github.com/aergaroth/openjobseu/commit/6ed31ef51bfbb92c893ff670854e4f60fb8dfb86))
+
 ## [2.16.0](https://github.com/aergaroth/openjobseu/compare/v2.15.0...v2.16.0) (2026-03-30)
 
 
