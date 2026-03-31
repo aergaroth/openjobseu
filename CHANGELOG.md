@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.19.0](https://github.com/aergaroth/openjobseu/compare/v2.18.0...v2.19.0) (2026-03-31)
+
+
+### Features
+
+* **ingestion:** add description cleaning before job identity computation ([b9864ae](https://github.com/aergaroth/openjobseu/commit/b9864ae601d4798523924c265af9e9104169a223))
+
 ## [2.18.0](https://github.com/aergaroth/openjobseu/compare/v2.17.0...v2.18.0) (2026-03-31)
 
 
