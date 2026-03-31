@@ -215,6 +215,69 @@ def test_geo_v3_non_eu_scope_title_phrase_overrides_emea_mixed_region():
     assert result["reason"] == "israel"
 
 
+def test_geo_v3_apac_scope_not_eu():
+    # Regression: jobs with APAC/Oceania/LatAm scopes were incorrectly approved because
+    # those countries were missing from NON_EU_SCOPE_TITLE_PHRASES.
+    apac_cases = [
+        ("auckland, auckland, new zealand", "Senior Staff Software Engineer"),
+        ("manila, manila, philippines", "People and Culture Coordinator"),
+        ("sydney, new south wales, australia", "Account Executive"),
+        ("remote, india, apac", "Solution Architect"),
+        ("mexico city, mexico", "iOS Engineer"),
+    ]
+    for scope, title in apac_cases:
+        result = classify_geo_v3(title=title, description="", remote_scope=scope)
+        assert result["geo_class"] == GeoClass.NON_EU, f"Expected NON_EU for scope='{scope}', got {result['geo_class']}"
+
+    # EMEA title + India/APAC scope → NON_EU (scope phrase wins via non_eu_scope_title_phrase_hit)
+    result = classify_geo_v3(
+        title="Solution Architect, Networking - EMEA Hours",
+        description="",
+        remote_scope="remote, india, apac",
+    )
+    assert result["geo_class"] == GeoClass.NON_EU
+
+
+def test_geo_v3_europe_in_boilerplate_with_multi_region_context_is_not_eu():
+    # Regression: company boilerplate like "offices in north america, europe, and asia pacific"
+    # was triggering eu_region because the description-level "europe" had no conflict guard.
+    # The guard applies only when broad multi-region signals ("north america", "americas",
+    # "asia pacific", "apac") are present — not for single-region phrases like "latam",
+    # which may appear as a direct candidate location alongside "europe".
+    lightspeed_boilerplate = (
+        "Lightspeed is listed on the nasdaq (lspd) and toronto stock exchange (tsx: lspd). "
+        "With teams across north america, europe, and asia pacific, the company serves retail, "
+        "hospitality, and golf businesses worldwide."
+    )
+    # NZ scope is already caught by scope-level detection (new zealand in NON_EU_SCOPE_TITLE_PHRASES)
+    result = classify_geo_v3(
+        title="Senior Staff Software Engineer",
+        description=lightspeed_boilerplate,
+        remote_scope="auckland, auckland, new zealand",
+    )
+    assert result["geo_class"] == GeoClass.NON_EU
+
+    # Scope-neutral (just "remote") with "north america" + "europe" in boilerplate → not EU-targeted
+    result = classify_geo_v3(
+        title="Software Engineer",
+        description=lightspeed_boilerplate,
+        remote_scope="remote",
+    )
+    assert result["geo_class"] != GeoClass.EU_REGION
+    assert result["geo_class"] != GeoClass.EU_MEMBER_STATE
+
+
+def test_geo_v3_latam_or_europe_direct_scope_stays_eu():
+    # "latam or europe" as a direct candidate location statement (not company boilerplate)
+    # must not be blocked by the multi-region conflict guard — the job IS EU-eligible.
+    result = classify_geo_v3(
+        title="Senior Software Engineer",
+        description="This role can be based in latam or europe. We cannot hire in the usa for this position.",
+        remote_scope="remote",
+    )
+    assert result["geo_class"] in (GeoClass.EU_REGION, GeoClass.EU_MEMBER_STATE)
+
+
 def test_geo_v3_global_role_emea_and_apac_in_description_is_not_eu():
     # Regression: global IT/ops roles mentioning EMEA alongside APAC/Americas in the description
     # (e.g. SAM, IT Program Manager) were incorrectly classified as EU_REGION.
