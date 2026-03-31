@@ -132,6 +132,11 @@ def _classify_from_remote_scope(scope_l: str) -> dict | None:
                 found_non_eu = True
                 continue
             if token_part in COUNTRY_ALIASES:
+                # Skip 2-letter ISO codes in sub-token context (e.g. "IT" in "Sr IT Project"
+                # means Information Technology, not Italy). Standalone tokens are still
+                # handled by the outer loop above.
+                if len(token_part) <= 2:
+                    continue
                 mapped = COUNTRY_ALIASES[token_part].lower()
                 if mapped in EU_MEMBER_STATES or mapped in EOG_COUNTRIES:
                     found_eu = True
@@ -277,6 +282,11 @@ def classify_geo(
 
     for kw in EU_REGION_CUSTOM:
         if _contains_phrase(desc_l, kw):
+            # If non-EU regions are also mentioned in the description, this is a global role
+            # description (e.g., "manages IT across EMEA and APAC") — not EU-targeted.
+            # Only classify as EU_REGION when EMEA/similar appears without non-EU region context.
+            if any(_contains_phrase(desc_l, non_eu_kw) for non_eu_kw in NON_EU_REGION_CUSTOM):
+                break
             return {"geo_class": GeoClass.EU_REGION, "reason": f"desc_{kw.replace(' & ', '_').replace(' ', '_')}"}
 
     # Safely match explicit UK restrictions in text without triggering generic words like "London"
