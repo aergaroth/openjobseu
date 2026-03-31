@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.20.0](https://github.com/aergaroth/openjobseu/compare/v2.19.0...v2.20.0) (2026-03-31)
+
+
+### Features
+
+* **backfill:** implement script to clean HTML descriptions and recompute job fingerprints ([8dade5f](https://github.com/aergaroth/openjobseu/commit/8dade5ffe1e1619d59a0e0a15d0a8bd773490986))
+
 ## [2.19.0](https://github.com/aergaroth/openjobseu/compare/v2.18.0...v2.19.0) (2026-03-31)
 
 
