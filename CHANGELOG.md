@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.18.0](https://github.com/aergaroth/openjobseu/compare/v2.17.0...v2.18.0) (2026-03-31)
+
+
+### Features
+
+* **geo:** enhance geo classification for APAC and LatAm regions, add regression tests ([f7434a9](https://github.com/aergaroth/openjobseu/commit/f7434a9055dca42a735ebbbae076127b93085878))
+
 ## [2.17.0](https://github.com/aergaroth/openjobseu/compare/v2.16.0...v2.17.0) (2026-03-31)
 
 
