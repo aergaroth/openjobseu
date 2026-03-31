@@ -506,12 +506,40 @@ select:focus  { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,82,22
   font-size: 0.875rem;
   color: var(--text-secondary);
   line-height: 1.65;
-  white-space: pre-wrap;
   word-break: break-word;
   max-height: 4.95em; /* ~3 lines */
   overflow: hidden;
   transition: max-height 0.3s ease;
 }
+
+.job-description p,
+.job-description ul,
+.job-description ol { margin: 0 0 0.4em; }
+.job-description p:last-child,
+.job-description ul:last-child,
+.job-description ol:last-child { margin-bottom: 0; }
+.job-description ul,
+.job-description ol { padding-left: 1.4em; }
+.job-description li { margin-bottom: 0.1em; }
+.job-description .md-h {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0.4em 0 0.15em;
+}
+.job-description code {
+  font-family: monospace;
+  font-size: 0.83em;
+  background: var(--bg-tag);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+.job-description a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: var(--accent-light);
+}
+.job-description a:hover { text-decoration-color: var(--accent); }
 
 .job-description.expanded {
   max-height: 18rem;
@@ -598,4 +626,124 @@ select:focus  { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,82,22
   .job-card-top { flex-direction: column; gap: 0.5rem; }
   .job-salary   { align-self: flex-start; }
   .content-header { flex-direction: column; align-items: flex-start; gap: 0.25rem; }
+}
+
+/* ── Market Overview ─────────────────────────────────── */
+.market-overview {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.market-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.market-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex: 1;
+  margin: 0;
+}
+
+.chart-toggle {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.toggle-btn {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: var(--bg-tag);
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  padding: 0.2rem 0.6rem;
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.toggle-btn:hover { background: var(--bg-hover); }
+
+.toggle-btn.active {
+  background: var(--bg-tag-active);
+  color: var(--text-tag-active);
+}
+
+.market-collapse {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.market-collapse:hover { color: var(--text-secondary); }
+
+.metric-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.metric-card {
+  background: var(--bg);
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.metric-card-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+.metric-card-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.chart-figure {
+  margin: 0;
+}
+
+.chart-figure figcaption {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 0.4rem;
+}
+
+.chart-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: var(--radius-sm);
+}
+
+@media (min-width: 960px) {
+  .chart-grid { grid-template-columns: repeat(3, 1fr); }
+  .metric-cards { grid-template-columns: repeat(3, 1fr); }
 }

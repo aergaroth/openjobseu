@@ -2,6 +2,7 @@
   "use strict";
 
   const FEED_URL = "/feed.json";
+  const MARKET_STATS_URL = "/market-stats.json";
   const DEBOUNCE_MS = 200;
 
   // ── DOM refs ───────────────────────────────────────────
@@ -30,6 +31,95 @@
     includeNoSalary: true,
     sort: "newest",
   };
+
+  // ── Markdown renderer ──────────────────────────────────
+  // Converts a safe subset of Markdown to HTML.
+  // Text portions are HTML-escaped before insertion; only whitelisted
+  // tags are ever produced. Safe for use with innerHTML.
+  function renderMarkdown(text) {
+    if (!text) return '';
+
+    function esc(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function safeHref(url) {
+      // url arrives pre-HTML-escaped; strip entities before URL validation
+      const raw = url.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+      try {
+        const u = new URL(raw);
+        return (u.protocol === 'http:' || u.protocol === 'https:') ? esc(raw) : '#';
+      } catch { return '#'; }
+    }
+
+    // Inline markup: runs on already-HTML-escaped text
+    function inline(s) {
+      return esc(s)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g,     '<em>$1</em>')
+        .replace(/`(.+?)`/g,       '<code>$1</code>')
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) =>
+          `<a href="${safeHref(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`
+        );
+    }
+
+    const lines = text.split('\n');
+    const blocks = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const trimmed = lines[i].trim();
+
+      // ATX headings — rendered as h4–h6 to stay below the page's h1/h2 hierarchy
+      const hm = trimmed.match(/^(#{1,3})\s+(.*)/);
+      if (hm) {
+        const lvl = hm[1].length + 3;
+        blocks.push(`<h${lvl} class="md-h">${inline(hm[2])}</h${lvl}>`);
+        i++; continue;
+      }
+
+      // Unordered list
+      if (/^[-*+] /.test(trimmed)) {
+        const items = [];
+        while (i < lines.length && /^[-*+] /.test(lines[i].trim())) {
+          items.push(`<li>${inline(lines[i].trim().slice(2))}</li>`);
+          i++;
+        }
+        blocks.push(`<ul>${items.join('')}</ul>`);
+        continue;
+      }
+
+      // Ordered list
+      if (/^\d+\. /.test(trimmed)) {
+        const items = [];
+        while (i < lines.length && /^\d+\. /.test(lines[i].trim())) {
+          items.push(`<li>${inline(lines[i].trim().replace(/^\d+\.\s+/, ''))}</li>`);
+          i++;
+        }
+        blocks.push(`<ol>${items.join('')}</ol>`);
+        continue;
+      }
+
+      // Blank line
+      if (!trimmed) { i++; continue; }
+
+      // Paragraph — collect consecutive non-block lines
+      const paraLines = [];
+      while (
+        i < lines.length &&
+        lines[i].trim() &&
+        !/^#{1,3} /.test(lines[i].trim()) &&
+        !/^[-*+] /.test(lines[i].trim()) &&
+        !/^\d+\. /.test(lines[i].trim())
+      ) {
+        paraLines.push(lines[i].trim());
+        i++;
+      }
+      blocks.push(`<p>${paraLines.map(inline).join('<br>')}</p>`);
+    }
+
+    return blocks.join('');
+  }
 
   // ── Helpers ────────────────────────────────────────────
   function debounce(fn, ms) {
@@ -219,9 +309,9 @@
       const fullText = job.description || "";
       const CLIP_THRESHOLD = 160;
 
-      const descEl = document.createElement("p");
+      const descEl = document.createElement("div");
       descEl.className = "job-description";
-      descEl.appendChild(safeText(fullText));
+      descEl.innerHTML = renderMarkdown(fullText);
       card.appendChild(descEl);
 
       if (fullText.length > CLIP_THRESHOLD) {
@@ -364,6 +454,110 @@
     });
   }
 
+  // ── Market stats ───────────────────────────────────────
+
+  function computeMetrics(stats, days) {
+    const subset = stats.slice(-days);
+    const last = subset[subset.length - 1];
+    const totalActive = last ? last.jobs_active : 0;
+
+    const salaryVals = subset.map(s => s.avg_salary_eur).filter(v => v != null);
+    const avgSalary = salaryVals.length
+      ? salaryVals.reduce((a, b) => a + b, 0) / salaryVals.length
+      : null;
+
+    const remoteVals = subset.map(s => s.remote_ratio).filter(v => v != null);
+    const remoteRatio = remoteVals.length
+      ? remoteVals.reduce((a, b) => a + b, 0) / remoteVals.length
+      : null;
+
+    return { totalActive, avgSalary, remoteRatio };
+  }
+
+  function setChartPeriod(days, data) {
+    const base = data.meta.chart_base_url;
+    const volumeImg = document.getElementById("chart-volume");
+    const salaryImg = document.getElementById("chart-salary");
+    const remoteImg = document.getElementById("chart-remote");
+
+    if (volumeImg) volumeImg.src = `${base}/charts/volume-${days}d.svg`;
+    if (salaryImg) salaryImg.src = `${base}/charts/salary-${days}d.svg`;
+    if (remoteImg) remoteImg.src = `${base}/charts/remote-${days}d.svg`;
+
+    document.querySelectorAll(".toggle-btn").forEach(btn => {
+      const pressed = parseInt(btn.dataset.days, 10) === days;
+      btn.classList.toggle("active", pressed);
+      btn.setAttribute("aria-pressed", String(pressed));
+    });
+  }
+
+  function renderMarketError() {
+    const body = document.getElementById("market-body");
+    if (!body) return;
+    body.textContent = "";
+    body.appendChild(safeText("Statistics unavailable."));
+  }
+
+  function renderMarketOverview(data) {
+    const section = document.getElementById("market-overview");
+    if (!section) return;
+
+    // Metric cards
+    const cardsEl = section.querySelector(".metric-cards");
+    if (cardsEl) {
+      const m = computeMetrics(data.stats, 7);
+      cardsEl.innerHTML = "";
+      [
+        { label: "Active jobs",   value: m.totalActive != null ? m.totalActive.toLocaleString() : "—" },
+        { label: "Avg. salary",   value: m.avgSalary   != null ? `€${Math.round(m.avgSalary).toLocaleString()}` : "—" },
+        { label: "Remote ratio",  value: m.remoteRatio != null ? `${Math.round(m.remoteRatio * 100)}%` : "—" },
+      ].forEach(({ label, value }) => {
+        cardsEl.appendChild(
+          el("div", { class: "metric-card" }, [
+            el("span", { class: "metric-card-label" }, [label]),
+            el("div",  { class: "metric-card-value" }, [value]),
+          ])
+        );
+      });
+    }
+
+    // Initial chart period
+    setChartPeriod(7, data);
+
+    // Toggle buttons
+    section.querySelectorAll(".toggle-btn").forEach(btn => {
+      btn.addEventListener("click", () => setChartPeriod(parseInt(btn.dataset.days, 10), data));
+    });
+
+    // Collapse button
+    const collapseBtn = section.querySelector(".market-collapse");
+    const body = document.getElementById("market-body");
+    if (collapseBtn && body) {
+      collapseBtn.addEventListener("click", () => {
+        const expanded = collapseBtn.getAttribute("aria-expanded") === "true";
+        body.hidden = expanded;
+        collapseBtn.setAttribute("aria-expanded", String(!expanded));
+        collapseBtn.textContent = "";
+        collapseBtn.appendChild(safeText(expanded ? "Show" : "Hide"));
+      });
+    }
+
+    section.removeAttribute("hidden");
+  }
+
+  function loadMarketStats(baseUrl = "") {
+    fetch(`${baseUrl}${MARKET_STATS_URL}`)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(data => renderMarketOverview(data))
+      .catch(err => {
+        console.error("Market stats error:", err);
+        renderMarketError();
+      });
+  }
+
   // ── Fetch ──────────────────────────────────────────────
   fetch(FEED_URL)
     .then(r => {
@@ -388,6 +582,7 @@
       renderDepartments(data.meta?.departments || []);
       injectStructuredData(allJobs);
       setupEventListeners();
+      loadMarketStats();
 
       if (metaEl && data.meta?.generated_at) {
         const generated = new Date(data.meta.generated_at);

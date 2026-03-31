@@ -129,6 +129,65 @@
           ></div>
         </div>
 
+        <section
+          id="market-overview"
+          class="market-overview"
+          aria-label="Market statistics"
+          hidden
+        >
+          <div class="market-header">
+            <h2 class="market-title">Market overview</h2>
+            <div class="chart-toggle" role="group" aria-label="Chart period">
+              <button class="toggle-btn active" data-days="7" aria-pressed="true">7d</button>
+              <button class="toggle-btn" data-days="30" aria-pressed="false">30d</button>
+            </div>
+            <button class="market-collapse" aria-expanded="true" aria-controls="market-body">Hide</button>
+          </div>
+
+          <div id="market-body" class="market-body">
+            <div class="metric-cards" aria-label="Key metrics"></div>
+
+            <div class="chart-grid">
+              <figure class="chart-figure">
+                <img
+                  id="chart-volume"
+                  class="chart-img"
+                  src=""
+                  alt="Job volume over time"
+                  loading="lazy"
+                  width="560"
+                  height="120"
+                />
+                <figcaption>Job volume</figcaption>
+              </figure>
+              <figure class="chart-figure">
+                <img
+                  id="chart-salary"
+                  class="chart-img"
+                  src=""
+                  alt="Average salary over time"
+                  loading="lazy"
+                  width="560"
+                  height="120"
+                />
+                <figcaption>Avg. salary (EUR)</figcaption>
+              </figure>
+              <figure class="chart-figure">
+                <img
+                  id="chart-remote"
+                  class="chart-img"
+                  src=""
+                  alt="Remote work ratio over time"
+                  loading="lazy"
+                  width="560"
+                  height="80"
+                />
+                <figcaption>Remote ratio</figcaption>
+              </figure>
+            </div>
+          </div>
+        </section>
+
         <div id="jobs-list" class="jobs-list" aria-label="Job listings">
           <div class="placeholder-row" role="status">Loading jobs…</div>
         </div>
