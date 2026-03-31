@@ -213,3 +213,27 @@ def test_geo_v3_non_eu_scope_title_phrase_overrides_emea_mixed_region():
     )
     assert result["geo_class"] == GeoClass.NON_EU
     assert result["reason"] == "israel"
+
+
+def test_geo_v3_global_role_emea_and_apac_in_description_is_not_eu():
+    # Regression: global IT/ops roles mentioning EMEA alongside APAC/Americas in the description
+    # (e.g. SAM, IT Program Manager) were incorrectly classified as EU_REGION.
+    # "EMEA" in a job description that also mentions other non-EU regions means the role
+    # is globally scoped, not EU-targeted — candidate location is not restricted to EU.
+    description = (
+        "You will manage software asset lifecycles across all regions including EMEA, APAC, "
+        "and the Americas. Responsibilities include license compliance globally."
+    )
+    result = classify_geo_v3(
+        title="Sr IT Project/Program Manager - SAM",
+        description=description,
+        remote_scope="remote",
+    )
+    assert result["geo_class"] != GeoClass.EU_REGION
+    assert result["geo_class"] != GeoClass.EU_MEMBER_STATE
+
+    job, _ = apply_policy(
+        {"title": "Sr IT Project/Program Manager - SAM", "description": description, "remote_scope": "remote"},
+        source="employer_ing",
+    )
+    assert job["_compliance"]["compliance_score"] < 80
