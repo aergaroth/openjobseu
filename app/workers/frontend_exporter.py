@@ -4,9 +4,18 @@ import json
 import logging
 import mimetypes
 import os
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
+
+from app.workers.chart_generator import (
+    generate_line_chart,
+    generate_sparkline,
+    generate_volume_chart,
+    svg_to_file,
+)
+from app.workers.market_types import DailyStats, MarketStatsMeta, MarketStatsResponse
+from storage.db_engine import get_engine
 
 logger = logging.getLogger("openjobseu.runtime")
 
@@ -22,10 +31,10 @@ FRONTEND_EXCLUDE_PATTERNS = [
 _DEFAULT_ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable"
 _DEFAULT_HTML_CACHE_CONTROL = "public, max-age=300"
 _DEFAULT_FEED_CACHE_CONTROL = "public, max-age=300"
+_DEFAULT_MARKET_STATS_CACHE_CONTROL = "public, max-age=300"
 
 
 def _json_serial(obj):
-    """Wsparcie serializacji obiektów nienatywnych (np. datetime) dla json.dumps()"""
     if isinstance(obj, (datetime, date)):
         return obj.isoformat().replace("+00:00", "Z")
     raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
@@ -106,7 +115,6 @@ def _export_feed(bucket) -> tuple[int, int]:
         offset=0,
     )
 
-    # Agregaty dla UI
     departments = Counter(job["source_department"] for job in jobs if job.get("source_department"))
     departments_list = [{"name": name, "count": count} for name, count in departments.items()]
 
@@ -135,21 +143,120 @@ def _export_feed(bucket) -> tuple[int, int]:
     return len(jobs), 1
 
 
+def _build_chart_set(stats: list[DailyStats], days: int) -> dict[str, bytes]:
+    """
+    Slice stats to the last `days` entries and generate three SVG charts.
+    Returns a dict mapping filename suffix → SVG bytes.
+    """
+    subset = stats[-days:] if stats else []
+    dates = [s.date for s in subset]
+
+    volume_svg = generate_volume_chart(
+        [s.jobs_created for s in subset],
+        [s.jobs_expired for s in subset],
+        [s.jobs_active for s in subset],
+        dates,
+    )
+    salary_svg = generate_line_chart(
+        [s.avg_salary_eur for s in subset],
+        dates,
+        "#50E3C2",
+        lambda v: f"€{int(v):,}",
+    )
+    remote_svg = generate_sparkline(
+        [s.remote_ratio for s in subset],
+        dates,
+        "#F5A623",
+    )
+
+    return {
+        "volume": svg_to_file(volume_svg),
+        "salary": svg_to_file(salary_svg),
+        "remote": svg_to_file(remote_svg),
+    }
+
+
+def _export_charts(bucket, stats: list[DailyStats]) -> int:
+    """
+    Upload six SVG chart files (volume/salary/remote × 7d/30d) to GCS.
+    Partial failure is logged per file but does not abort remaining uploads.
+    Returns count of successfully uploaded files.
+    """
+    uploaded = 0
+    for days in [7, 30]:
+        chart_set = _build_chart_set(stats, days)
+        for name, svg_bytes in chart_set.items():
+            blob_name = f"charts/{name}-{days}d.svg"
+            try:
+                blob = bucket.blob(blob_name)
+                blob.cache_control = _DEFAULT_MARKET_STATS_CACHE_CONTROL
+                blob.upload_from_string(svg_bytes, content_type="image/svg+xml")
+                uploaded += 1
+            except Exception:
+                logger.exception("chart_upload_failed", extra={"blob": blob_name})
+    return uploaded
+
+
+def _export_market_stats(bucket, chart_base_url: str) -> tuple[int, int]:
+    """
+    1. Query market_daily_stats for the last 30 days.
+    2. Upload six SVG chart files via _export_charts().
+    3. Serialize MarketStatsResponse and upload as market-stats.json.
+    Returns (rows_exported, charts_uploaded).
+    """
+    from sqlalchemy import text
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        today = date.today()
+        thirty_days_ago = today - timedelta(days=30)
+        results = (
+            conn.execute(
+                text(
+                    "SELECT date, jobs_created, jobs_expired, jobs_active, jobs_reposted,"
+                    " avg_salary_eur, median_salary_eur, remote_ratio"
+                    " FROM market_daily_stats"
+                    " WHERE date >= :start_date"
+                    " ORDER BY date ASC"
+                ),
+                {"start_date": thirty_days_ago},
+            )
+            .mappings()
+            .all()
+        )
+
+    stats = [DailyStats(**row) for row in results]
+    charts_uploaded = _export_charts(bucket, stats)
+
+    meta = MarketStatsMeta(
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        days_available=len(stats),
+        chart_base_url=chart_base_url,
+    )
+    response = MarketStatsResponse(meta=meta, stats=stats)
+
+    stats_blob = bucket.blob("market-stats.json")
+    stats_blob.cache_control = _DEFAULT_MARKET_STATS_CACHE_CONTROL
+    stats_blob.upload_from_string(
+        response.model_dump_json(),
+        content_type="application/json",
+    )
+
+    return len(stats), charts_uploaded
+
+
 def run_frontend_export(
     sync_assets: bool = False,
     *,
     asset_version: str | None = None,
     export_feed: bool = True,
+    export_market_stats: bool = True,
 ) -> dict:
-    """
-    Pobiera najświeższy, zwalidowany feed ofert z bazy i wgrywa jako statyczny plik JSON
-    do publicznego bucketa GCS. Opcjonalnie kopiuje zawartość folderu `frontend`
-    (pomijając niezmienione pliki za pomocą weryfikacji MD5) i może dodać prosty
-    cache-busting dla `style.css` oraz `feed.js` przez wersjonowany query string w `index.html`.
-    """
     bucket_name = os.getenv("PUBLIC_FEED_BUCKET")
     if not bucket_name:
         return {"status": "skipped", "reason": "no_bucket_configured"}
+
+    chart_base_url = os.getenv("PUBLIC_FEED_BASE_URL", "")
 
     logger.info(
         "exporting_frontend_to_gcs",
@@ -157,6 +264,7 @@ def run_frontend_export(
             "bucket": bucket_name,
             "sync_assets": sync_assets,
             "export_feed": export_feed,
+            "export_market_stats": export_market_stats,
             "asset_version": asset_version,
         },
     )
@@ -168,6 +276,7 @@ def run_frontend_export(
         bucket = client.bucket(bucket_name)
         uploaded_files = 0
         exported_jobs = 0
+        exported_stats = 0
 
         if sync_assets:
             uploaded_files += _upload_frontend_assets(bucket, asset_version=asset_version)
@@ -176,25 +285,37 @@ def run_frontend_export(
             exported_jobs, feed_uploads = _export_feed(bucket)
             uploaded_files += feed_uploads
 
-        logger.info(
-            "frontend_exported_to_gcs",
-            extra={
-                "job_count": exported_jobs,
-                "uploaded_files": uploaded_files,
-                "sync_assets": sync_assets,
-                "export_feed": export_feed,
-                "asset_version": asset_version,
-            },
-        )
-        return {
-            "status": "ok",
-            "exported_jobs": exported_jobs,
-            "uploaded_files": uploaded_files,
-            "synced_assets": sync_assets,
-            "exported_feed": export_feed,
-            "asset_version": asset_version,
-        }
-
     except Exception as e:
         logger.exception("frontend_export_failed", extra={"error": str(e)})
         return {"status": "error", "error": str(e)}
+
+    if export_market_stats:
+        try:
+            exported_stats, stats_uploads = _export_market_stats(bucket, chart_base_url)
+            # stats_uploads = SVG count; +1 for market-stats.json
+            uploaded_files += stats_uploads + 1
+        except Exception:
+            logger.exception("market_stats_export_failed")
+
+    logger.info(
+        "frontend_exported_to_gcs",
+        extra={
+            "job_count": exported_jobs,
+            "stats_count": exported_stats,
+            "uploaded_files": uploaded_files,
+            "sync_assets": sync_assets,
+            "export_feed": export_feed,
+            "export_market_stats": export_market_stats,
+            "asset_version": asset_version,
+        },
+    )
+    return {
+        "status": "ok",
+        "exported_jobs": exported_jobs,
+        "exported_stats": exported_stats,
+        "uploaded_files": uploaded_files,
+        "synced_assets": sync_assets,
+        "exported_feed": export_feed,
+        "exported_market_stats": export_market_stats,
+        "asset_version": asset_version,
+    }
