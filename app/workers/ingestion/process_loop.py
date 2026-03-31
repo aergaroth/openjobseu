@@ -4,6 +4,7 @@ from typing import Dict, List
 from sqlalchemy.engine import Connection
 
 from app.adapters.ats.base import ATSAdapter
+from app.domain.jobs.cleaning import clean_description
 from app.domain.jobs.identity import compute_job_identity
 from app.domain.jobs.job_processing import process_ingested_job
 from app.workers.ingestion.metrics import IngestionMetrics
@@ -41,6 +42,12 @@ def process_company_jobs(
 
             metrics.observe_normalized()
             normalized["company_id"] = company_id
+
+            # Clean description before fingerprint computation so the fingerprint
+            # is always derived from the canonical clean text, not raw ATS HTML.
+            if normalized.get("description"):
+                normalized["description"] = clean_description(normalized["description"], source=provider)
+
             normalized = compute_job_identity(company_id, raw, normalized)
 
             job, report = process_ingested_job(normalized, source=provider)
