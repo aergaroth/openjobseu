@@ -80,6 +80,32 @@ def _contains_any(text: str, keywords: list[str]) -> bool:
     return any(k in text for k in keywords)
 
 
+def _phrase_in_desc(text: str, phrase: str) -> bool:
+    """Word-boundary match — prevents 'distributed team' matching 'distributed teams'."""
+    return bool(re.search(r"(?<![a-z])" + re.escape(phrase) + r"(?![a-z])", text))
+
+
+# Phrases that contain remote keywords but describe a benefit perk, not the work arrangement.
+# E.g. "work from home budget" or "work from home allowance" is an equipment stipend,
+# not an indication that the role is remote.
+_REMOTE_BENEFIT_CONTEXT_RE = re.compile(
+    r"\bwork from home\s+(?:budget|stipend|allowance|reimbursement|equipment|setup|kit)\b",
+    re.IGNORECASE,
+)
+
+
+def _strong_remote_in_desc(desc_l: str) -> bool:
+    """Check V2_REMOTE_STRONG against description with benefit-context exclusions."""
+    for phrase in V2_REMOTE_STRONG:
+        if not _phrase_in_desc(desc_l, phrase):
+            continue
+        # "work from home budget/stipend/allowance" is a benefit, not a work arrangement.
+        if phrase == "work from home" and _REMOTE_BENEFIT_CONTEXT_RE.search(desc_l):
+            continue
+        return True
+    return False
+
+
 def is_region_locked(remote_scope: str | None) -> bool:
     if not remote_scope:
         return False
@@ -160,8 +186,10 @@ def classify_remote(
     if "remote" in title_l:
         return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": "title_remote"}
 
-    # 6 Strong Remote in description
-    if any(k in desc_l for k in V2_REMOTE_STRONG):
+    # 6 Strong Remote in description — word-boundary matching + benefit-context exclusions.
+    # e.g. "distributed team" must not match "distributed teams";
+    # "work from home" must not match "work from home budget" (perk, not work arrangement).
+    if _strong_remote_in_desc(desc_l):
         return {"remote_model": RemoteClass.REMOTE_ONLY, "reason": "desc_remote_strong"}
 
     # 6.5 Region-locked remote in description

@@ -66,6 +66,15 @@ class AshbyAdapter(ATSAdapter):
 
         location = sanitize_location(raw_job.get("location"))
 
+        # Collect secondary locations and combine with primary for scope classification
+        secondary_locations = raw_job.get("secondaryLocations") or []
+        secondary_location_strs = [
+            sanitize_location(loc.get("location"))
+            for loc in secondary_locations
+            if isinstance(loc, dict) and loc.get("location")
+        ]
+        secondary_location_strs = [s for s in secondary_location_strs if s]
+
         updated_at = normalize_source_datetime(raw_job.get("updatedAt") or raw_job.get("publishedAt"))
         first_seen_at = updated_at or datetime.now(timezone.utc).isoformat()
 
@@ -83,7 +92,9 @@ class AshbyAdapter(ATSAdapter):
             explicit_flag=(raw_job.get("isRemote") is True or is_remote_location),
         )
 
-        normalized_remote_scope = self.normalize_remote_scope(location)
+        all_locations = [loc for loc in [location] + secondary_location_strs if loc]
+        combined_scope = "; ".join(all_locations) if all_locations else location
+        normalized_remote_scope = self.normalize_remote_scope(combined_scope)
 
         department = raw_job.get("departmentName")
         if department and not isinstance(department, str):
