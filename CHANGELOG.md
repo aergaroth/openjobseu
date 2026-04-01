@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.21.0](https://github.com/aergaroth/openjobseu/compare/v2.20.0...v2.21.0) (2026-04-01)
+
+
+### Features
+
+* Enhance market stats functionality and UI updates ([fd57eb4](https://github.com/aergaroth/openjobseu/commit/fd57eb4db2a2d9b6b3c59e27c41a734ed53d7588))
+
 ## [2.20.0](https://github.com/aergaroth/openjobseu/compare/v2.19.0...v2.20.0) (2026-03-31)
 
 
