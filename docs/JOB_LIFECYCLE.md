@@ -50,6 +50,8 @@ stale → active
 
 Expired jobs are not deleted immediately and may be retained for audit or analytical purposes.
 
+Additionally, the lifecycle worker identifies and flags jobs that are reposted, setting the `is_repost` flag and incrementing `repost_count` for analytical purposes.
+
 ---
 
 ## Verification and transition rules
