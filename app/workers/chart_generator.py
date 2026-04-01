@@ -132,7 +132,7 @@ def render_x_labels(
         label = dates[i].strftime("%b %d")
         parts.append(
             f'<text x="{x:.2f}" y="{y:.2f}" text-anchor="middle"'
-            f' font-size="9" font-family="system-ui, sans-serif" fill="#9898a8">{label}</text>'
+            f' font-size="11" font-family="system-ui, sans-serif" fill="#9898a8">{label}</text>'
         )
     return "\n".join(parts)
 
@@ -192,7 +192,7 @@ def generate_line_chart(
     color: str,
     y_label: Callable[[float], str],
     width: int = 560,
-    height: int = 120,
+    height: int = 160,
 ) -> str:
     """
     Full chart: polyline + y-axis with 3 gridlines + y-tick labels + x-axis dates.
@@ -200,7 +200,7 @@ def generate_line_chart(
     Suitable for jobs_active (count) and salary series (EUR values).
     Returns a complete <svg> string.
     """
-    pad_l, pad_r, pad_t, pad_b = 55, 15, 10, 25
+    pad_l, pad_r, pad_t, pad_b = 62, 15, 12, 30
     x_start = float(pad_l)
     x_end = float(width - pad_r)
     y_top = float(pad_t)
@@ -224,12 +224,12 @@ def generate_line_chart(
             f' stroke="#ddddd4" stroke-width="1"/>'
         )
         gridlines_parts.append(
-            f'  <text x="{x_start - 4:.2f}" y="{gy + 3:.2f}" text-anchor="end"'
-            f' font-size="9" font-family="system-ui, sans-serif"'
+            f'  <text x="{x_start - 5:.2f}" y="{gy + 4:.2f}" text-anchor="end"'
+            f' font-size="11" font-family="system-ui, sans-serif"'
             f' fill="#9898a8">{y_label(gv)}</text>'
         )
 
-    x_labels = render_x_labels(dates, x_start, x_end, y_bottom + 12)
+    x_labels = render_x_labels(dates, x_start, x_end, y_bottom + 15)
 
     no_data = ""
     if all_none:
@@ -237,7 +237,7 @@ def generate_line_chart(
         cy = (y_top + y_bottom) / 2
         no_data = (
             f'  <text x="{cx:.2f}" y="{cy:.2f}" text-anchor="middle"'
-            f' font-size="11" font-family="system-ui, sans-serif"'
+            f' font-size="13" font-family="system-ui, sans-serif"'
             f' fill="#9898a8">No data available</text>\n'
         )
 
@@ -265,7 +265,7 @@ def generate_volume_chart(
     active: List[Optional[float]],
     dates: List[date],
     width: int = 560,
-    height: int = 120,
+    height: int = 160,
 ) -> str:
     """
     Three polylines on a shared y-axis:
@@ -274,7 +274,7 @@ def generate_volume_chart(
       active  = gray (#6B7280)
     Returns a complete <svg> string.
     """
-    pad_l, pad_r, pad_t, pad_b = 55, 15, 10, 25
+    pad_l, pad_r, pad_t, pad_b = 62, 15, 12, 30
     x_start = float(pad_l)
     x_end = float(width - pad_r)
     y_top = float(pad_t)
@@ -317,12 +317,12 @@ def generate_volume_chart(
             f' stroke="#ddddd4" stroke-width="1"/>'
         )
         gridlines_parts.append(
-            f'  <text x="{x_start - 4:.2f}" y="{gy + 3:.2f}" text-anchor="end"'
-            f' font-size="9" font-family="system-ui, sans-serif"'
+            f'  <text x="{x_start - 5:.2f}" y="{gy + 4:.2f}" text-anchor="end"'
+            f' font-size="11" font-family="system-ui, sans-serif"'
             f' fill="#9898a8">{int(gv)}</text>'
         )
 
-    x_labels = render_x_labels(dates, x_start, x_end, y_bottom + 12)
+    x_labels = render_x_labels(dates, x_start, x_end, y_bottom + 15)
 
     return (
         f'<svg viewBox="0 0 {width} {height}" width="100%" role="img"'
