@@ -269,9 +269,9 @@ def generate_volume_chart(
 ) -> str:
     """
     Three polylines on a shared y-axis:
-      created = blue (#4A90E2)
-      expired = red  (#E24A4A)
-      active  = gray (#9898a8)
+      created = blue (#3B82F6)
+      expired = red  (#EF4444)
+      active  = gray (#6B7280)
     Returns a complete <svg> string.
     """
     pad_l, pad_r, pad_t, pad_b = 55, 15, 10, 25
@@ -331,9 +331,9 @@ def generate_volume_chart(
         f' font-family="system-ui, sans-serif">\n'
         + "\n".join(gridlines_parts)
         + "\n"
-        + f'  <polyline fill="none" stroke="#4A90E2" stroke-width="1.5" points="{pts_created}"/>\n'
-        + f'  <polyline fill="none" stroke="#E24A4A" stroke-width="1.5" points="{pts_expired}"/>\n'
-        + f'  <polyline fill="none" stroke="#9898a8" stroke-width="1.5" points="{pts_active}"/>\n'
+        + f'  <polyline fill="none" stroke="#3B82F6" stroke-width="1.5" points="{pts_created}"/>\n'
+        + f'  <polyline fill="none" stroke="#EF4444" stroke-width="1.5" points="{pts_expired}"/>\n'
+        + f'  <polyline fill="none" stroke="#6B7280" stroke-width="1.5" points="{pts_active}"/>\n'
         + (x_labels + "\n" if x_labels else "")
         + "</svg>"
     )

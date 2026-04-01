@@ -4,18 +4,18 @@ import json
 import logging
 import mimetypes
 import os
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
 from app.workers.chart_generator import (
     generate_line_chart,
-    generate_sparkline,
     generate_volume_chart,
     svg_to_file,
 )
 from app.workers.market_types import DailyStats, MarketStatsMeta, MarketStatsResponse
 from storage.db_engine import get_engine
+from storage.repositories.market_repository import get_active_jobs_compliance_counts, get_market_daily_stats
 
 logger = logging.getLogger("openjobseu.runtime")
 
@@ -160,13 +160,14 @@ def _build_chart_set(stats: list[DailyStats], days: int) -> dict[str, bytes]:
     salary_svg = generate_line_chart(
         [s.avg_salary_eur for s in subset],
         dates,
-        "#50E3C2",
-        lambda v: f"€{int(v):,}",
+        "#0D9488",
+        lambda v: f"€{int(v):,}/yr",
     )
-    remote_svg = generate_sparkline(
+    remote_svg = generate_line_chart(
         [s.remote_ratio for s in subset],
         dates,
-        "#F5A623",
+        "#D97706",
+        lambda v: f"{int(v * 100)}%",
     )
 
     return {
@@ -204,34 +205,19 @@ def _export_market_stats(bucket, chart_base_url: str) -> tuple[int, int]:
     3. Serialize MarketStatsResponse and upload as market-stats.json.
     Returns (rows_exported, charts_uploaded).
     """
-    from sqlalchemy import text
-
     engine = get_engine()
     with engine.connect() as conn:
-        today = date.today()
-        thirty_days_ago = today - timedelta(days=30)
-        results = (
-            conn.execute(
-                text(
-                    "SELECT date, jobs_created, jobs_expired, jobs_active, jobs_reposted,"
-                    " avg_salary_eur, median_salary_eur, remote_ratio"
-                    " FROM market_daily_stats"
-                    " WHERE date >= :start_date"
-                    " ORDER BY date ASC"
-                ),
-                {"start_date": thirty_days_ago},
-            )
-            .mappings()
-            .all()
-        )
+        raw_rows = get_market_daily_stats(conn, days=30)
+        compliance_counts = get_active_jobs_compliance_counts(conn)
 
-    stats = [DailyStats(**row) for row in results]
+    stats = [DailyStats(**row) for row in raw_rows]
     charts_uploaded = _export_charts(bucket, stats)
 
     meta = MarketStatsMeta(
         generated_at=datetime.now(timezone.utc).isoformat(),
         days_available=len(stats),
         chart_base_url=chart_base_url,
+        **compliance_counts,
     )
     response = MarketStatsResponse(meta=meta, stats=stats)
 
