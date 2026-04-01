@@ -506,11 +506,16 @@
     const cardsEl = section.querySelector(".metric-cards");
     if (cardsEl) {
       const m = computeMetrics(data.stats, 7);
+      const jobsTotal    = data.meta.jobs_total    ?? null;
+      const jobsApproved = data.meta.jobs_approved ?? null;
       cardsEl.innerHTML = "";
       [
-        { label: "Active jobs",   value: m.totalActive != null ? m.totalActive.toLocaleString() : "—" },
-        { label: "Avg. salary",   value: m.avgSalary   != null ? `€${Math.round(m.avgSalary).toLocaleString()}` : "—" },
-        { label: "Remote ratio",  value: m.remoteRatio != null ? `${Math.round(m.remoteRatio * 100)}%` : "—" },
+        { label: "Total active",       value: jobsTotal    != null ? jobsTotal.toLocaleString() : "—" },
+        { label: "In feed (approved)", value: jobsApproved != null && jobsTotal != null
+            ? `${jobsApproved.toLocaleString()} of ${jobsTotal.toLocaleString()}`
+            : jobsApproved != null ? jobsApproved.toLocaleString() : "—" },
+        { label: "Avg. annual salary", value: m.avgSalary   != null ? `€${Math.round(m.avgSalary).toLocaleString()}/yr` : "—" },
+        { label: "Remote jobs",        value: m.remoteRatio != null ? `${Math.round(m.remoteRatio * 100)}% of active` : "—" },
       ].forEach(({ label, value }) => {
         cardsEl.appendChild(
           el("div", { class: "metric-card" }, [

@@ -51,6 +51,49 @@ def compute_market_stats(conn: Connection, date: date) -> dict:
     }
 
 
+def get_market_daily_stats(conn: Connection, *, days: int = 30) -> list[dict]:
+    """Return the last `days` rows from market_daily_stats, ordered chronologically."""
+    from datetime import date, timedelta
+
+    start_date = date.today() - timedelta(days=days)
+    rows = (
+        conn.execute(
+            text(
+                "SELECT date, jobs_created, jobs_expired, jobs_active, jobs_reposted,"
+                " avg_salary_eur, median_salary_eur, remote_ratio"
+                " FROM market_daily_stats"
+                " WHERE date >= :start_date"
+                " ORDER BY date ASC"
+            ),
+            {"start_date": start_date},
+        )
+        .mappings()
+        .all()
+    )
+    return [dict(row) for row in rows]
+
+
+def get_active_jobs_compliance_counts(conn: Connection) -> dict:
+    """Return total active jobs and how many meet the feed compliance threshold (score >= 80)."""
+    row = (
+        conn.execute(
+            text("""
+                SELECT
+                    COUNT(*) AS jobs_total,
+                    COUNT(*) FILTER (WHERE compliance_score >= 80) AS jobs_approved
+                FROM jobs
+                WHERE availability_status = 'active'
+            """)
+        )
+        .mappings()
+        .one()
+    )
+    return {
+        "jobs_total": int(row["jobs_total"] or 0),
+        "jobs_approved": int(row["jobs_approved"] or 0),
+    }
+
+
 def insert_market_daily_stats(conn: Connection, stats: dict) -> None:
     conn.execute(
         text(
