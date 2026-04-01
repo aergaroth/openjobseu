@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.21.1](https://github.com/aergaroth/openjobseu/compare/v2.21.0...v2.21.1) (2026-04-01)
+
+
+### Bug Fixes
+
+* update IAM condition for cloud_run_feed_write to allow access to additional files ([ffb5a32](https://github.com/aergaroth/openjobseu/commit/ffb5a327fe12f460b84361b0760845adb6794bb8))
+
 ## [2.21.0](https://github.com/aergaroth/openjobseu/compare/v2.20.0...v2.21.0) (2026-04-01)
 
 
