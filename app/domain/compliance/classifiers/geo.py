@@ -258,7 +258,13 @@ def classify_geo(
 
     # 3 Mixed Region Resolution (Prevents False Negatives for "US & EMEA" etc.)
     if found_eu and found_non_eu:
-        if non_eu_scope_title_phrase_hit:
+        # non_eu_scope_title_phrase_hit overrides to NON_EU for cases like "EMEA; United States"
+        # where an EU region keyword appears alongside a hard non-EU phrase.
+        # However, when _classify_from_remote_scope already returned "mixed_region" it means
+        # it found explicit EU *country tokens* alongside non-EU ones (e.g. a Deel-style scope
+        # listing 20 countries).  In that case the structural parse is more reliable than the
+        # phrase override — the job is genuinely accessible from EU.
+        if non_eu_scope_title_phrase_hit and not _is_mixed(scope_result):
             return {
                 "geo_class": GeoClass.NON_EU,
                 "reason": non_eu_scope_title_phrase_reason or non_eu_reason,

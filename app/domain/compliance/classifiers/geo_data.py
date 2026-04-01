@@ -169,6 +169,13 @@ NON_EU_REGION_CUSTOM = (
     "north america",
     "latam",
     "apac",
+    "africa",
+    "sub-saharan africa",
+    "west africa",
+    "east africa",
+    "southern africa",
+    "central africa",
+    "north africa",
 )
 
 NON_EU_SCOPE_TITLE_PHRASES = (

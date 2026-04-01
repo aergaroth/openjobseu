@@ -17,11 +17,22 @@ Notes:
 
 ---
 
+## Internal Identifiers & Versioning (implemented)
+
+These fields are used for data integrity, deduplication, and tracking changes.
+
+- **job_uid**: A stable identifier for a job role at a company (company + title + location).
+- **job_fingerprint**: A hash of the job's core content to detect changes.
+- **source_schema_hash**: A hash of the raw data from the source to detect schema changes.
+
+---
+
 ## Job Metadata (implemented)
 
 - **title**
 - **company_name**
 - **description**
+- **source_department**
 
 ---
 
@@ -50,6 +61,10 @@ Historical alias still present in some data paths/metrics:
 
 - **compliance_score**:
   integer `0..100`
+
+- **policy_version**:
+  string (e.g., `v4.ab12cd3`)
+
 
 - **job_family**: `software_development | data_science | design | ...`
 - **job_role**: `engineer | developer | product_manager | ...`

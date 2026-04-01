@@ -94,6 +94,31 @@ def get_active_jobs_compliance_counts(conn: Connection) -> dict:
     }
 
 
+def backfill_remote_ratio(conn: Connection) -> int:
+    """
+    One-time fix: rewrite remote_ratio in all existing market_daily_stats rows
+    using the new definition (remote_class IN ('REMOTE_ONLY', 'REMOTE_REGION_LOCKED')).
+
+    Because the jobs table only holds current state (not historical snapshots),
+    every row gets the same current-snapshot value — not perfectly historical,
+    but eliminates the 1.0 artefact from the old `remote_scope IS NOT NULL` formula.
+
+    Returns the number of rows updated.
+    """
+    result = conn.execute(
+        text("""
+            UPDATE market_daily_stats
+            SET remote_ratio = (
+                SELECT AVG(CASE WHEN remote_class IN ('REMOTE_ONLY', 'REMOTE_REGION_LOCKED') THEN 1.0 ELSE 0.0 END)
+                FROM jobs
+                WHERE availability_status = 'active'
+            )
+            WHERE remote_ratio IS NOT DISTINCT FROM 1.0
+        """)
+    )
+    return result.rowcount
+
+
 def insert_market_daily_stats(conn: Connection, stats: dict) -> None:
     conn.execute(
         text(
