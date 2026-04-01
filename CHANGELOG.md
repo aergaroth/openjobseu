@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.22.0](https://github.com/aergaroth/openjobseu/compare/v2.21.2...v2.22.0) (2026-04-01)
+
+
+### Features
+
+* **docs:** update canonical model and data sources documentation; add internal identifiers and enhance job lifecycle details ([751b525](https://github.com/aergaroth/openjobseu/commit/751b52553d77fd34199d2cd4910278355d47dd89))
+* **remote_classification:** enhance remote job detection with context-aware matching and backfill remote ratio ([48bae57](https://github.com/aergaroth/openjobseu/commit/48bae57a3079f72b2afcf81cf9a80b4793ebe282))
+
 ## [2.21.2](https://github.com/aergaroth/openjobseu/compare/v2.21.1...v2.21.2) (2026-04-01)
 
 
