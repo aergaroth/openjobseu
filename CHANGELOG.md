@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.21.2](https://github.com/aergaroth/openjobseu/compare/v2.21.1...v2.21.2) (2026-04-01)
+
+
+### Bug Fixes
+
+* **chart_generator:** increase chart dimensions and label font sizes for better visibility ([7eba96d](https://github.com/aergaroth/openjobseu/commit/7eba96d16883525d3f8c2f55fa78866a8eb907ab))
+* **index.html:** update image heights for consistency across figures ([7eba96d](https://github.com/aergaroth/openjobseu/commit/7eba96d16883525d3f8c2f55fa78866a8eb907ab))
+* **market_repository:** refine remote ratio calculation for accuracy ([7eba96d](https://github.com/aergaroth/openjobseu/commit/7eba96d16883525d3f8c2f55fa78866a8eb907ab))
+* **scheduler.tf:** adjust tick maintenance job schedule to run every 4 hours ([7eba96d](https://github.com/aergaroth/openjobseu/commit/7eba96d16883525d3f8c2f55fa78866a8eb907ab))
+
 ## [2.21.1](https://github.com/aergaroth/openjobseu/compare/v2.21.0...v2.21.1) (2026-04-01)
 
 
