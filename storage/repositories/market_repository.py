@@ -18,7 +18,7 @@ def compute_market_stats(conn: Connection, date: date) -> dict:
                 COUNT(*) FILTER (WHERE is_repost = TRUE AND first_seen_at >= :start_time AND first_seen_at < :end_time) AS jobs_reposted,
                 AVG(salary_min_eur) FILTER (WHERE availability_status = 'active') AS avg_salary_eur,
                 percentile_cont(0.5) WITHIN GROUP (ORDER BY salary_min_eur) FILTER (WHERE availability_status = 'active') AS median_salary_eur,
-                AVG(CASE WHEN remote_scope IS NOT NULL THEN 1.0 ELSE 0.0 END) FILTER (WHERE availability_status = 'active') AS remote_ratio
+                AVG(CASE WHEN remote_class IN ('REMOTE_ONLY', 'REMOTE_REGION_LOCKED') THEN 1.0 ELSE 0.0 END) FILTER (WHERE availability_status = 'active') AS remote_ratio
             FROM jobs
         """),
             {"start_time": start_time, "end_time": end_time},

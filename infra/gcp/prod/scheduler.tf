@@ -93,7 +93,7 @@ resource "google_cloud_scheduler_job" "dorking_discovery" {
 resource "google_cloud_scheduler_job" "tick_maintenance" {
   name             = "openjobseu-tick-maintenance"
   region           = var.scheduler_region
-  schedule         = "5 * * * *" # at minute 5 past every hour (staggered)
+  schedule         = "5 */4 * * *" # at minute 5 past every 4th hour (staggered)
   time_zone        = "UTC"
   attempt_deadline = "30s"
 
