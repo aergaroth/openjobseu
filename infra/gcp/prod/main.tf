@@ -169,9 +169,9 @@ resource "google_storage_bucket_iam_member" "cloud_run_feed_write" {
   member = "serviceAccount:cloudrun-prod-runtime@openjobseu.iam.gserviceaccount.com"
 
   condition {
-    title       = "feed_json_only"
-    description = "Allow runtime to only manage feed.json"
-    expression  = "resource.name == \"projects/_/buckets/openjobseu.org/objects/feed.json\""
+    title       = "frontend_exports"
+    description = "Allow runtime to manage feed.json, market-stats.json and charts"
+    expression  = "resource.name == \"projects/_/buckets/openjobseu.org/objects/feed.json\" || resource.name == \"projects/_/buckets/openjobseu.org/objects/market-stats.json\" || resource.name.startsWith(\"projects/_/buckets/openjobseu.org/objects/charts/\")"
   }
 }
 
