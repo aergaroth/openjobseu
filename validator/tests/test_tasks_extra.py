@@ -10,17 +10,20 @@ client = TestClient(app)
 
 @patch("app.api.tasks.backfill_missing_compliance_classes")
 def test_run_backfill_compliance_task(mock_backfill):
-    # Symulujemy, że po 1.5 paczki brakło już danych do aktualizacji w bazie
-    mock_backfill.side_effect = [1000, 500, 0]
-    res = run_backfill_compliance_task(limit=2000)
-    assert res["updated_jobs_count"] == 1500
+    # Single-pass: wywołuje backfill raz z podanym limitem i zwraca wynik
+    mock_backfill.return_value = 1000
+    res = run_backfill_compliance_task(limit=5000)
+    assert res["updated_jobs_count"] == 1000
+    mock_backfill.assert_called_once_with(limit=5000)
 
 
 @patch("app.api.tasks.backfill_missing_salary_fields")
 def test_run_backfill_salary_task(mock_backfill):
-    mock_backfill.side_effect = [1000, 0]
-    res = run_backfill_salary_task(limit=1500)
-    assert res["updated_jobs_count"] == 1000
+    # Single-pass: wywołuje backfill raz z podanym limitem i zwraca wynik
+    mock_backfill.return_value = 800
+    res = run_backfill_salary_task(limit=5000)
+    assert res["updated_jobs_count"] == 800
+    mock_backfill.assert_called_once_with(limit=5000)
 
 
 @patch("app.api.tasks.run_pipeline")
