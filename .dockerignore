@@ -9,3 +9,6 @@ data
 *.log
 .vam
 .clinerules
+GEMINI.md
+.claude
+CLAUDE.md

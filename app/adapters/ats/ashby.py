@@ -86,14 +86,26 @@ class AshbyAdapter(ATSAdapter):
             return None
 
         is_remote_location = "remote" in (location or "").lower()
+        # workplaceType takes precedence over the isRemote boolean flag.
+        # Ashby sometimes sets isRemote=true on hybrid/onsite roles — trust the
+        # more specific workplaceType field when available.
+        workplace_type = (raw_job.get("workplaceType") or "").strip().lower()
+        is_non_remote_workplace = workplace_type in ("hybrid", "onsite", "on-site")
+        explicit_remote = (not is_non_remote_workplace and raw_job.get("isRemote") is True) or is_remote_location
         is_remote = self.detect_remote(
             title,
             location,
-            explicit_flag=(raw_job.get("isRemote") is True or is_remote_location),
+            explicit_flag=explicit_remote,
         )
 
         all_locations = [loc for loc in [location] + secondary_location_strs if loc]
         combined_scope = "; ".join(all_locations) if all_locations else location
+        # Inject workplace type signal so the remote classifier can detect
+        # hybrid/onsite roles even when the description contains remote-sounding perks.
+        if workplace_type == "hybrid":
+            combined_scope = (combined_scope + "; hybrid") if combined_scope else "hybrid"
+        elif is_non_remote_workplace:
+            combined_scope = (combined_scope + "; on-site") if combined_scope else "on-site"
         normalized_remote_scope = self.normalize_remote_scope(combined_scope)
 
         department = raw_job.get("departmentName")

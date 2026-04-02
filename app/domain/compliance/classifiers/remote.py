@@ -89,7 +89,8 @@ def _phrase_in_desc(text: str, phrase: str) -> bool:
 # E.g. "work from home budget" or "work from home allowance" is an equipment stipend,
 # not an indication that the role is remote.
 _REMOTE_BENEFIT_CONTEXT_RE = re.compile(
-    r"\bwork from home\s+(?:budget|stipend|allowance|reimbursement|equipment|setup|kit)\b",
+    r"\bwork from home\s+(?:budget|stipend|allowance|reimbursement|equipment|setup|kit)\b"
+    r"|\bwork from anywhere\s+(?:in the world|globally|worldwide)?\s*(?:\(|for\s+)?up to\b",
     re.IGNORECASE,
 )
 
