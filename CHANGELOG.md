@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.23.0](https://github.com/aergaroth/openjobseu/compare/v2.22.0...v2.23.0) (2026-04-02)
+
+
+### Features
+
+* **ashby:** enhance remote job detection with workplace type handling ([9246f75](https://github.com/aergaroth/openjobseu/commit/9246f750202c869cf514153db6e5d03e3f09f1a9))
+
+
+### Bug Fixes
+
+* **remote:** update regex to include 'work from anywhere' context ([9246f75](https://github.com/aergaroth/openjobseu/commit/9246f750202c869cf514153db6e5d03e3f09f1a9))
+
 ## [2.22.0](https://github.com/aergaroth/openjobseu/compare/v2.21.2...v2.22.0) (2026-04-01)
 
 
