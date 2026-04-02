@@ -8,9 +8,8 @@ from app.utils.backfill_department import backfill_missing_departments
 from app.utils.backfill_salary import backfill_missing_salary_fields
 from app.utils.cloud_tasks import create_tick_task, is_tick_queue_configured
 from storage.repositories.maintenance_repository import (
-    update_company_job_stats_bulk,
+    update_company_stats_and_posture_bulk,
     update_company_signal_scores_bulk,
-    update_company_remote_posture_bulk,
 )
 
 logger = logging.getLogger("openjobseu.maintenance")
@@ -25,23 +24,17 @@ def _lag_warning_threshold_ms() -> int:
         return 60000
 
 
-def _update_company_job_stats() -> int:
+def _update_company_stats_and_posture() -> int:
     """
-    Updates aggregated job statistics in the companies table:
-    - approved_jobs_count
-    - rejected_jobs_count
-    - total_jobs_count
-    - last_active_job_at
-    """
-    return update_company_job_stats_bulk()
+    Single-pass update for per-company job statistics and remote posture.
 
-
-def _update_company_remote_posture() -> int:
+    Replaces the former separate `_update_company_job_stats` and
+    `_update_company_remote_posture` calls. One scan of `jobs`, one UPDATE
+    on `companies` per batch — covers:
+      - approved_jobs_count, rejected_jobs_count, total_jobs_count, last_active_job_at
+      - remote_posture upgrade (UNKNOWN → REMOTE_FRIENDLY when remote_cnt >= 3)
     """
-    Upgrades remote_posture from 'UNKNOWN' to 'REMOTE_FRIENDLY'
-    for companies that have accumulated at least 3 remote jobs.
-    """
-    return update_company_remote_posture_bulk()
+    return update_company_stats_and_posture_bulk()
 
 
 def _update_company_signal_scores() -> int:
@@ -123,8 +116,7 @@ def _run_backfill_compliance() -> int:
 def run_maintenance_pipeline() -> dict:
     started = perf_counter()
     metrics = {
-        "posture_updated": 0,
-        "job_stats_updated": 0,
+        "company_stats_updated": 0,
         "scores_updated": 0,
         "salary_backfilled": 0,
         "department_backfilled": 0,
@@ -132,9 +124,8 @@ def run_maintenance_pipeline() -> dict:
     }
 
     try:
-        # Company-level updates
-        metrics["posture_updated"] = _update_company_remote_posture()
-        metrics["job_stats_updated"] = _update_company_job_stats()
+        # Company-level updates — single scan of `jobs` for stats + posture, then signal score
+        metrics["company_stats_updated"] = _update_company_stats_and_posture()
         metrics["scores_updated"] = _update_company_signal_scores()
 
         # Job-level backfills

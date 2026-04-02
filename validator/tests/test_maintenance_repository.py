@@ -1,8 +1,7 @@
 from sqlalchemy import text
 
 from storage.repositories.maintenance_repository import (
-    update_company_job_stats_bulk,
-    update_company_remote_posture_bulk,
+    update_company_stats_and_posture_bulk,
     update_company_signal_scores_bulk,
 )
 
@@ -58,21 +57,24 @@ def test_maintenance_repository_updates_stats_posture_scores_and_is_idempotent(d
         first_seen_at="2026-01-05T10:00:00+00:00",
     )
 
-    assert update_company_job_stats_bulk() == 2
-    assert update_company_remote_posture_bulk() == 1
+    # First run: both companies have outdated stats — 2 rows updated.
+    # Remote Co also gets posture upgraded (3 remote jobs) in the same UPDATE.
+    assert update_company_stats_and_posture_bulk() == 2
     assert update_company_signal_scores_bulk() == 2
-    assert update_company_job_stats_bulk() == 0
-    assert update_company_remote_posture_bulk() == 0
+
+    # Second run: nothing changed — idempotent, 0 rows updated.
+    assert update_company_stats_and_posture_bulk() == 0
     assert update_company_signal_scores_bulk() == 0
 
     with db_factory.engine.begin() as conn:
         rows = (
             conn.execute(
                 text("""
-                SELECT legal_name, remote_posture, approved_jobs_count, rejected_jobs_count, total_jobs_count, signal_score
-                FROM companies
-                ORDER BY legal_name
-            """)
+                    SELECT legal_name, remote_posture, approved_jobs_count,
+                           rejected_jobs_count, total_jobs_count, signal_score
+                    FROM companies
+                    ORDER BY legal_name
+                """)
             )
             .mappings()
             .all()

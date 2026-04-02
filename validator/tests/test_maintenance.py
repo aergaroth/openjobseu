@@ -145,9 +145,8 @@ def test_maintenance_pipeline_updates_company_stats(db_factory):
     result = run_maintenance_pipeline()
 
     assert result["metrics"]["status"] == "ok", f"Pipeline failed: {result['metrics'].get('error')}"
-    assert result["metrics"]["job_stats_updated"] >= 3
+    assert result["metrics"]["company_stats_updated"] >= 3
     assert result["metrics"]["scores_updated"] >= 3
-    assert result["metrics"]["posture_updated"] >= 1
 
     engine = get_engine()
     with engine.connect() as conn:
@@ -195,8 +194,7 @@ def test_maintenance_pipeline_updates_company_stats(db_factory):
 
 def test_maintenance_logs_warning_on_performance_lag(monkeypatch):
     # Ensure predictable, fast in-memory execution for this behavioral test.
-    monkeypatch.setattr(maintenance_module, "_update_company_remote_posture", lambda: 1)
-    monkeypatch.setattr(maintenance_module, "_update_company_job_stats", lambda: 1)
+    monkeypatch.setattr(maintenance_module, "_update_company_stats_and_posture", lambda: 2)
     monkeypatch.setattr(maintenance_module, "_update_company_signal_scores", lambda: 1)
     monkeypatch.setattr(maintenance_module, "_run_backfill_salary", lambda: 0)
     monkeypatch.setattr(maintenance_module, "_run_backfill_department", lambda: 0)
@@ -223,7 +221,7 @@ def test_maintenance_logs_warning_on_performance_lag(monkeypatch):
 
 def test_maintenance_logs_critical_on_failure(monkeypatch):
     monkeypatch.setattr(
-        maintenance_module, "_update_company_remote_posture", lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+        maintenance_module, "_update_company_stats_and_posture", lambda: (_ for _ in ()).throw(RuntimeError("boom"))
     )
 
     critical_calls: list[dict] = []
