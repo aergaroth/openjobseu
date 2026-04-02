@@ -94,6 +94,10 @@ def _classify_from_remote_scope(scope_l: str) -> dict | None:
 
     found_eu = False
     found_non_eu = False
+    # Tracks explicit EU member state / EOG country token hits (NOT UK — UK is not an EU member state).
+    # Used by the mixed-region resolver to distinguish "Spain + Brazil" (eu_count=1)
+    # from "London + New York" (eu_count=0, only UK hit).
+    eu_member_count = 0
 
     if any(_contains_phrase(scope_l, kw) for kw in NON_EU_SCOPE_TITLE_PHRASES):
         found_non_eu = True
@@ -110,15 +114,18 @@ def _classify_from_remote_scope(scope_l: str) -> dict | None:
             mapped_full_name = COUNTRY_ALIASES[token].lower()
             if mapped_full_name in EU_MEMBER_STATES or mapped_full_name in EOG_COUNTRIES:
                 found_eu = True
+                eu_member_count += 1
             else:
                 found_non_eu = True
             continue
 
         if token in EU_MEMBER_STATES or token in EOG_COUNTRIES:
             found_eu = True
+            eu_member_count += 1
             continue
 
         if token in UK_KEYWORDS:
+            # UK counts as "EU-accessible" for geo routing but NOT as an EU member state.
             found_eu = True
             continue
 
@@ -140,19 +147,21 @@ def _classify_from_remote_scope(scope_l: str) -> dict | None:
                 mapped = COUNTRY_ALIASES[token_part].lower()
                 if mapped in EU_MEMBER_STATES or mapped in EOG_COUNTRIES:
                     found_eu = True
+                    eu_member_count += 1
                 else:
                     found_non_eu = True
                 continue
             if token_part in EU_MEMBER_STATES or token_part in EOG_COUNTRIES:
                 found_eu = True
+                eu_member_count += 1
                 continue
 
     if found_eu and found_non_eu:
-        return {"geo_class": GeoClass.EU_REGION, "reason": "mixed_region"}
+        return {"geo_class": GeoClass.EU_REGION, "reason": "mixed_region", "eu_member_count": eu_member_count}
     if found_eu:
-        return {"geo_class": GeoClass.EU_MEMBER_STATE, "reason": "explicit_country"}
+        return {"geo_class": GeoClass.EU_MEMBER_STATE, "reason": "explicit_country", "eu_member_count": eu_member_count}
     if found_non_eu:
-        return {"geo_class": GeoClass.NON_EU, "reason": "explicit_country"}
+        return {"geo_class": GeoClass.NON_EU, "reason": "explicit_country", "eu_member_count": 0}
 
     return None
 
@@ -260,11 +269,15 @@ def classify_geo(
     if found_eu and found_non_eu:
         # non_eu_scope_title_phrase_hit overrides to NON_EU for cases like "EMEA; United States"
         # where an EU region keyword appears alongside a hard non-EU phrase.
-        # However, when _classify_from_remote_scope already returned "mixed_region" it means
-        # it found explicit EU *country tokens* alongside non-EU ones (e.g. a Deel-style scope
-        # listing 20 countries).  In that case the structural parse is more reliable than the
-        # phrase override — the job is genuinely accessible from EU.
-        if non_eu_scope_title_phrase_hit and not _is_mixed(scope_result):
+        # However, when the structural scope parse found at least one explicit EU member state
+        # or EOG country token (eu_member_count >= 1), the scope is listing countries that
+        # include EU ones (e.g. a Deel-style scope with 20 countries, or "Spain + Brazil").
+        # In that case the job IS accessible from the EU — trust the structural parse.
+        #
+        # "London + New York" is a counter-example: London is UK (eu_member_count=0), so the
+        # non_eu phrase override fires correctly → NON_EU.
+        eu_count_from_scope = (scope_result or {}).get("eu_member_count", 0)
+        if non_eu_scope_title_phrase_hit and eu_count_from_scope < 1:
             return {
                 "geo_class": GeoClass.NON_EU,
                 "reason": non_eu_scope_title_phrase_reason or non_eu_reason,

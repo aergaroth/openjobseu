@@ -278,6 +278,39 @@ def test_geo_v3_latam_or_europe_direct_scope_stays_eu():
     assert result["geo_class"] in (GeoClass.EU_REGION, GeoClass.EU_MEMBER_STATE)
 
 
+def test_geo_v3_london_plus_new_york_scope_is_non_eu():
+    """Regresja: 'London + New York City' w scope to NIE jest EU_REGION.
+
+    Bug: London (UK_KEYWORDS) ustawiał found_eu=True, a 'new york' ustawiał found_non_eu=True,
+    co dawało mixed_region → EU_REGION.  Po naprawie eu_member_count=0 (UK to nie EU member state),
+    więc non_eu_scope_title_phrase_hit przebija i zwraca NON_EU.
+    """
+    result = classify_geo_v3(
+        title="Research Engineer",
+        description="",
+        remote_scope="london, uk; new york city, new york, us",
+    )
+    assert result["geo_class"] == GeoClass.NON_EU, (
+        f"London + New York scope must resolve to NON_EU, got {result['geo_class']}"
+    )
+
+
+def test_geo_v3_spain_plus_brazil_scope_is_eu_region():
+    """'Spain + Brazil' w scope to EU_REGION (eu_member_count >= 1 blokuje NON_EU override).
+
+    Deel-style scope z krajami EU i non-EU: kiedy jest co najmniej 1 EU member state token,
+    nie ma nadpisania przez non_eu_scope_title_phrase_hit.
+    """
+    result = classify_geo_v3(
+        title="Software Engineer",
+        description="",
+        remote_scope="spain; brazil",
+    )
+    assert result["geo_class"] in (GeoClass.EU_REGION, GeoClass.EU_MEMBER_STATE), (
+        f"Spain + Brazil scope must be EU-accessible, got {result['geo_class']}"
+    )
+
+
 def test_geo_v3_global_role_emea_and_apac_in_description_is_not_eu():
     # Regression: global IT/ops roles mentioning EMEA alongside APAC/Americas in the description
     # (e.g. SAM, IT Program Manager) were incorrectly classified as EU_REGION.
