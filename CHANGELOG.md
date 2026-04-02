@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.24.0](https://github.com/aergaroth/openjobseu/compare/v2.23.0...v2.24.0) (2026-04-02)
+
+
+### Features
+
+* **geo:** enhance classification logic for EU member states and update tests ([004422a](https://github.com/aergaroth/openjobseu/commit/004422ae1c863edd1fdfd5039ed092eae6ce6087))
+
 ## [2.23.0](https://github.com/aergaroth/openjobseu/compare/v2.22.0...v2.23.0) (2026-04-02)
 
 
