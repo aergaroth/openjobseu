@@ -12,37 +12,47 @@ from storage.repositories.compliance_repository import (
 
 logger = logging.getLogger("openjobseu.backfill")
 
-BATCH_SIZE = 100
+# Records fetched, processed, and committed in one atomic unit.
+# Small enough to keep memory pressure low; large enough to amortise DB round-trip cost.
+CHUNK_SIZE = 100
 
 
 def backfill_missing_compliance_classes(limit: int = 1000) -> int:
+    """
+    Re-evaluate compliance for jobs whose policy_version is stale or missing.
+
+    Processes records in chunks of CHUNK_SIZE: each iteration fetches a fresh
+    batch from the DB, runs apply_policy, and commits — no large in-memory list.
+
+    Returns the total number of records *fetched and processed* (not just updated).
+    Callers use this to detect whether the limit was hit (result == limit → more
+    records likely remain → enqueue a continuation task).
+    """
     engine = get_engine()
 
-    logger.info("Starting compliance backfill...")
+    logger.info("Starting compliance backfill (limit=%d, chunk_size=%d)", limit, CHUNK_SIZE)
 
-    # 1. Fetch jobs missing compliance data or with outdated policy
-    with engine.begin() as conn:
-        rows = get_jobs_for_compliance_backfill(
-            conn,
-            limit=limit,
-            current_policy_version=ENGINE_POLICY_VERSION.value,
-        )
+    total_processed = 0
+    total_updated = 0
 
-    total_found = len(rows)
-    logger.info(f"Found {total_found} jobs to backfill")
+    while total_processed < limit:
+        chunk_size = min(CHUNK_SIZE, limit - total_processed)
 
-    if total_found == 0:
-        return 0
+        # Fresh fetch per chunk — avoids stale in-memory state and keeps RAM low.
+        with engine.connect() as conn:
+            rows = get_jobs_for_compliance_backfill(
+                conn,
+                limit=chunk_size,
+                current_policy_version=ENGINE_POLICY_VERSION.value,
+            )
 
-    processed = 0
-    updated = 0
+        if not rows:
+            break
 
-    for i in range(0, total_found, BATCH_SIZE):
-        batch = rows[i : i + BATCH_SIZE]
         job_updates = []
         report_entries = []
 
-        for row in batch:
+        for row in rows:
             job_data = dict(row)
             job_id = job_data["job_id"]
             job_uid = job_data["job_uid"]
@@ -114,20 +124,30 @@ def backfill_missing_compliance_classes(limit: int = 1000) -> int:
             try:
                 with engine.begin() as conn:
                     update_job_compliance_data(conn, job_updates)
-
                     if report_entries:
                         insert_compliance_reports(conn, report_entries)
-
-                updated += len(job_updates)
-
+                total_updated += len(job_updates)
             except Exception:
-                logger.error("Failed to update batch starting at index %d", i, exc_info=True)
+                logger.error(
+                    "Failed to commit compliance chunk (first job_id=%s)", job_updates[0]["job_id"], exc_info=True
+                )
 
-        processed += len(batch)
-        pct = int((processed / total_found) * 100)
-        filled = int(20 * processed / total_found)
+        fetched = len(rows)
+        total_processed += fetched
+
+        filled = int(20 * total_processed / limit)
         bar = "█" * filled + "-" * (20 - filled)
-        logger.info(f"compliance_backfill progress: [{bar}] {pct}% ({processed}/{total_found}) | updated: {updated}")
+        logger.info(
+            "compliance_backfill progress: [%s] %d%% (%d/%d) | updated: %d",
+            bar,
+            int(total_processed / limit * 100),
+            total_processed,
+            limit,
+            total_updated,
+        )
 
-    logger.info(f"Backfill finished. Total jobs updated: {updated}")
-    return updated
+        if fetched < chunk_size:
+            break  # No more records available — done early
+
+    logger.info("Compliance backfill finished. processed=%d updated=%d", total_processed, total_updated)
+    return total_processed

@@ -23,10 +23,12 @@ def test_backfill_missing_salary_fields():
         )
 
     # 2. Run backfill
-    updated_count = backfill_missing_salary_fields(limit=10)
+    processed_count = backfill_missing_salary_fields(limit=10)
 
-    # Only id1 should be updated (id2 has no salary in description, id3 already has salary)
-    assert updated_count == 1
+    # id1 + id2 both have NULL salary → fetched and processed (id3 skipped — already has salary).
+    # Function returns total_processed (fetched records), not total_updated.
+    # id1 is updated (salary found), id2 is not (no salary in description).
+    assert processed_count == 2
 
     # 3. Verify results
     with engine.connect() as conn:

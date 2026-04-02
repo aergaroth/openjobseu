@@ -48,34 +48,16 @@ class TaskExecuteResponse(BaseModel):
     result: Any
 
 
-def run_backfill_compliance_task(limit: int = 10000):
-    total = 0
-    while total < limit:
-        chunk = min(1000, limit - total)
-        count = backfill_missing_compliance_classes(limit=chunk)
-        if not count:
-            break
-        total += count
-        logger.info(
-            "backfill_compliance chunk completed",
-            extra={"chunk_updated": count, "total_updated": total},
-        )
-    return {"status": "completed", "updated_jobs_count": total}
+def run_backfill_compliance_task(limit: int = 5000):
+    count = backfill_missing_compliance_classes(limit=limit)
+    logger.info("backfill_compliance completed", extra={"updated_jobs_count": count, "limit": limit})
+    return {"status": "completed", "updated_jobs_count": count}
 
 
-def run_backfill_salary_task(limit: int = 10000):
-    total = 0
-    while total < limit:
-        chunk = min(1000, limit - total)
-        count = backfill_missing_salary_fields(limit=chunk)
-        if not count:
-            break
-        total += count
-        logger.info(
-            "backfill_salary chunk completed",
-            extra={"chunk_updated": count, "total_updated": total},
-        )
-    return {"status": "completed", "updated_jobs_count": total}
+def run_backfill_salary_task(limit: int = 5000):
+    count = backfill_missing_salary_fields(limit=limit)
+    logger.info("backfill_salary completed", extra={"updated_jobs_count": count, "limit": limit})
+    return {"status": "completed", "updated_jobs_count": count}
 
 
 def run_tick_task(incremental: bool = True, limit: int = 100):
@@ -170,6 +152,34 @@ def trigger_async_task(
     }
 
 
+def _enqueue_task_continuation(task_name: str, limit: int, request: Request) -> None:
+    """Re-enqueue a backfill task when it hit the per-run record cap."""
+    task_id = str(uuid.uuid4())
+    base_url = os.getenv("BASE_URL", str(request.base_url).rstrip("/"))
+    handler_url = f"{base_url}/internal/tasks/{task_name}/execute"
+    try:
+        create_tick_task(
+            task_id=task_id,
+            handler_url=handler_url,
+            payload={"limit": limit},
+            headers={"Content-Type": "application/json"},
+        )
+        logger.info(
+            "task_continuation_enqueued",
+            extra={"task": task_name, "task_id": task_id, "limit": limit},
+        )
+    except Exception:
+        logger.error(
+            "task_continuation_enqueue_failed",
+            extra={"task": task_name},
+            exc_info=True,
+        )
+
+
+# Tasks that support self-chaining when they hit their per-run record cap.
+_CHAINABLE_BACKFILL_TASKS = {"backfill-compliance", "backfill-salary"}
+
+
 @tasks_execute_router.post("/{task_name}/execute", response_model=TaskExecuteResponse)
 async def execute_task(task_name: str, request: Request):
     if task_name not in TASK_MAP:
@@ -183,8 +193,13 @@ async def execute_task(task_name: str, request: Request):
     try:
         if task_name == "tick":
             result = func(incremental=incremental, limit=limit)
-        elif task_name in ("backfill-compliance", "backfill-salary"):
+        elif task_name in _CHAINABLE_BACKFILL_TASKS:
             result = func(limit=limit)
+            # Self-chain: if the batch hit the cap, more records likely remain.
+            # Enqueue a new Cloud Task rather than extending this request's runtime.
+            updated = result.get("updated_jobs_count", 0) if isinstance(result, dict) else 0
+            if updated >= limit and is_tick_queue_configured():
+                _enqueue_task_continuation(task_name, limit, request)
         else:
             result = func()
 

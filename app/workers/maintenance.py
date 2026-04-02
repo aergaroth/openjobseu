@@ -1,10 +1,12 @@
 import logging
 import os
+import uuid
 from time import perf_counter
 
 from app.utils.backfill_compliance import backfill_missing_compliance_classes
 from app.utils.backfill_department import backfill_missing_departments
 from app.utils.backfill_salary import backfill_missing_salary_fields
+from app.utils.cloud_tasks import create_tick_task, is_tick_queue_configured
 from storage.repositories.maintenance_repository import (
     update_company_job_stats_bulk,
     update_company_signal_scores_bulk,
@@ -53,11 +55,18 @@ def _update_company_signal_scores() -> int:
     return update_company_signal_scores_bulk()
 
 
+_BACKFILL_SALARY_LIMIT = 5000
+
+
 def _run_backfill_salary() -> int:
     """
-    Backfills missing salary fields by re-parsing description and title.
+    Backfills missing salary fields — one pass of up to BACKFILL_SALARY_LIMIT records.
+    Enqueues a Cloud Task continuation if the limit is reached.
     """
-    return backfill_missing_salary_fields(limit=5000)
+    count = backfill_missing_salary_fields(limit=_BACKFILL_SALARY_LIMIT)
+    if count >= _BACKFILL_SALARY_LIMIT and is_tick_queue_configured():
+        _enqueue_backfill_continuation("backfill-salary", _BACKFILL_SALARY_LIMIT)
+    return count
 
 
 def _run_backfill_department() -> int:
@@ -67,11 +76,48 @@ def _run_backfill_department() -> int:
     return backfill_missing_departments()
 
 
+_BACKFILL_COMPLIANCE_LIMIT = 5000
+
+
+def _enqueue_backfill_continuation(task_name: str, limit: int) -> None:
+    """Enqueue a Cloud Task to continue a backfill job that hit its per-tick record cap."""
+    base_url = os.getenv("BASE_URL", "").rstrip("/")
+    if not base_url:
+        logger.warning(
+            "backfill_continuation_skipped",
+            extra={"reason": "BASE_URL not set", "task": task_name},
+        )
+        return
+    handler_url = f"{base_url}/internal/tasks/{task_name}/execute"
+    try:
+        create_tick_task(
+            task_id=str(uuid.uuid4()),
+            handler_url=handler_url,
+            payload={"limit": limit},
+            headers={"Content-Type": "application/json"},
+        )
+        logger.info(
+            "backfill_continuation_enqueued",
+            extra={"task": task_name, "limit": limit},
+        )
+    except Exception:
+        logger.error(
+            "backfill_continuation_enqueue_failed",
+            extra={"task": task_name},
+            exc_info=True,
+        )
+
+
 def _run_backfill_compliance() -> int:
     """
-    Backfills missing compliance fields for jobs.
+    Backfills missing compliance fields for jobs — one pass of up to BACKFILL_COMPLIANCE_LIMIT.
+    If the limit is reached (more records likely remain), enqueues a Cloud Task continuation
+    so the next batch runs in a fresh request rather than extending this tick's runtime.
     """
-    return backfill_missing_compliance_classes(limit=5000)
+    count = backfill_missing_compliance_classes(limit=_BACKFILL_COMPLIANCE_LIMIT)
+    if count >= _BACKFILL_COMPLIANCE_LIMIT and is_tick_queue_configured():
+        _enqueue_backfill_continuation("backfill-compliance", _BACKFILL_COMPLIANCE_LIMIT)
+    return count
 
 
 def run_maintenance_pipeline() -> dict:
