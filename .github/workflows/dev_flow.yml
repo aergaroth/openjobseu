@@ -61,8 +61,7 @@ jobs:
             -var="session_secret_key=${{ secrets.DEV_SESSION_SECRET_KEY }}" \
             -var="allowed_auth_email=${{ secrets.DEV_ALLOWED_AUTH_EMAIL }}" \
             -var="google_api_key=${{ secrets.DEV_GOOGLE_API_KEY }}" \
-            -var="google_cse_id=${{ secrets.DEV_GOOGLE_CSE_ID }}" \
-            -var="slack_webhook_url=${{ secrets.SLACK_WEBHOOK_URL }}"
+            -var="google_cse_id=${{ secrets.DEV_GOOGLE_CSE_ID }}"
 
       - name: Setup Python for smoke test
         uses: actions/setup-python@v5

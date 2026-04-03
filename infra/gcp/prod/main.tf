@@ -39,27 +39,6 @@ resource "google_secret_manager_secret_iam_member" "cloud_run_google_cse_id" {
   member    = "serviceAccount:cloudrun-prod-runtime@openjobseu.iam.gserviceaccount.com"
 }
 
-resource "google_secret_manager_secret" "slack_webhook_url" {
-  count     = var.slack_webhook_url != "" ? 1 : 0
-  secret_id = "slack-webhook-url"
-  replication {
-    auto {}
-  }
-}
-
-resource "google_secret_manager_secret_version" "slack_webhook_url" {
-  count       = var.slack_webhook_url != "" ? 1 : 0
-  secret      = google_secret_manager_secret.slack_webhook_url[0].id
-  secret_data = var.slack_webhook_url
-}
-
-resource "google_secret_manager_secret_iam_member" "cloud_run_slack_webhook_url" {
-  count     = var.slack_webhook_url != "" ? 1 : 0
-  secret_id = google_secret_manager_secret.slack_webhook_url[0].id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:cloudrun-prod-runtime@openjobseu.iam.gserviceaccount.com"
-}
-
 resource "google_cloud_run_v2_service" "this" {
   name     = var.service_name
   location = var.region
@@ -163,19 +142,6 @@ resource "google_cloud_run_v2_service" "this" {
           secret_key_ref {
             secret  = google_secret_manager_secret.google_cse_id.secret_id
             version = "latest"
-          }
-        }
-      }
-
-      dynamic "env" {
-        for_each = var.slack_webhook_url != "" ? toset(["enabled"]) : toset([])
-        content {
-          name = "SLACK_WEBHOOK_URL"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.slack_webhook_url[0].secret_id
-              version = "latest"
-            }
           }
         }
       }

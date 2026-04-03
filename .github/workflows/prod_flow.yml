@@ -90,8 +90,7 @@ jobs:
             -var="session_secret_key=${{ secrets.PROD_SESSION_SECRET_KEY }}" \
             -var="allowed_auth_email=${{ secrets.PROD_ALLOWED_AUTH_EMAIL }}" \
             -var="google_api_key=${{ secrets.PROD_GOOGLE_API_KEY }}" \
-            -var="google_cse_id=${{ secrets.PROD_GOOGLE_CSE_ID }}" \
-            -var="slack_webhook_url=${{ secrets.SLACK_WEBHOOK_URL }}"
+            -var="google_cse_id=${{ secrets.PROD_GOOGLE_CSE_ID }}"
 
   publish-frontend-assets:
     needs: build-deploy-prod
