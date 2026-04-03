@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.26.0](https://github.com/aergaroth/openjobseu/compare/v2.25.0...v2.26.0) (2026-04-03)
+
+
+### Features
+
+* add validThrough field to job postings with expiration date ([65d66b7](https://github.com/aergaroth/openjobseu/commit/65d66b7a5d6c61543d3ac4ee8604e66b2c3a0d65))
+
 ## [2.25.0](https://github.com/aergaroth/openjobseu/compare/v2.24.0...v2.25.0) (2026-04-02)
 
 
