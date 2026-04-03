@@ -168,7 +168,7 @@ resource "google_cloud_run_v2_service" "this" {
       }
 
       dynamic "env" {
-        for_each = var.slack_webhook_url != "" ? [1] : []
+        for_each = var.slack_webhook_url != "" ? toset(["enabled"]) : toset([])
         content {
           name = "SLACK_WEBHOOK_URL"
           value_source {
