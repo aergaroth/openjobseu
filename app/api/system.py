@@ -20,7 +20,9 @@ from app.workers.pipeline import run_pipeline
 from app.utils.backfill_compliance import backfill_missing_compliance_classes
 from app.utils.backfill_salary import backfill_missing_salary_fields
 from app.utils.backfill_department import backfill_missing_departments
+from storage.repositories.market_repository import backfill_remote_ratio
 from storage.repositories.system_repository import get_system_metrics
+from storage.db_engine import get_engine
 
 from app.domain.jobs.job_processing import process_ingested_job
 import app.workers.ingestion.employer as employer_worker
@@ -59,6 +61,14 @@ def backfill_salary(limit: int = Query(1000, ge=1, le=10000)):
 @system_ops_router.post("/backfill-department", response_model=BackfillResponse)
 def backfill_department():
     updated_count = backfill_missing_departments()
+    return {"status": "ok", "updated_jobs_count": updated_count}
+
+
+@system_ops_router.post("/backfill-remote-ratio", response_model=BackfillResponse)
+def backfill_remote_ratio_endpoint():
+    engine = get_engine()
+    with engine.begin() as conn:
+        updated_count = backfill_remote_ratio(conn)
     return {"status": "ok", "updated_jobs_count": updated_count}
 
 
