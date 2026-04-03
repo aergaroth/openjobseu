@@ -421,6 +421,8 @@ Discovery worker set:
 4. **Market metrics worker** – `app/workers/market_metrics.py`
    - Reads: `jobs`, `job_sources`
    - Writes: `market_daily_stats`, `market_daily_stats_segments`
+   - Key metrics: `jobs_active`, `jobs_created`, `jobs_expired`, `median_salary_eur` (p50), `remote_ratio` (fraction of `remote_only`/`remote_region_locked` among active jobs)
+   - Note: `remote_ratio` uses lowercase enum values (`remote_only`, `remote_region_locked`) — must match `RemoteClass` enum stored values
 
 5. **Maintenance worker** – `app/workers/maintenance.py`
    - Reads/Writes: `companies`, `jobs`
@@ -446,7 +448,7 @@ Discovery worker set:
   - Writes: `company_ats`, `companies.ats_guess_last_checked_at`
 
 #### Utility/backfill workers exposed via internal API
-- Direct ops endpoints in `app/api/system.py`: `POST /internal/backfill-compliance`, `POST /internal/backfill-salary`, `POST /internal/backfill-department`
+- Direct ops endpoints in `app/api/system.py`: `POST /internal/backfill-compliance`, `POST /internal/backfill-salary`, `POST /internal/backfill-department`, `POST /internal/backfill-remote-ratio`
 - Async task router in `app/api/tasks.py`: `POST /internal/tasks/{task_name}` and `POST /internal/tasks/{task_name}/execute`
 
 ### 7. Data model overview
@@ -526,7 +528,7 @@ Schema source: Alembic revisions under `storage/alembic/versions/` + repository 
 - `GET /internal/audit/stats/company` – company compliance ratios (`jobs` + `companies`).
 - `GET /internal/audit/stats/source-7d` – source compliance ratios (`jobs` + `job_sources`).
 - `POST /internal/audit/tick-dev` – tick endpoint with forced text output.
-- `POST /internal/backfill-compliance`, `POST /internal/backfill-salary`, `POST /internal/backfill-department` – direct ops/backfill endpoints.
+- `POST /internal/backfill-compliance`, `POST /internal/backfill-salary`, `POST /internal/backfill-department`, `POST /internal/backfill-remote-ratio` – direct ops/backfill endpoints.
 - `POST /internal/discovery/*` – discovery phase triggers and admin discovery endpoints.
 - `POST /internal/tasks/{task_name}` – async worker triggers (Cloud Tasks).
 - `POST /internal/tasks/{task_name}/execute` – Cloud Tasks execution handlers.
