@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.25.0](https://github.com/aergaroth/openjobseu/compare/v2.24.0...v2.25.0) (2026-04-02)
+
+
+### Features
+
+* add indexes for improved query performance on jobs and companies ([09cad69](https://github.com/aergaroth/openjobseu/commit/09cad69b9781399225f0d33555c4878657220bf1))
+
 ## [2.24.0](https://github.com/aergaroth/openjobseu/compare/v2.23.0...v2.24.0) (2026-04-02)
 
 
