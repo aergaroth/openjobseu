@@ -468,8 +468,8 @@
     const last = subset[subset.length - 1];
     const totalActive = last ? last.jobs_active : 0;
 
-    const salaryVals = subset.map(s => s.avg_salary_eur).filter(v => v != null);
-    const avgSalary = salaryVals.length
+    const salaryVals = subset.map(s => s.median_salary_eur).filter(v => v != null);
+    const medianSalary = salaryVals.length
       ? salaryVals.reduce((a, b) => a + b, 0) / salaryVals.length
       : null;
 
@@ -478,7 +478,7 @@
       ? remoteVals.reduce((a, b) => a + b, 0) / remoteVals.length
       : null;
 
-    return { totalActive, avgSalary, remoteRatio };
+    return { totalActive, medianSalary, remoteRatio };
   }
 
   function setChartPeriod(days, data) {
@@ -521,7 +521,7 @@
         { label: "In feed (approved)", value: jobsApproved != null && jobsTotal != null
             ? `${jobsApproved.toLocaleString()} of ${jobsTotal.toLocaleString()}`
             : jobsApproved != null ? jobsApproved.toLocaleString() : "—" },
-        { label: "Avg. annual salary", value: m.avgSalary   != null ? `€${Math.round(m.avgSalary).toLocaleString()}/yr` : "—" },
+        { label: "Median annual salary", value: m.medianSalary != null ? `€${Math.round(m.medianSalary).toLocaleString()}/yr` : "—" },
         { label: "Remote jobs",        value: m.remoteRatio != null ? `${Math.round(m.remoteRatio * 100)}% of active` : "—" },
       ].forEach(({ label, value }) => {
         cardsEl.appendChild(

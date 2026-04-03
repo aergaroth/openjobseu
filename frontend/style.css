@@ -718,6 +718,7 @@ select:focus  { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,82,22
   padding: 0.75rem;
   border-radius: var(--radius);
   border: 1px solid var(--border);
+  min-width: 0;
 }
 
 .metric-card-label {
@@ -733,6 +734,8 @@ select:focus  { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,82,22
   font-size: 1.2rem;
   font-weight: 700;
   color: var(--text-primary);
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .chart-grid {
