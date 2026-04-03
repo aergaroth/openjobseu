@@ -363,6 +363,13 @@
       "jobLocationType": "TELECOMMUTE",
       "applicantLocationRequirements": { "@type": "Country", "name": "Europe" },
       "datePosted": j.first_seen_at ? j.first_seen_at.substring(0, 10) : undefined,
+      "validThrough": (() => {
+        const base = j.last_seen_at || j.first_seen_at;
+        if (!base) return undefined;
+        const d = new Date(base);
+        d.setDate(d.getDate() + 30);
+        return d.toISOString().substring(0, 10);
+      })(),
       "description": j.description || "",
       "employmentType": "FULL_TIME",
       ...(j.url ? { "url": j.url } : {}),
