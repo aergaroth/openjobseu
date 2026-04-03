@@ -69,10 +69,10 @@ Non-goals remain unchanged:
 ### P3 – DB and migration hardening
 - [x] Introduce explicit migration tooling (Alembic or equivalent)
 - [x] Tune indexes for feed/audit/lifecycle query patterns (e.g., covering compound indexes, `GROUPING SETS`)
-- [ ] Add automated post-deploy smoke checks
+- [x] Add automated post-deploy smoke checks
 
 ### P4 – Observability
-- [ ] Add scheduler/tick failure alerting
+- [x] Add scheduler/tick failure alerting
 - [ ] Add trend dashboards for per-source quality drift and rejection reasons
 
 ---

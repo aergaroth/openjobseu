@@ -68,6 +68,13 @@ variable "google_cse_id" {
   sensitive   = true
 }
 
+variable "slack_webhook_url" {
+  type        = string
+  description = "Slack incoming webhook URL for pipeline failure alerts"
+  sensitive   = true
+  default     = ""
+}
+
 variable "artifact_registry_repository_id" {
   type        = string
   description = "Artifact Registry repository used by GitHub Actions in dev"

@@ -5,6 +5,7 @@ from time import perf_counter
 from typing import Any
 
 from app.utils.tick_context import reset_current_tick_context, set_current_tick_context
+from app.utils.slack_notifier import notify_tick_failure
 
 # Ponownie ładujemy potrzebne funkcje (Ruff wykasował je w poprzednim kroku)
 from app.workers.ingestion.employer import run_employer_ingestion
@@ -126,6 +127,15 @@ def run_pipeline(group: str = "all", context: dict[str, Any] | None = None) -> d
             **context,
         },
     )
+
+    if sources_failed > 0:
+        failed_steps = [name for name, m in metrics.items() if isinstance(m, dict) and m.get("status") == "error"]
+        notify_tick_failure(
+            tick_id=context.get("tick_id"),
+            failed_steps=failed_steps,
+            sources_failed=sources_failed,
+            duration_ms=tick_duration_ms,
+        )
 
     final_metrics = {
         "status": "completed",
