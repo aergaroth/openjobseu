@@ -1,3 +1,12 @@
+resource "google_logging_metric" "tick_finished" {
+  name   = "tick_finished_count"
+  filter = "resource.type=\"cloud_run_revision\" AND jsonPayload.phase=\"tick_finished\""
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+  }
+}
+
 resource "google_monitoring_notification_channel" "email_alerts" {
   display_name = "Pipeline alerts (email)"
   type         = "email"
@@ -13,11 +22,7 @@ resource "google_monitoring_alert_policy" "tick_failure" {
   conditions {
     display_name = "tick_finished with sources_failed > 0"
     condition_matched_log {
-      filter = join("\n", [
-        "resource.type=\"cloud_run_revision\"",
-        "jsonPayload.phase=\"tick_finished\"",
-        "jsonPayload.sources_failed>0",
-      ])
+      filter = "resource.type=\"cloud_run_revision\" AND jsonPayload.phase=\"tick_finished\" AND jsonPayload.sources_failed>0"
     }
   }
 
@@ -31,7 +36,7 @@ resource "google_monitoring_alert_policy" "tick_failure" {
   }
 
   documentation {
-    content = "A pipeline tick completed with at least one failed step. Check Cloud Run logs for details (filter: jsonPayload.phase=\"tick_finished\")."
+    content = "A pipeline tick completed with at least one failed step. Check Cloud Run logs (filter: jsonPayload.phase=\"tick_finished\")."
   }
 }
 
@@ -42,11 +47,12 @@ resource "google_monitoring_alert_policy" "tick_absent" {
   conditions {
     display_name = "No tick_finished log in last 2 hours"
     condition_absent {
-      filter   = "resource.type=\"cloud_run_revision\" AND jsonPayload.phase=\"tick_finished\""
+      filter   = "metric.type=\"logging.googleapis.com/user/${google_logging_metric.tick_finished.name}\" AND resource.type=\"global\""
       duration = "7200s"
       aggregations {
-        alignment_period   = "600s"
-        per_series_aligner = "ALIGN_COUNT"
+        alignment_period     = "600s"
+        per_series_aligner   = "ALIGN_RATE"
+        cross_series_reducer = "REDUCE_SUM"
       }
     }
   }

@@ -125,6 +125,18 @@ resource "google_project_iam_member" "github_deploy_project_iam_admin" {
   member  = "serviceAccount:${google_service_account.github_deploy.email}"
 }
 
+resource "google_project_iam_member" "github_deploy_monitoring_editor" {
+  project = var.project_id
+  role    = "roles/monitoring.editor"
+  member  = "serviceAccount:${google_service_account.github_deploy.email}"
+}
+
+resource "google_project_iam_member" "github_deploy_logging_config_writer" {
+  project = var.project_id
+  role    = "roles/logging.configWriter"
+  member  = "serviceAccount:${google_service_account.github_deploy.email}"
+}
+
 resource "google_service_account_iam_member" "github_deploy_runtime_user" {
   service_account_id = data.google_service_account.cloud_run_runtime.name
   role               = "roles/iam.serviceAccountUser"
