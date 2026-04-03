@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.27.0](https://github.com/aergaroth/openjobseu/compare/v2.26.0...v2.27.0) (2026-04-03)
+
+
+### Features
+
+* add backfill endpoint for remote ratio and update salary calculations to use median ([d9826ee](https://github.com/aergaroth/openjobseu/commit/d9826eeb5aca9d5d1e3322dd6c387054a3d89787))
+
 ## [2.26.0](https://github.com/aergaroth/openjobseu/compare/v2.25.0...v2.26.0) (2026-04-03)
 
 
