@@ -102,7 +102,7 @@ Automation path:
 - `run_ats_guessing` (`app/workers/discovery/ats_guessing.py`)
 
 ### Utility/backfill workers (internal ops)
-- direct system ops: `POST /internal/backfill-compliance`, `POST /internal/backfill-salary`, `POST /internal/backfill-department`
+- direct system ops: `POST /internal/backfill-compliance`, `POST /internal/backfill-salary`, `POST /internal/backfill-department`, `POST /internal/backfill-remote-ratio`
 - async task router: `POST /internal/tasks/{task_name}`
 - strict task execution router: `POST /internal/tasks/{task_name}/execute`
 
