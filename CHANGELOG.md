@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.29.0](https://github.com/aergaroth/openjobseu/compare/v2.28.0...v2.29.0) (2026-04-04)
+
+
+### Features
+
+* **audit:** add source compliance trend and rejection reasons endpoints, implement audit export functionality, and enhance UI for audit stats ([bc92ff8](https://github.com/aergaroth/openjobseu/commit/bc92ff8ed22582b6c2fa97c3b6564072ccedd0ed))
+
 ## [2.28.0](https://github.com/aergaroth/openjobseu/compare/v2.27.0...v2.28.0) (2026-04-04)
 
 
