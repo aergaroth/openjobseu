@@ -169,6 +169,41 @@
 
     <div class="panel">
       <div class="chip-box audit-stats-card">
+        <h3 style="margin-bottom: 8px;">Source quality trend (weekly, last 30 days)</h3>
+        <div class="table-wrap" style="max-height: 320px;">
+          <table id="source-trend-table">
+            <thead><tr id="source-trend-header"></tr></thead>
+            <tbody id="source-trend-rows"></tbody>
+          </table>
+        </div>
+        <div class="audit-stats-meta" id="source-trend-meta">loading...</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="chip-box audit-stats-card">
+        <h3 style="margin-bottom: 8px;">Rejection reasons by source (last 30 days)</h3>
+        <div class="table-wrap" style="max-height: 320px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>hard_geo</th>
+                <th>non_remote</th>
+                <th>non_eu_geo</th>
+                <th>other</th>
+                <th>Total rejected</th>
+              </tr>
+            </thead>
+            <tbody id="rejection-reasons-rows"></tbody>
+          </table>
+        </div>
+        <div class="audit-stats-meta" id="rejection-reasons-meta">loading...</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="chip-box audit-stats-card">
         <h3 style="color: var(--danger);">Dead / Stale ATS Integrations (> 3 days without sync)</h3>
         <div class="table-wrap" style="max-height: 260px;">
           <table>

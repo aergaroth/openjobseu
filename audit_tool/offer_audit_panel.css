@@ -386,6 +386,10 @@ td a:hover { text-decoration: underline; }
   align-items: center;
 }
 .error { color: var(--danger); font-weight: 600; }
+td.compliance-good { background: #e6f4ee; color: #1a5c38; font-weight: 600; }
+td.compliance-mid  { background: #fef9e6; color: #7a5c00; font-weight: 600; }
+td.compliance-bad  { background: #fdf0ef; color: var(--danger); font-weight: 600; }
+td.muted { color: var(--muted); text-align: center; }
 @media (max-width: 1080px) {
   .filters { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
   .stats { grid-template-columns: 1fr; }

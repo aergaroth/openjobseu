@@ -425,6 +425,123 @@ async function safeLoadAuditStats() {
   }
 }
 
+function ratioClass(pct) {
+  if (pct === null || pct === undefined) return "";
+  if (pct >= 80) return "compliance-good";
+  if (pct >= 50) return "compliance-mid";
+  return "compliance-bad";
+}
+
+async function loadSourceTrend() {
+  const response = await fetch("/internal/audit/stats/source-trend?days=30");
+  if (!response.ok) throw new Error(`source-trend request failed with status ${response.status}`);
+  const payload = await response.json();
+  const items = payload.items || [];
+
+  // Collect unique weeks and sources
+  const weeksSet = new Set();
+  const sourcesSet = new Set();
+  for (const row of items) {
+    weeksSet.add(row.week);
+    sourcesSet.add(row.source);
+  }
+  const weeks = [...weeksSet].sort();
+  const sources = [...sourcesSet].sort();
+
+  // Build lookup: {source: {week: {approved_ratio_pct, total}}}
+  const lookup = {};
+  for (const row of items) {
+    if (!lookup[row.source]) lookup[row.source] = {};
+    lookup[row.source][row.week] = row;
+  }
+
+  const header = document.getElementById("source-trend-header");
+  const body = document.getElementById("source-trend-rows");
+  if (!header || !body) return;
+
+  // Header: Source + one col per week
+  header.innerHTML = `<th>Source</th>` + weeks.map(w => `<th>${esc(w)}</th>`).join("");
+
+  // Rows: one per source
+  if (sources.length === 0) {
+    body.innerHTML = `<tr><td colspan="${weeks.length + 1}">No data in the last 30 days.</td></tr>`;
+  } else {
+    body.innerHTML = sources.map(source => {
+      const cells = weeks.map(week => {
+        const d = lookup[source]?.[week];
+        if (!d) return `<td class="muted">—</td>`;
+        const cls = ratioClass(d.approved_ratio_pct);
+        const label = d.approved_ratio_pct !== null ? `${d.approved_ratio_pct.toFixed(1)}%` : "N/A";
+        return `<td class="${cls}" title="${d.approved}/${d.total} approved">${label}</td>`;
+      }).join("");
+      return `<tr><td>${esc(source)}</td>${cells}</tr>`;
+    }).join("");
+  }
+
+  document.getElementById("source-trend-meta").textContent =
+    `${sources.length} sources · ${weeks.length} weeks · window: ${payload.window_days}d`;
+}
+
+async function safeLoadSourceTrend() {
+  try {
+    await loadSourceTrend();
+  } catch (e) {
+    const body = document.getElementById("source-trend-rows");
+    if (body) body.innerHTML = `<tr><td class="error" colspan="10">${esc(e.message)}</td></tr>`;
+  }
+}
+
+async function loadRejectionReasons() {
+  const response = await fetch("/internal/audit/stats/rejection-reasons?days=30");
+  if (!response.ok) throw new Error(`rejection-reasons request failed with status ${response.status}`);
+  const payload = await response.json();
+  const items = payload.items || [];
+
+  // Pivot by source → {hard_geo, non_remote, non_eu_geo, other}
+  const reasonKeys = ["hard_geo", "non_remote", "non_eu_geo", "other"];
+  const bySource = {};
+  for (const row of items) {
+    if (!bySource[row.source]) bySource[row.source] = {};
+    bySource[row.source][row.reason] = row.count;
+  }
+
+  const body = document.getElementById("rejection-reasons-rows");
+  if (!body) return;
+
+  const sources = Object.keys(bySource).sort((a, b) => {
+    const totalA = reasonKeys.reduce((s, k) => s + (bySource[a][k] || 0), 0);
+    const totalB = reasonKeys.reduce((s, k) => s + (bySource[b][k] || 0), 0);
+    return totalB - totalA;
+  });
+
+  if (sources.length === 0) {
+    body.innerHTML = `<tr><td colspan="6">No rejections in the last 30 days.</td></tr>`;
+  } else {
+    body.innerHTML = sources.map(source => {
+      const d = bySource[source];
+      const total = reasonKeys.reduce((s, k) => s + (d[k] || 0), 0);
+      const cells = reasonKeys.map(k => {
+        const v = d[k] || 0;
+        const pct = total > 0 ? ((v / total) * 100).toFixed(0) : 0;
+        return `<td title="${pct}% of rejections">${v > 0 ? v : "—"}</td>`;
+      }).join("");
+      return `<tr><td>${esc(source)}</td>${cells}<td><strong>${total}</strong></td></tr>`;
+    }).join("");
+  }
+
+  document.getElementById("rejection-reasons-meta").textContent =
+    `${sources.length} sources · window: ${payload.window_days}d`;
+}
+
+async function safeLoadRejectionReasons() {
+  try {
+    await loadRejectionReasons();
+  } catch (e) {
+    const body = document.getElementById("rejection-reasons-rows");
+    if (body) body.innerHTML = `<tr><td class="error" colspan="6">${esc(e.message)}</td></tr>`;
+  }
+}
+
 async function loadAtsHealth() {
   const response = await fetch("/internal/audit/ats-health?days_threshold=3");
   if (!response.ok) throw new Error(`ats-health request failed`);
@@ -491,7 +608,7 @@ async function safeLoadMetrics() {
 }
 
 async function safeLoadAll() {
-  await Promise.all([safeLoadJobs(), safeLoadCompanies(), safeLoadAuditStats(), safeLoadMetrics(), safeLoadAtsHealth()]);
+  await Promise.all([safeLoadJobs(), safeLoadCompanies(), safeLoadAuditStats(), safeLoadMetrics(), safeLoadAtsHealth(), safeLoadSourceTrend(), safeLoadRejectionReasons()]);
 }
 let compDebounceTimer = null;
 function scheduleCompLoad() {

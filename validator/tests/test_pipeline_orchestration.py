@@ -34,6 +34,11 @@ def test_pipeline_runs_steps_in_order(monkeypatch):
         "run_frontend_export",
         lambda: order.append("frontend_export"),
     )
+    monkeypatch.setattr(
+        pipeline,
+        "run_audit_export",
+        lambda: order.append("audit_export"),
+    )
 
     pipeline.run_pipeline()
 
@@ -44,6 +49,7 @@ def test_pipeline_runs_steps_in_order(monkeypatch):
         "market_metrics",
         "maintenance",
         "frontend_export",
+        "audit_export",
     ]
 
     order.clear()
@@ -58,6 +64,7 @@ def test_pipeline_runs_steps_in_order(monkeypatch):
         "market_metrics",
         "maintenance",
         "frontend_export",
+        "audit_export",
     ]
 
 
@@ -103,6 +110,10 @@ def test_pipeline_orchestration_full_flow(monkeypatch):
         order.append("frontend_export")
         return {"metrics": {"component": "frontend_export", "exported_jobs": 100}}
 
+    def _fake_audit_export():
+        order.append("audit_export")
+        return {"status": "ok"}
+
     info_calls = []
     monkeypatch.setattr(pipeline, "run_employer_ingestion", _fake_employer_ingestion)
     monkeypatch.setattr(pipeline, "run_lifecycle_pipeline", _fake_lifecycle)
@@ -110,6 +121,7 @@ def test_pipeline_orchestration_full_flow(monkeypatch):
     monkeypatch.setattr(pipeline, "run_market_metrics_worker", _fake_market_metrics)
     monkeypatch.setattr(pipeline, "run_maintenance_pipeline", _fake_maintenance)
     monkeypatch.setattr(pipeline, "run_frontend_export", _fake_frontend_export)
+    monkeypatch.setattr(pipeline, "run_audit_export", _fake_audit_export)
     monkeypatch.setattr(
         pipeline.logger,
         "info",
@@ -125,6 +137,7 @@ def test_pipeline_orchestration_full_flow(monkeypatch):
         "market_metrics",
         "maintenance",
         "frontend_export",
+        "audit_export",
     ]
     assert result["actions"] == ["employer_ingestion_completed"]
     assert result["metrics"]["ingestion"]["source"] == "employer_ing"

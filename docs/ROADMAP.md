@@ -73,7 +73,7 @@ Non-goals remain unchanged:
 
 ### P4 – Observability
 - [x] Add scheduler/tick failure alerting
-- [ ] Add trend dashboards for per-source quality drift and rejection reasons
+- [x] Add trend dashboards for per-source quality drift and rejection reasons
 
 ---
 

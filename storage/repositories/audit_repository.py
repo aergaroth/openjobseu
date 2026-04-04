@@ -389,6 +389,82 @@ def get_audit_source_compliance_stats_last_7d() -> list[dict]:
     return result
 
 
+def get_source_compliance_trend(days: int = 30) -> list[dict]:
+    with engine.connect() as conn:
+        rows = (
+            conn.execute(
+                text("""
+                SELECT
+                    DATE_TRUNC('week', j.first_seen_at)::date AS week,
+                    js.source,
+                    COUNT(DISTINCT j.job_id) AS total,
+                    COUNT(DISTINCT j.job_id) FILTER (WHERE j.compliance_status = 'approved') AS approved,
+                    COUNT(DISTINCT j.job_id) FILTER (WHERE j.compliance_status = 'rejected') AS rejected,
+                    ROUND(
+                        COUNT(DISTINCT j.job_id) FILTER (WHERE j.compliance_status = 'approved')::numeric
+                        / NULLIF(COUNT(DISTINCT j.job_id), 0) * 100,
+                        1
+                    ) AS approved_ratio_pct
+                FROM jobs j
+                JOIN job_sources js ON js.job_id = j.job_id
+                WHERE j.first_seen_at > NOW() - INTERVAL '1 day' * :days
+                  AND j.compliance_status IS NOT NULL
+                GROUP BY 1, 2
+                ORDER BY 1, 2
+            """),
+                {"days": days},
+            )
+            .mappings()
+            .all()
+        )
+
+    result: list[dict] = []
+    for row in rows:
+        ratio = row["approved_ratio_pct"]
+        result.append(
+            {
+                "week": str(row["week"]),
+                "source": row["source"],
+                "total": int(row["total"] or 0),
+                "approved": int(row["approved"] or 0),
+                "rejected": int(row["rejected"] or 0),
+                "approved_ratio_pct": float(ratio) if ratio is not None else None,
+            }
+        )
+    return result
+
+
+def get_rejection_reasons_by_source(days: int = 30) -> list[dict]:
+    with engine.connect() as conn:
+        rows = (
+            conn.execute(
+                text("""
+                SELECT
+                    js.source,
+                    CASE
+                        WHEN cr.hard_geo_flag = true THEN 'hard_geo'
+                        WHEN j.remote_class = 'NON_REMOTE' THEN 'non_remote'
+                        WHEN j.geo_class = 'NON_EU' THEN 'non_eu_geo'
+                        ELSE 'other'
+                    END AS reason,
+                    COUNT(DISTINCT j.job_id) AS count
+                FROM jobs j
+                JOIN job_sources js ON js.job_id = j.job_id
+                LEFT JOIN compliance_reports cr ON cr.job_id = j.job_id
+                WHERE j.compliance_status = 'rejected'
+                  AND j.first_seen_at > NOW() - INTERVAL '1 day' * :days
+                GROUP BY 1, 2
+                ORDER BY 1, count DESC
+            """),
+                {"days": days},
+            )
+            .mappings()
+            .all()
+        )
+
+    return [{"source": row["source"], "reason": row["reason"], "count": int(row["count"] or 0)} for row in rows]
+
+
 def get_ghost_jobs(days_threshold: int = 3) -> list[dict]:
     with engine.connect() as conn:
         rows = (
