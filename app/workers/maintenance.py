@@ -54,12 +54,13 @@ _BACKFILL_SALARY_LIMIT = 5000
 def _run_backfill_salary() -> int:
     """
     Backfills missing salary fields — one pass of up to BACKFILL_SALARY_LIMIT records.
-    Enqueues a Cloud Task continuation if the limit is reached.
+    Enqueues a Cloud Task continuation only if the limit was hit AND progress was made.
+    Without the progress check, runs with no parseable salaries would loop indefinitely.
     """
-    count = backfill_missing_salary_fields(limit=_BACKFILL_SALARY_LIMIT)
-    if count >= _BACKFILL_SALARY_LIMIT and is_tick_queue_configured():
+    result = backfill_missing_salary_fields(limit=_BACKFILL_SALARY_LIMIT)
+    if result["processed"] >= _BACKFILL_SALARY_LIMIT and result["updated"] > 0 and is_tick_queue_configured():
         _enqueue_backfill_continuation("backfill-salary", _BACKFILL_SALARY_LIMIT)
-    return count
+    return result["updated"]
 
 
 def _run_backfill_department() -> int:

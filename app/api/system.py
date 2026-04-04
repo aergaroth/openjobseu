@@ -54,8 +54,8 @@ def backfill_compliance(limit: int = Query(1000, ge=1, le=10000)):
 
 @system_ops_router.post("/backfill-salary", response_model=BackfillResponse)
 def backfill_salary(limit: int = Query(1000, ge=1, le=10000)):
-    updated_count = backfill_missing_salary_fields(limit=limit)
-    return {"status": "ok", "updated_jobs_count": updated_count}
+    result = backfill_missing_salary_fields(limit=limit)
+    return {"status": "ok", "updated_jobs_count": result["updated"]}
 
 
 @system_ops_router.post("/backfill-department", response_model=BackfillResponse)

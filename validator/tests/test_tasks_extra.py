@@ -20,9 +20,10 @@ def test_run_backfill_compliance_task(mock_backfill):
 @patch("app.api.tasks.backfill_missing_salary_fields")
 def test_run_backfill_salary_task(mock_backfill):
     # Single-pass: wywołuje backfill raz z podanym limitem i zwraca wynik
-    mock_backfill.return_value = 800
+    mock_backfill.return_value = {"processed": 1000, "updated": 800}
     res = run_backfill_salary_task(limit=5000)
     assert res["updated_jobs_count"] == 800
+    assert res["processed_jobs_count"] == 1000
     mock_backfill.assert_called_once_with(limit=5000)
 
 
