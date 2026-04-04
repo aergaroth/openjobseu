@@ -10,7 +10,7 @@ def test_tasks_execute_endpoint_processes_payload(monkeypatch):
     """Weryfikuje czy endpoint wykonujący zadanie dla Cloud Tasks odpowiednio deleguje parametry z body."""
 
     def mock_backfill(limit):
-        return 100  # Zwracamy liczbę zamiast słownika, by pętla while wewnątrz taska poprawnie ją dodała
+        return {"processed": 100, "updated": 100}
 
     monkeypatch.setattr(tasks_api, "backfill_missing_salary_fields", mock_backfill)
 
@@ -21,5 +21,5 @@ def test_tasks_execute_endpoint_processes_payload(monkeypatch):
     assert response.status_code == 200
     assert response.json() == {
         "status": "completed",
-        "result": {"status": "completed", "updated_jobs_count": 100},
+        "result": {"status": "completed", "processed_jobs_count": 100, "updated_jobs_count": 100},
     }

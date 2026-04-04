@@ -37,18 +37,24 @@ def test_system_metrics_endpoint(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("path", "target", "limit", "updated"),
+    ("path", "target", "limit", "updated", "mock_return"),
     [
-        ("/internal/backfill-compliance?limit=25", "backfill_missing_compliance_classes", 25, 7),
-        ("/internal/backfill-salary?limit=15", "backfill_missing_salary_fields", 15, 5),
+        ("/internal/backfill-compliance?limit=25", "backfill_missing_compliance_classes", 25, 7, 7),
+        (
+            "/internal/backfill-salary?limit=15",
+            "backfill_missing_salary_fields",
+            15,
+            5,
+            {"processed": 15, "updated": 5},
+        ),
     ],
 )
-def test_backfill_endpoints_forward_limit_and_return_payload(monkeypatch, path, target, limit, updated):
+def test_backfill_endpoints_forward_limit_and_return_payload(monkeypatch, path, target, limit, updated, mock_return):
     seen = {}
 
     def _backfill(*, limit):
         seen["limit"] = limit
-        return updated
+        return mock_return
 
     monkeypatch.setattr(system_api, target, _backfill)
 
