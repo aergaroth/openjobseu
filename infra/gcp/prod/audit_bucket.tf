@@ -32,6 +32,14 @@ resource "google_storage_bucket_iam_member" "appsmith_reader_audit" {
   member = "serviceAccount:${google_service_account.appsmith_reader.email}"
 }
 
+# Cloud Run SA może podpisywać URL-e przez IAM SignBlob API
+# (potrzebne do blob.generate_signed_url() bez klucza prywatnego w pamięci)
+resource "google_service_account_iam_member" "cloud_run_self_sign" {
+  service_account_id = "projects/${var.project_id}/serviceAccounts/cloudrun-prod-runtime@${var.project_id}.iam.gserviceaccount.com"
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:cloudrun-prod-runtime@${var.project_id}.iam.gserviceaccount.com"
+}
+
 output "audit_bucket_name" {
   value       = google_storage_bucket.audit_internal.name
   description = "Private bucket name for audit snapshots"
