@@ -55,9 +55,9 @@ def run_backfill_compliance_task(limit: int = 5000):
 
 
 def run_backfill_salary_task(limit: int = 5000):
-    count = backfill_missing_salary_fields(limit=limit)
-    logger.info("backfill_salary completed", extra={"updated_jobs_count": count, "limit": limit})
-    return {"status": "completed", "updated_jobs_count": count}
+    result = backfill_missing_salary_fields(limit=limit)
+    logger.info("backfill_salary completed", extra={"updated_jobs_count": result["updated"], "limit": limit})
+    return {"status": "completed", "processed_jobs_count": result["processed"], "updated_jobs_count": result["updated"]}
 
 
 def run_tick_task(incremental: bool = True, limit: int = 100):
@@ -195,10 +195,12 @@ async def execute_task(task_name: str, request: Request):
             result = func(incremental=incremental, limit=limit)
         elif task_name in _CHAINABLE_BACKFILL_TASKS:
             result = func(limit=limit)
-            # Self-chain: if the batch hit the cap, more records likely remain.
-            # Enqueue a new Cloud Task rather than extending this request's runtime.
+            # Self-chain: if the batch hit the cap AND made progress, more records likely remain.
+            # Without the progress check (updated > 0), tasks with no parseable records would
+            # re-fetch the same records and loop indefinitely.
+            processed = result.get("processed_jobs_count", 0) if isinstance(result, dict) else 0
             updated = result.get("updated_jobs_count", 0) if isinstance(result, dict) else 0
-            if updated >= limit and is_tick_queue_configured():
+            if processed >= limit and updated > 0 and is_tick_queue_configured():
                 _enqueue_task_continuation(task_name, limit, request)
         else:
             result = func()

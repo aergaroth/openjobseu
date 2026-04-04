@@ -14,7 +14,7 @@ logger = logging.getLogger("openjobseu.backfill")
 CHUNK_SIZE = 100
 
 
-def backfill_missing_salary_fields(limit: int = 1000) -> int:
+def backfill_missing_salary_fields(limit: int = 1000) -> dict:
     """
     Backfill missing salary fields by re-parsing description and title.
     Only updates rows where BOTH salary_min AND salary_max are NULL.
@@ -22,9 +22,10 @@ def backfill_missing_salary_fields(limit: int = 1000) -> int:
     Processes records in chunks of CHUNK_SIZE: each iteration fetches a fresh
     batch from the DB, parses salaries, and commits atomically.
 
-    Returns the total number of records *fetched and processed* (not just updated).
-    Callers use this to detect whether the limit was hit (result == limit → more
-    records likely remain → enqueue a continuation task).
+    Returns {"processed": int, "updated": int}.
+    Callers should continue only if processed >= limit AND updated > 0.
+    If updated == 0, all fetched records had no parseable salary — re-running
+    would fetch the same records again (infinite loop).
     """
     engine = get_engine()
 
@@ -108,4 +109,4 @@ def backfill_missing_salary_fields(limit: int = 1000) -> int:
             break  # No more records available — done early
 
     logger.info("Salary backfill finished. processed=%d updated=%d", total_processed, total_updated)
-    return total_processed
+    return {"processed": total_processed, "updated": total_updated}
