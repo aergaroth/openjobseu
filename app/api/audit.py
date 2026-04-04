@@ -15,6 +15,8 @@ from storage.repositories.audit_repository import (
     get_audit_source_filter_values,
     get_jobs_audit,
     get_failing_ats_integrations,
+    get_source_compliance_trend,
+    get_rejection_reasons_by_source,
 )
 from storage.repositories.ats_repository import (
     get_ats_integration_by_id,
@@ -70,6 +72,18 @@ class AuditStatsCompanyResponse(BaseModel):
 class AuditStatsSourceResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     window: str
+    items: list[dict[str, Any]]
+
+
+class AuditSourceTrendResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    window_days: int
+    items: list[dict[str, Any]]
+
+
+class AuditRejectionReasonsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    window_days: int
     items: list[dict[str, Any]]
 
 
@@ -212,6 +226,16 @@ def audit_source_stats_7d():
         "window": "last_7_days",
         "items": get_audit_source_compliance_stats_last_7d(),
     }
+
+
+@audit_api_router.get("/stats/source-trend", response_model=AuditSourceTrendResponse)
+def audit_source_trend(days: int = Query(30, ge=7, le=180)):
+    return {"window_days": days, "items": get_source_compliance_trend(days=days)}
+
+
+@audit_api_router.get("/stats/rejection-reasons", response_model=AuditRejectionReasonsResponse)
+def audit_rejection_reasons(days: int = Query(30, ge=7, le=180)):
+    return {"window_days": days, "items": get_rejection_reasons_by_source(days=days)}
 
 
 @audit_api_router.get("/ats-health", response_model=AtsHealthResponse)

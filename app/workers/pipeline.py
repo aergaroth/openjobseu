@@ -13,6 +13,7 @@ from app.workers.lifecycle import run_lifecycle_pipeline
 from app.workers.market_metrics import run_market_metrics_worker
 from app.workers.maintenance import run_maintenance_pipeline
 from app.workers.frontend_exporter import run_frontend_export
+from app.workers.audit_exporter import run_audit_export
 
 # Definiujemy __all__, aby poinformować analizatory statyczne (i Ruffa),
 # że te funkcje są częścią publicznego interfejsu tego modułu i muszą w nim pozostać.
@@ -23,6 +24,7 @@ __all__ = [
     "run_market_metrics_worker",
     "run_maintenance_pipeline",
     "run_frontend_export",
+    "run_audit_export",
 ]
 
 logger = logging.getLogger("openjobseu.pipeline")
@@ -41,6 +43,7 @@ PIPELINE_STEPS_MAINTENANCE = [
     ("market_metrics", "run_market_metrics_worker"),
     ("maintenance", "run_maintenance_pipeline"),
     ("frontend_export", "run_frontend_export"),
+    ("audit_export", "run_audit_export"),
 ]
 
 
