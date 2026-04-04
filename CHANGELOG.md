@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.30.0](https://github.com/aergaroth/openjobseu/compare/v2.29.0...v2.30.0) (2026-04-04)
+
+
+### Features
+
+* **audit:** add support for publishing audit metadata to public bucket with signed URL ([605674d](https://github.com/aergaroth/openjobseu/commit/605674d12f6f5159df0f47fde81101f760d99b68))
+
 ## [2.29.0](https://github.com/aergaroth/openjobseu/compare/v2.28.0...v2.29.0) (2026-04-04)
 
 
