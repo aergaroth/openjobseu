@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.28.0](https://github.com/aergaroth/openjobseu/compare/v2.27.0...v2.28.0) (2026-04-04)
+
+
+### Features
+
+* add backfill endpoint for remote ratio in architecture and system map documentation ([6288a47](https://github.com/aergaroth/openjobseu/commit/6288a4755ec5ae468bae29468583a90b0a6dd0cb))
+* add IAM roles for monitoring and logging to GitHub deploy service account ([fd31aeb](https://github.com/aergaroth/openjobseu/commit/fd31aeb3ffa5afc76ab29ba99b828e0f04369160))
+* add Slack webhook integration for pipeline failure alerts ([29d126e](https://github.com/aergaroth/openjobseu/commit/29d126e1568cf79d945aaddab9467097cd4a677f))
+
+
+### Bug Fixes
+
+* **monitoring:** remove invalid resource.type from condition_absent filter ([0e418fb](https://github.com/aergaroth/openjobseu/commit/0e418fbc1ab1c838852695d5ecd33ebc33ff01cf))
+* **monitoring:** use cloud_run_revision resource type in condition_absent filter ([958a18d](https://github.com/aergaroth/openjobseu/commit/958a18d0a35e3c79bd603f5b431ec2856e95173e))
+* update slack webhook URL environment variable handling ([b7eb0a1](https://github.com/aergaroth/openjobseu/commit/b7eb0a15ef40739aae534b5f97a5b0a3b0414824))
+
 ## [2.27.0](https://github.com/aergaroth/openjobseu/compare/v2.26.0...v2.27.0) (2026-04-03)
 
 
