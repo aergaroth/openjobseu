@@ -47,7 +47,7 @@ resource "google_monitoring_alert_policy" "tick_absent" {
   conditions {
     display_name = "No tick_finished log in last 2 hours"
     condition_absent {
-      filter   = "metric.type=\"logging.googleapis.com/user/${google_logging_metric.tick_finished.name}\""
+      filter   = "metric.type=\"logging.googleapis.com/user/${google_logging_metric.tick_finished.name}\" AND resource.type=\"cloud_run_revision\""
       duration = "7200s"
       aggregations {
         alignment_period     = "600s"
