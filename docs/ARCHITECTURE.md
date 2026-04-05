@@ -522,7 +522,7 @@ Schema source: Alembic revisions under `storage/alembic/versions/` + repository 
 - `POST /internal/tick/execute` – Cloud Tasks execution handler for the tick pipeline.
 - `GET /internal/metrics` – system metrics snapshot from `storage.repositories.system_repository`.
 - `POST /internal/preview-job` – adapter/debug preview for a single ATS job flow.
-- `GET /internal/audit` – HTML audit panel (`audit_tool/offer_audit_panel.html`).
+- `GET /internal/audit` – built-in HTML audit panel (`audit_tool/offer_audit_panel.html`).
 - `GET /internal/audit/jobs` – audit listing and counts (reads `jobs` + `job_sources`).
 - `GET /internal/audit/filters` – filter registry + dynamic source list.
 - `GET /internal/audit/stats/company` – company compliance ratios (`jobs` + `companies`).
