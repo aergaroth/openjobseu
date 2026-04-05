@@ -24,4 +24,9 @@ lint:
 
 # Uruchamia WSZYSTKIE zdefiniowane hooki (w tym customowe sprawdzarki np. check-no-prints)
 check: compile
-	pre-commit run --all-files
+	@if .venv/bin/python scripts/pytest_precommit_guard.py; then \
+		pre-commit run --all-files; \
+	else \
+		echo "WARNING: local test database is unavailable; skipping pytest hook in pre-commit."; \
+		SKIP=pytest pre-commit run --all-files; \
+	fi
