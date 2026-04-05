@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.31.0](https://github.com/aergaroth/openjobseu/compare/v2.30.0...v2.31.0) (2026-04-05)
+
+
+### Features
+
+* **audit:** add health metrics and remove public feed flow ([8095f89](https://github.com/aergaroth/openjobseu/commit/8095f8969699e6d93561d8c2c0ff6b9f6a1508de))
+
 ## [2.30.0](https://github.com/aergaroth/openjobseu/compare/v2.29.0...v2.30.0) (2026-04-04)
 
 
