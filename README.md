@@ -14,12 +14,14 @@ The project is backend-first and infrastructure-oriented. It leverages a modern 
 - **Robust Async Processing**: Leverages Google Cloud Tasks and Cloud Scheduler for time-budgeted, idempotent, and heavily retried worker execution.
 - **Strict Security**: Endpoints split between UI (Session-based via Google OAuth) and M2M routes (OIDC tokens with strict Audience validation). For local development (`APP_RUNTIME=local`), the system falls back to dummy placeholders to ensure low friction.
 - **High Performance Data**: Scalable PostgreSQL database design with GIN Trigram indexing for fuzzy search and `GROUPING SETS` for real-time audit aggregations.
+- **Current Database Runtime**: Both `dev` and `prod` now run in `DB_MODE=standard` against Aiven PostgreSQL via `DATABASE_URL`.
 
 ## Documentation
 
 Detailed documentation detailing the design decisions and data flows is located in the `docs/` directory:
 
 - System Architecture
+- Aiven PostgreSQL Migration Notes
 - System Map
 - Canonical Model
 - Compliance & Data Usage
@@ -122,3 +124,9 @@ Local pattern:
 # start postgres
 docker run --rm --name openjobspg -e POSTGRES_PASSWORD=postgres \
   -e POSTGRES_DB=testdb -p 5432:5432 -d postgres:16
+```
+
+`make check` still runs `compile` and `pre-commit --all-files`, but when the
+local PostgreSQL test database is unavailable it now marks the `pytest` hook as
+`Skipped` instead of letting it appear as `Passed` after a fully skipped test
+session.

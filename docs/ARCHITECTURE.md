@@ -61,8 +61,11 @@ Runtime path:
 
 The storage backend uses SQLAlchemy Core and PostgreSQL.
 
-Database modes:
+Current deployed database mode:
 - `DB_MODE=standard` + `DATABASE_URL=postgresql+psycopg://...`
+- active `dev` and `prod` deployments use Aiven PostgreSQL
+
+Legacy/optional code path still present in the runtime:
 - `DB_MODE=cloudsql` + Cloud SQL connector settings (`INSTANCE_CONNECTION_NAME`, `DB_NAME`, `DB_USER`)
 
 Schema initialization is Alembic-based (`storage/alembic/`, `alembic.ini`) and applied at startup via `alembic upgrade head`.
@@ -202,7 +205,7 @@ Core GCP services used:
 - **Cloud Run**: Core compute layer (configured with `cpu_idle=true`). Both `dev` and `prod` services are private: they do not grant `roles/run.invoker` to `allUsers`, and only the dedicated scheduler service account (`scheduler-internal`) receives `roles/run.invoker`. Cloud Scheduler and Cloud Tasks call the service with OIDC tokens minted for that same service account, enforcing a strictly backend/administrative boundary.
 - **Cloud Scheduler**: Cron triggers for pipelines.
 - **Cloud Tasks**: Durable async job queue for long-running endpoints (bypassing timeouts).
-- **Cloud SQL (PostgreSQL)**: GIN-indexed relational database.
+- **Aiven PostgreSQL**: primary relational database used by the application in both `dev` and `prod`.
 - **Cloud Storage (GCS)**: Highly available CDN for serving the static `feed.json`.
 
 ---
