@@ -119,7 +119,7 @@ pyyaml==6.0.3
     #   responses
 questionary==2.1.1
     # via commitizen
-requests==2.33.0
+requests==2.33.1
     # via
     #   -c requirements.txt
     #   responses
