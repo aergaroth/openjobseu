@@ -108,6 +108,7 @@ def get_jobs(
             last_seen_at,
             description,
             source_department,
+            job_family,
             salary_min,
             salary_max,
             salary_currency,

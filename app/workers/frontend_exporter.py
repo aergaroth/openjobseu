@@ -108,12 +108,26 @@ def _export_feed(bucket) -> tuple[int, int]:
         FEED_MIN_COMPLIANCE_SCORE,
     )
 
+    from app.domain.taxonomy.taxonomy import classify_taxonomy
+
     jobs = get_jobs(
         status="visible",
         min_compliance_score=FEED_MIN_COMPLIANCE_SCORE,
         limit=FEED_LIMIT,
         offset=0,
     )
+
+    # Enrich jobs that have no job_family in the DB (historical data ingested before
+    # taxonomy classification was wired up). classify_taxonomy() is pure/fast — no I/O.
+    for job in jobs:
+        if not job.get("job_family") or job["job_family"] == "unknown":
+            result = classify_taxonomy(
+                title=str(job.get("title") or ""),
+                department=job.get("source_department"),
+            )
+            family = result.get("job_family")
+            if family and family != "unknown":
+                job["job_family"] = family
 
     departments = Counter(job["job_family"] for job in jobs if job.get("job_family") and job["job_family"] != "unknown")
     departments_list = [{"name": name, "count": count} for name, count in departments.items()]
