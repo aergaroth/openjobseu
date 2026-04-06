@@ -373,14 +373,14 @@
       "description": j.description || "",
       "employmentType": "FULL_TIME",
       ...(j.url ? { "url": j.url } : {}),
-      ...(j.salary_min_eur || j.salary_max_eur ? {
+      ...(j.salary_min_eur != null && j.salary_max_eur != null ? {
         "baseSalary": {
           "@type": "MonetaryAmount",
           "currency": "EUR",
           "value": {
             "@type": "QuantitativeValue",
-            "minValue": j.salary_min_eur || undefined,
-            "maxValue": j.salary_max_eur || undefined,
+            "minValue": j.salary_min_eur,
+            "maxValue": j.salary_max_eur,
             "unitText": "YEAR"
           }
         }
