@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.31.1](https://github.com/aergaroth/openjobseu/compare/v2.31.0...v2.31.1) (2026-04-06)
+
+
+### Bug Fixes
+
+* **feed:** ensure salary values are only included when both min and max are provided ([62bf8f9](https://github.com/aergaroth/openjobseu/commit/62bf8f95a8ab794015415fed318731f518c64d68))
+
 ## [2.31.0](https://github.com/aergaroth/openjobseu/compare/v2.30.0...v2.31.0) (2026-04-05)
 
 
