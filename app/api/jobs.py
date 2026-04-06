@@ -60,6 +60,7 @@ class FeedJobItem(BaseModel):
     last_seen_at: Optional[datetime] = None
     description: Optional[str] = None
     source_department: Optional[str] = None
+    job_family: Optional[str] = None
     salary_min: Optional[int] = None
     salary_max: Optional[int] = None
     salary_currency: Optional[str] = None
@@ -131,6 +132,7 @@ def serialize_feed_job(job: dict) -> dict:
         "last_seen_at",
         "description",
         "source_department",
+        "job_family",
         "salary_min",
         "salary_max",
         "salary_currency",

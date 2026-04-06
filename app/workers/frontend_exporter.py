@@ -115,7 +115,7 @@ def _export_feed(bucket) -> tuple[int, int]:
         offset=0,
     )
 
-    departments = Counter(job["source_department"] for job in jobs if job.get("source_department"))
+    departments = Counter(job["job_family"] for job in jobs if job.get("job_family") and job["job_family"] != "unknown")
     departments_list = [{"name": name, "count": count} for name, count in departments.items()]
 
     all_salaries_eur = [job["salary_min_eur"] for job in jobs if job.get("salary_min_eur")]

@@ -575,6 +575,12 @@ select:focus  { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,82,22
 
 .job-description-toggle:hover { color: var(--accent-hover); }
 
+.job-source-dept {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+}
+
 /* ── Placeholder / empty ─────────────────────────────── */
 .placeholder-row {
   text-align: center;

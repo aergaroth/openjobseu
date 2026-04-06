@@ -5,6 +5,18 @@
   const MARKET_STATS_URL = "/market-stats.json";
   const DEBOUNCE_MS = 200;
 
+  const JOB_FAMILY_LABELS = {
+    software_development: "Engineering",
+    data_science:         "Data & AI",
+    design:               "Design",
+    product_management:   "Product",
+    marketing:            "Marketing",
+    sales:                "Sales",
+    hr:                   "People & HR",
+    finance:              "Finance",
+    operations:           "Operations",
+  };
+
   // ── DOM refs ───────────────────────────────────────────
   const metaEl               = document.getElementById("meta");
   const jobsList             = document.getElementById("jobs-list");
@@ -203,12 +215,13 @@
     return allJobs.filter(j => {
       // Text search: title, company, department, remote_scope
       if (q) {
-        const haystack = [j.title, j.company, j.source_department, j.remote_scope]
+        const haystack = [j.title, j.company, j.source_department, j.remote_scope,
+          j.job_family ? JOB_FAMILY_LABELS[j.job_family] : null]
           .filter(Boolean).join(" ").toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       // Department
-      if (departments.size > 0 && !departments.has(j.source_department)) return false;
+      if (departments.size > 0 && !departments.has(j.job_family)) return false;
       // Salary
       if (salaryMin !== null || salaryMax !== null) {
         const hasSalary = j.salary_min_eur || j.salary_max_eur;
@@ -298,8 +311,8 @@
       if (job.remote_scope) {
         metaRow.appendChild(makeIconTag(ICON_PIN, job.remote_scope));
       }
-      if (job.source_department) {
-        metaRow.appendChild(makeIconTag(ICON_DEPT, job.source_department));
+      if (job.job_family && JOB_FAMILY_LABELS[job.job_family]) {
+        metaRow.appendChild(makeIconTag(ICON_DEPT, JOB_FAMILY_LABELS[job.job_family]));
       }
 
       card.appendChild(metaRow);
@@ -331,6 +344,13 @@
         card.appendChild(toggleBtn);
       }
 
+      if (job.source_department) {
+        const deptDetail = document.createElement("div");
+        deptDetail.className = "job-source-dept";
+        deptDetail.appendChild(safeText(job.source_department));
+        card.appendChild(deptDetail);
+      }
+
       fragment.appendChild(card);
     });
 
@@ -348,7 +368,8 @@
         btn.className = "dept-btn";
         btn.setAttribute("aria-pressed", "false");
         btn.dataset.dept = d.name;
-        btn.appendChild(safeText(`${d.name} (${d.count})`));
+        const label = JOB_FAMILY_LABELS[d.name] || d.name;
+        btn.appendChild(safeText(`${label} (${d.count})`));
         deptFiltersEl.appendChild(btn);
       });
   }
