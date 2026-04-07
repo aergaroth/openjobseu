@@ -22,6 +22,7 @@ Detailed documentation detailing the design decisions and data flows is located 
 
 - System Architecture
 - Aiven PostgreSQL Migration Notes
+- Looker Studio Audit Dashboard
 - System Map
 - Canonical Model
 - Compliance & Data Usage
