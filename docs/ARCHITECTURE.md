@@ -110,6 +110,7 @@ OpenJobsEU has one active access model in `dev` and `prod`: the Cloud Run runtim
 |---|---|---|---|
 | `GET /feed.json` | GCS + CDN | Public | Zero-compute data feed exported by `run_frontend_export(export_feed=True)` during runtime maintenance. |
 | Static frontend (`/`, `index.html`, JS/CSS assets) | GCS + CDN | Public | Read-only website consuming `feed.json`, published separately by CI/CD after a successful production deploy. |
+| Looker Studio audit report | Aiven PostgreSQL reporting views | Selected Google accounts | Private read-only audit reporting backed by `vw_looker_audit_*` views. |
 | `GET /health`, `GET /ready` | Private Cloud Run | Internal/admin | Operational endpoints on the private runtime. |
 | `GET /jobs`, `GET /companies`, `GET /jobs/stats/compliance-7d` | Private Cloud Run | Internal/admin | Read/query endpoints reachable only by callers with Cloud Run IAM access. |
 | `/internal/*` | Private Cloud Run | Internal/admin | Scheduler, Cloud Tasks, and audit/ops tooling. |
