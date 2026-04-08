@@ -1,5 +1,7 @@
+import logging
 import os
 from datetime import datetime, timezone
+from time import perf_counter
 import uuid
 
 import pytest
@@ -50,6 +52,19 @@ from alembic import command
 from alembic.config import Config
 
 _engine = None
+_DB_PROFILE_ENABLED = os.environ.get("PYTEST_DB_PROFILE") == "1"
+_logger = logging.getLogger(__name__)
+_db_profile_stats = {
+    "clean_db_calls": 0,
+    "clean_db_total_s": 0.0,
+    "db_setup_total_s": 0.0,
+    "alembic_upgrade_s": 0.0,
+}
+
+
+def _profile_log(message: str) -> None:
+    if _DB_PROFILE_ENABLED:
+        _logger.info("[pytest-db-profile] %s", message)
 
 
 @pytest.fixture(autouse=True)
@@ -86,6 +101,7 @@ def block_external_httpx_requests(respx_mock):
 def db_engine_setup():
     """Inicjalizuje bazę i uruchamia migracje dokładnie raz na sesję testową."""
     global _engine
+    setup_started = perf_counter()
     try:
         alembic_cfg = Config("alembic.ini")
         alembic_cfg.attributes["configure_logger"] = False
@@ -98,11 +114,21 @@ def db_engine_setup():
                 command.stamp(alembic_cfg, "56f2bf3724cd")
                 conn.commit()
 
+        upgrade_started = perf_counter()
         command.upgrade(alembic_cfg, "head")
+        _db_profile_stats["alembic_upgrade_s"] = perf_counter() - upgrade_started
     except (OperationalError, InterfaceError) as exc:  # pragma: no cover
         pytest.skip(f"database unavailable, skipping tests: {exc}")
     except ProgrammingError as exc:
         raise RuntimeError("test database schema is missing. Ensure Alembic migrations are up to date.") from exc
+    finally:
+        _db_profile_stats["db_setup_total_s"] = perf_counter() - setup_started
+        if _DB_PROFILE_ENABLED:
+            _profile_log(
+                "db_engine_setup "
+                f"total={_db_profile_stats['db_setup_total_s']:.3f}s "
+                f"alembic_upgrade={_db_profile_stats['alembic_upgrade_s']:.3f}s"
+            )
 
 
 @pytest.fixture(autouse=True)
@@ -120,6 +146,7 @@ def clean_db(db_engine_setup):
     if _engine is None:
         return
 
+    clean_started = perf_counter()
     with _engine.begin() as conn:
         # DELETE jest o rzędy wielkości szybsze niż TRUNCATE CASCADE w PostgreSQL,
         # zwłaszcza na pustych lub małych tabelach. Usuwamy od dzieci do rodziców.
@@ -129,7 +156,30 @@ def clean_db(db_engine_setup):
         conn.execute(text("DELETE FROM jobs;"))
         conn.execute(text("DELETE FROM company_ats;"))
         conn.execute(text("DELETE FROM companies;"))
+    clean_elapsed = perf_counter() - clean_started
+    _db_profile_stats["clean_db_calls"] += 1
+    _db_profile_stats["clean_db_total_s"] += clean_elapsed
     yield
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    if not _DB_PROFILE_ENABLED:
+        return
+
+    clean_calls = _db_profile_stats["clean_db_calls"]
+    clean_total_s = _db_profile_stats["clean_db_total_s"]
+    clean_avg_ms = (clean_total_s / clean_calls * 1000) if clean_calls else 0.0
+    terminalreporter.write_sep(
+        "-",
+        (
+            "[pytest-db-profile] "
+            f"db_setup_total={_db_profile_stats['db_setup_total_s']:.3f}s "
+            f"alembic_upgrade={_db_profile_stats['alembic_upgrade_s']:.3f}s "
+            f"clean_db_calls={clean_calls} "
+            f"clean_db_total={clean_total_s:.3f}s "
+            f"clean_db_avg={clean_avg_ms:.2f}ms"
+        ),
+    )
 
 
 class DbFactory:
