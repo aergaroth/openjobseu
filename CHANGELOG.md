@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.32.0](https://github.com/aergaroth/openjobseu/compare/v2.31.1...v2.32.0) (2026-04-07)
+
+
+### Features
+
+* **reporting:** add Looker Studio audit views and guide ([f94e95c](https://github.com/aergaroth/openjobseu/commit/f94e95c0a7bb013b969f0f2e23b3d770e4147201))
+
 ## [2.31.1](https://github.com/aergaroth/openjobseu/compare/v2.31.0...v2.31.1) (2026-04-06)
 
 
