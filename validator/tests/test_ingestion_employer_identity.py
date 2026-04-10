@@ -124,14 +124,15 @@ def test_ingest_company_computes_identity_before_policy_and_persist(monkeypatch)
 
     monkeypatch.setattr(process_loop, "process_ingested_job", _fake_process_ingested_job)
 
-    def _fake_upsert(job, conn=None, *, company_id=None):
+    def _fake_upsert(jobs, conn, *, company_id=None, source=None):
         call_order.append("upsert")
         assert conn is not None
         assert company_id == "company-1"
-        persisted_jobs.append(dict(job))
-        return job["job_id"]
+        for job in jobs:
+            persisted_jobs.append(dict(job))
+        return [job["job_id"] for job in jobs]
 
-    monkeypatch.setattr(process_loop, "upsert_job", _fake_upsert)
+    monkeypatch.setattr(process_loop, "bulk_upsert_jobs", _fake_upsert)
     monkeypatch.setattr(
         process_loop,
         "insert_compliance_reports",
@@ -266,8 +267,10 @@ def test_ingest_company_accepts_uuid_company_identifiers(monkeypatch):
     )
     monkeypatch.setattr(
         process_loop,
-        "upsert_job",
-        lambda job, conn=None, *, company_id=None: persisted_jobs.append(dict(job)) or job["job_id"],
+        "bulk_upsert_jobs",
+        lambda jobs, conn, *, company_id=None, source=None: [
+            persisted_jobs.append(dict(j)) or j["job_id"] for j in jobs
+        ],
     )
     monkeypatch.setattr(
         employer,
@@ -352,8 +355,10 @@ def test_ingest_company_rejected_job_does_not_insert_compliance_report_without_j
     monkeypatch.setattr(process_loop, "process_ingested_job", _fake_process_ingested_job)
     monkeypatch.setattr(
         process_loop,
-        "upsert_job",
-        lambda job, conn=None, *, company_id=None: upsert_calls.append(dict(job)) or "job-x",
+        "bulk_upsert_jobs",
+        lambda jobs, conn, *, company_id=None, source=None: [
+            upsert_calls.append(dict(j)) or j.get("job_id", "job-x") for j in jobs
+        ],
     )
     monkeypatch.setattr(
         process_loop,

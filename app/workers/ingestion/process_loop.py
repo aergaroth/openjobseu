@@ -9,7 +9,7 @@ from app.domain.jobs.identity import compute_job_identity
 from app.domain.jobs.job_processing import process_ingested_job
 from app.workers.ingestion.metrics import IngestionMetrics
 from storage.repositories.compliance_repository import insert_compliance_reports
-from storage.repositories.jobs_repository import upsert_job
+from storage.repositories.jobs_repository import bulk_upsert_jobs
 from storage.repositories.salary_repository import insert_salary_parsing_cases
 
 logger = logging.getLogger("openjobseu.ingestion.employer")
@@ -30,8 +30,8 @@ def process_company_jobs(
     """
     Process a list of raw jobs for a company: normalize, process, persist, and collect metrics.
     """
-    compliance_reports_bulk = []
-    salary_cases_bulk = []
+    # Collect (job, report) pairs first, then bulk-persist in one batch.
+    pending: list[tuple[dict, dict]] = []
 
     for raw in raw_jobs:
         try:
@@ -69,30 +69,8 @@ def process_company_jobs(
             else:
                 metrics.observe_rejection(reason)
 
-            # Log salary detection (from worker as requested)
-            salary_source = job.get("salary_source")
-            metrics.observe_salary(bool(salary_source))
-
-            canonical_job_id = upsert_job(job, conn=conn, company_id=company_id)
-            report["job_id"] = canonical_job_id
-
-            # Logowanie edge-case'ów z ekstrakcji wynagrodzeń
-            parsing_case = job.get("_salary_parsing_case")
-            if parsing_case and canonical_job_id:
-                salary_cases_bulk.append(
-                    {
-                        "job_id": canonical_job_id,
-                        "salary_raw": parsing_case.get("salary_raw"),
-                        "description_fragment": None,
-                        "parser_confidence": parsing_case.get("salary_confidence"),
-                        "extracted_min": parsing_case.get("salary_min"),
-                        "extracted_max": parsing_case.get("salary_max"),
-                        "extracted_currency": parsing_case.get("salary_currency"),
-                    }
-                )
-
-            if report.get("job_id"):
-                compliance_reports_bulk.append(report)
+            metrics.observe_salary(bool(job.get("salary_source")))
+            pending.append((job, report))
 
         except Exception as exc:
             logger.warning(
@@ -107,6 +85,36 @@ def process_company_jobs(
             )
             metrics.observe_skip()
             continue
+
+    if not pending:
+        return
+
+    # Bulk-persist all jobs in a single batch (replaces N × upsert_job calls).
+    job_list = [job for job, _ in pending]
+    canonical_ids = bulk_upsert_jobs(job_list, conn, company_id=company_id, source=provider)
+
+    compliance_reports_bulk = []
+    salary_cases_bulk = []
+
+    for (job, report), canonical_job_id in zip(pending, canonical_ids):
+        report["job_id"] = canonical_job_id
+
+        parsing_case = job.get("_salary_parsing_case")
+        if parsing_case and canonical_job_id:
+            salary_cases_bulk.append(
+                {
+                    "job_id": canonical_job_id,
+                    "salary_raw": parsing_case.get("salary_raw"),
+                    "description_fragment": None,
+                    "parser_confidence": parsing_case.get("salary_confidence"),
+                    "extracted_min": parsing_case.get("salary_min"),
+                    "extracted_max": parsing_case.get("salary_max"),
+                    "extracted_currency": parsing_case.get("salary_currency"),
+                }
+            )
+
+        if report.get("job_id"):
+            compliance_reports_bulk.append(report)
 
     if compliance_reports_bulk:
         insert_compliance_reports(conn, compliance_reports_bulk)
