@@ -1,3 +1,4 @@
+import asyncio
 import os
 import json
 import logging
@@ -192,9 +193,9 @@ async def execute_task(task_name: str, request: Request):
     func = TASK_MAP[task_name]
     try:
         if task_name == "tick":
-            result = func(incremental=incremental, limit=limit)
+            result = await asyncio.to_thread(func, incremental=incremental, limit=limit)
         elif task_name in _CHAINABLE_BACKFILL_TASKS:
-            result = func(limit=limit)
+            result = await asyncio.to_thread(func, limit=limit)
             # Self-chain: if the batch hit the cap AND made progress, more records likely remain.
             # Without the progress check (updated > 0), tasks with no parseable records would
             # re-fetch the same records and loop indefinitely.
@@ -203,7 +204,7 @@ async def execute_task(task_name: str, request: Request):
             if processed >= limit and updated > 0 and is_tick_queue_configured():
                 _enqueue_task_continuation(task_name, limit, request)
         else:
-            result = func()
+            result = await asyncio.to_thread(func)
 
         return {"status": "completed", "result": result}
     except Exception as e:

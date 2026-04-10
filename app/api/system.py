@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -181,7 +182,7 @@ async def execute_tick(request: Request):
         scheduler_schedule_time=request.headers.get("x-scheduler-schedule-time") or body.get("scheduler_schedule_time"),
         task_name=request.headers.get("x-cloudtasks-taskname"),
     )
-    return _execute_tick(response_format=response_format, force_text=False, context=context)
+    return await asyncio.to_thread(_execute_tick, response_format=response_format, force_text=False, context=context)
 
 
 def tick(

@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timezone
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.engine import Connection
 from storage.db_engine import get_engine
 from storage.common import _derive_source_fields, _require_open_conn
@@ -615,3 +615,301 @@ def upsert_job(job: dict, conn: Connection | None = None, *, company_id: str | N
         now=now,
         company_id=company_id,
     )
+
+
+def bulk_upsert_jobs(
+    jobs: list[dict],
+    conn: Connection,
+    *,
+    company_id: str | None = None,
+    source: str | None = None,
+) -> list[str]:
+    """
+    Bulk version of upsert_job. Returns canonical job IDs in same order as input.
+    Reduces round-trips from 5–6 per job to ~7 total for any batch size.
+    """
+    if not jobs:
+        return []
+
+    now = datetime.now(timezone.utc)
+
+    # --- Phase 1: Prepare all jobs ---
+    prepared = []
+    for raw_job in jobs:
+        job = dict(raw_job)
+        first_seen_at = job.get("first_seen_at") or now
+
+        resolved_source, resolved_source_job_id, resolved_source_url = _derive_source_fields(job)
+
+        if "job_fingerprint" not in job:
+            job["job_fingerprint"] = compute_job_fingerprint(
+                job.get("description") or "",
+                title=job.get("title") or "",
+                location=job.get("remote_scope"),
+                company_id=job.get("company_id") or company_id,
+                company_name=job.get("company_name") or "",
+            )
+        if "job_uid" not in job:
+            job["job_uid"] = compute_job_uid(
+                company_id=job.get("company_id") or company_id,
+                title=job.get("title") or "",
+                location=job.get("remote_scope"),
+            )
+
+        if job.get("salary_min") is None and job.get("salary_max") is None:
+            salary_info = extract_salary(job.get("description") or "", title=job.get("title"))
+            if salary_info:
+                job.update(salary_info)
+
+        prepared.append(
+            {
+                "job": job,
+                "first_seen_at": first_seen_at,
+                "resolved_source": resolved_source,
+                "resolved_source_job_id": resolved_source_job_id,
+                "resolved_source_url": resolved_source_url,
+                "incoming_job_id": str(job["job_id"]),
+                "job_fingerprint": str(job["job_fingerprint"]),
+            }
+        )
+
+    # --- Phase 2: Batch fingerprint resolution (1 query) ---
+    fingerprints = [p["job_fingerprint"] for p in prepared]
+    fingerprint_to_id: dict[str, str] = {}
+    fp_stmt = text("SELECT job_id, job_fingerprint FROM jobs WHERE job_fingerprint IN :fps").bindparams(
+        bindparam("fps", expanding=True)
+    )
+    for row in conn.execute(fp_stmt, {"fps": fingerprints}):
+        fingerprint_to_id[str(row[1])] = str(row[0])
+
+    # --- Phase 3: Batch source mapping for unresolved jobs (1–2 queries) ---
+    unresolved = [p for p in prepared if p["job_fingerprint"] not in fingerprint_to_id]
+    source_to_id: dict[tuple[str, str], str] = {}
+
+    if unresolved:
+        batch_source = source or unresolved[0]["resolved_source"]
+        src_job_ids = [p["resolved_source_job_id"] for p in unresolved]
+
+        # Primary: job_sources table
+        js_stmt = text("""
+            SELECT job_id, source_job_id FROM job_sources
+            WHERE source = :src AND source_job_id IN :ids
+        """).bindparams(bindparam("ids", expanding=True))
+        for row in conn.execute(js_stmt, {"src": batch_source, "ids": src_job_ids}):
+            source_to_id[(batch_source, str(row[1]))] = str(row[0])
+
+        # Legacy fallback: jobs table
+        still_unresolved = [
+            p["resolved_source_job_id"]
+            for p in unresolved
+            if (batch_source, p["resolved_source_job_id"]) not in source_to_id
+        ]
+        if still_unresolved:
+            legacy_stmt = text("""
+                SELECT job_id, source_job_id FROM jobs
+                WHERE source = :src AND source_job_id IN :ids
+            """).bindparams(bindparam("ids", expanding=True))
+            for row in conn.execute(legacy_stmt, {"src": batch_source, "ids": still_unresolved}):
+                source_to_id[(batch_source, str(row[1]))] = str(row[0])
+
+    # --- Phase 4: Determine canonical IDs ---
+    for p in prepared:
+        src_key = (p["resolved_source"], p["resolved_source_job_id"])
+        p["canonical_job_id"] = (
+            fingerprint_to_id.get(p["job_fingerprint"]) or source_to_id.get(src_key) or p["incoming_job_id"]
+        )
+
+    # --- Phase 5: Batch fetch existing job states for snapshot comparison (1 query) ---
+    all_canonical_ids = list({p["canonical_job_id"] for p in prepared})
+    existing_jobs: dict[str, dict] = {}
+    existing_stmt = text("""
+        SELECT job_id, job_fingerprint, title, company_name,
+               salary_min, salary_max, salary_currency, remote_class, geo_class
+        FROM jobs WHERE job_id IN :ids
+    """).bindparams(bindparam("ids", expanding=True))
+    for row in conn.execute(existing_stmt, {"ids": all_canonical_ids}).mappings():
+        existing_jobs[str(row["job_id"])] = dict(row)
+
+    # --- Phase 6: Batch snapshot insert (0–1 query) ---
+    snapshots_to_insert = []
+    for p in prepared:
+        existing = existing_jobs.get(p["canonical_job_id"])
+        if not existing:
+            continue
+        job = p["job"]
+        existing_fingerprint = existing["job_fingerprint"]
+        new_salary_min = int(job["salary_min"]) if job.get("salary_min") is not None else None
+        new_salary_max = int(job["salary_max"]) if job.get("salary_max") is not None else None
+        salary_changed = (
+            existing.get("salary_min") != new_salary_min
+            or existing.get("salary_max") != new_salary_max
+            or existing.get("salary_currency") != job.get("salary_currency")
+        )
+        title_changed = existing.get("title") != job.get("title")
+        if (existing_fingerprint and existing_fingerprint != p["job_fingerprint"]) or salary_changed or title_changed:
+            snapshots_to_insert.append(
+                {
+                    "job_id": p["canonical_job_id"],
+                    "job_fingerprint": existing_fingerprint,
+                    "title": existing.get("title"),
+                    "company_name": existing.get("company_name"),
+                    "salary_min": existing.get("salary_min"),
+                    "salary_max": existing.get("salary_max"),
+                    "salary_currency": existing.get("salary_currency"),
+                    "remote_class": existing.get("remote_class"),
+                    "geo_class": existing.get("geo_class"),
+                }
+            )
+
+    if snapshots_to_insert:
+        snap_stmt = text("""
+            INSERT INTO job_snapshots (
+                job_id, job_fingerprint, title, company_name,
+                salary_min, salary_max, salary_currency, remote_class, geo_class, captured_at
+            ) VALUES (
+                :job_id, :job_fingerprint, :title, :company_name,
+                :salary_min, :salary_max, :salary_currency, :remote_class, :geo_class, NOW()
+            )
+        """)
+        conn.execute(snap_stmt, snapshots_to_insert)
+        logger.debug("bulk_snapshots_created", extra={"count": len(snapshots_to_insert)})
+
+    # --- Phase 7: Batch jobs upsert (1 query via executemany) ---
+    job_rows = []
+    for p in prepared:
+        job = p["job"]
+        job_rows.append(
+            {
+                "job_id": p["canonical_job_id"],
+                "source": p["resolved_source"],
+                "source_job_id": p["resolved_source_job_id"],
+                "source_url": p["resolved_source_url"],
+                "title": job["title"],
+                "company_name": job["company_name"],
+                "description": job["description"],
+                "remote_source_flag": bool(job["remote_source_flag"]),
+                "remote_scope": job["remote_scope"],
+                "status": job["status"],
+                "first_seen_at": p["first_seen_at"],
+                "last_seen_at": now,
+                "remote_class": job.get("remote_class"),
+                "geo_class": job.get("geo_class"),
+                "company_id": job.get("company_id") or company_id,
+                "job_uid": job.get("job_uid"),
+                "job_fingerprint": job.get("job_fingerprint"),
+                "source_schema_hash": job.get("source_schema_hash"),
+                "policy_version": job.get("policy_version"),
+                "compliance_status": job.get("compliance_status"),
+                "compliance_score": job.get("compliance_score"),
+                "job_family": job.get("job_family"),
+                "job_role": job.get("job_role"),
+                "seniority": job.get("seniority"),
+                "specialization": job.get("specialization"),
+                "job_quality_score": job.get("job_quality_score"),
+                "salary_min": int(job["salary_min"]) if job.get("salary_min") is not None else None,
+                "salary_max": int(job["salary_max"]) if job.get("salary_max") is not None else None,
+                "salary_currency": job.get("salary_currency"),
+                "salary_period": job.get("salary_period"),
+                "salary_source": job.get("salary_source"),
+                "salary_min_eur": int(job["salary_min_eur"]) if job.get("salary_min_eur") is not None else None,
+                "salary_max_eur": int(job["salary_max_eur"]) if job.get("salary_max_eur") is not None else None,
+                "salary_transparency_status": job.get("salary_transparency_status"),
+                "source_department": str(job.get("department"))[:255] if job.get("department") else None,
+            }
+        )
+
+    jobs_upsert_stmt = text("""
+        INSERT INTO jobs (
+            job_id, source, source_job_id, source_url, title, company_name, description,
+            remote_source_flag, remote_scope, status, first_seen_at, last_seen_at,
+            remote_class, geo_class, company_id, job_uid, job_fingerprint, source_schema_hash,
+            policy_version, compliance_status, compliance_score, job_family, job_role,
+            seniority, specialization, job_quality_score, salary_min, salary_max,
+            salary_currency, salary_period, salary_source, salary_min_eur, salary_max_eur,
+            salary_transparency_status, source_department
+        ) VALUES (
+            :job_id, :source, :source_job_id, :source_url, :title, :company_name, :description,
+            :remote_source_flag, :remote_scope, :status, :first_seen_at, :last_seen_at,
+            :remote_class, :geo_class, :company_id, :job_uid, :job_fingerprint, :source_schema_hash,
+            :policy_version, :compliance_status, :compliance_score, :job_family, :job_role,
+            :seniority, :specialization, :job_quality_score, :salary_min, :salary_max,
+            :salary_currency, :salary_period, :salary_source, :salary_min_eur, :salary_max_eur,
+            :salary_transparency_status, :source_department
+        )
+        ON CONFLICT (job_id) DO UPDATE SET
+            source = COALESCE(jobs.source, excluded.source),
+            source_job_id = COALESCE(jobs.source_job_id, excluded.source_job_id),
+            source_url = COALESCE(jobs.source_url, excluded.source_url),
+            title = excluded.title,
+            company_name = excluded.company_name,
+            description = excluded.description,
+            remote_source_flag = excluded.remote_source_flag,
+            remote_scope = excluded.remote_scope,
+            status = excluded.status,
+            remote_class = excluded.remote_class,
+            geo_class = excluded.geo_class,
+            company_id = COALESCE(jobs.company_id, excluded.company_id),
+            job_uid = excluded.job_uid,
+            job_fingerprint = excluded.job_fingerprint,
+            source_schema_hash = excluded.source_schema_hash,
+            policy_version = excluded.policy_version,
+            compliance_status = excluded.compliance_status,
+            compliance_score = excluded.compliance_score,
+            job_family = excluded.job_family,
+            job_role = excluded.job_role,
+            seniority = excluded.seniority,
+            specialization = excluded.specialization,
+            job_quality_score = excluded.job_quality_score,
+            salary_min = excluded.salary_min,
+            salary_max = excluded.salary_max,
+            salary_currency = excluded.salary_currency,
+            salary_period = excluded.salary_period,
+            salary_source = excluded.salary_source,
+            salary_min_eur = excluded.salary_min_eur,
+            salary_max_eur = excluded.salary_max_eur,
+            salary_transparency_status = excluded.salary_transparency_status,
+            source_department = excluded.source_department,
+            first_seen_at = CASE
+                WHEN excluded.first_seen_at < jobs.first_seen_at THEN excluded.first_seen_at
+                ELSE jobs.first_seen_at
+            END,
+            last_seen_at = excluded.last_seen_at
+    """)
+    conn.execute(jobs_upsert_stmt, job_rows)
+
+    # --- Phase 8: Batch job_sources upsert (1 query via executemany) ---
+    source_rows = [
+        {
+            "job_id": p["canonical_job_id"],
+            "source": p["resolved_source"],
+            "source_job_id": p["resolved_source_job_id"],
+            "source_url": p["resolved_source_url"],
+            "first_seen_at": p["first_seen_at"],
+            "last_seen_at": now,
+            "created_at": now,
+            "updated_at": now,
+        }
+        for p in prepared
+    ]
+    src_upsert_stmt = text("""
+        INSERT INTO job_sources (
+            job_id, source, source_job_id, source_url,
+            first_seen_at, last_seen_at, created_at, updated_at
+        ) VALUES (
+            :job_id, :source, :source_job_id, :source_url,
+            :first_seen_at, :last_seen_at, :created_at, :updated_at
+        )
+        ON CONFLICT (source, source_job_id) DO UPDATE SET
+            job_id = excluded.job_id,
+            source_url = excluded.source_url,
+            first_seen_at = CASE
+                WHEN excluded.first_seen_at < job_sources.first_seen_at THEN excluded.first_seen_at
+                ELSE job_sources.first_seen_at
+            END,
+            last_seen_at = excluded.last_seen_at,
+            seen_count = job_sources.seen_count + 1,
+            updated_at = excluded.updated_at
+    """)
+    conn.execute(src_upsert_stmt, source_rows)
+
+    return [p["canonical_job_id"] for p in prepared]
