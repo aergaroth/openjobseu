@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.34.0](https://github.com/aergaroth/openjobseu/compare/v2.33.0...v2.34.0) (2026-04-11)
+
+
+### Features
+
+* add Teamtailor adapter and update documentation for ATS support ([21bc17e](https://github.com/aergaroth/openjobseu/commit/21bc17ec6079be34dd2045a906831c9141715380))
+
 ## [2.33.0](https://github.com/aergaroth/openjobseu/compare/v2.32.0...v2.33.0) (2026-04-11)
 
 
