@@ -29,6 +29,13 @@ def _extract_slug_from_url(url: str, provider: str) -> str | None:
             if match:
                 return match.group(1)
 
+        elif provider == "jobadder":
+            # Path structure: /jobboard/{boardId}
+            # e.g., https://app.jobadder.com/jobboard/abc-123
+            parts = path.strip("/").split("/")
+            if len(parts) >= 2 and parts[0] == "jobboard" and parts[1]:
+                return parts[1]
+
         elif provider in [
             "lever",
             "greenhouse",

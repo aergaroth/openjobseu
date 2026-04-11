@@ -4,6 +4,7 @@ import pytest
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.greenhouse import GreenhouseAdapter
+from app.adapters.ats.jobadder import JobAdderAdapter
 from app.adapters.ats.lever import LeverAdapter
 from app.adapters.ats.workable import WorkableAdapter
 from app.adapters.ats.ashby import AshbyAdapter
@@ -12,6 +13,7 @@ from app.adapters.ats.smartrecruiters import SmartrecruitersAdapter
 
 ADAPTERS = [
     GreenhouseAdapter(),
+    JobAdderAdapter(),
     LeverAdapter(),
     WorkableAdapter(),
     AshbyAdapter(),
@@ -185,6 +187,20 @@ VALID_JOBS = [
             "_ats_slug": "test-company",
         },
     ),
+    (
+        JobAdderAdapter(),
+        {
+            "adId": 77001,
+            "title": "Senior Python Developer",
+            "description": "<p>We are looking for a senior Python developer...</p>",
+            "applicationUri": "https://jobadder.com/apply/77001",
+            "categories": {"location": "Remote - Europe", "locationType": "remote"},
+            "department": {"name": "Engineering"},
+            "updatedAt": "2024-01-15T10:00:00Z",
+            "_ats_slug": "test-company",
+            "salary": {"min": 90000, "max": 110000, "currency": "GBP", "per": "annual"},
+        },
+    ),
 ]
 
 
@@ -209,7 +225,8 @@ def test_normalized_job_has_required_fields(adapter, raw_job):
     assert normalized["remote_scope"] == "europe", "remote_scope should be normalized"
 
     # Verify values
-    assert str(normalized["source_job_id"]) in str(raw_job.get("id") or raw_job.get("shortcode"))
+    raw_id_val = raw_job.get("id") or raw_job.get("shortcode") or raw_job.get("adId")
+    assert str(normalized["source_job_id"]) in str(raw_id_val)
     assert normalized["title"] == "Senior Python Developer"
     assert len(normalized["description"]) > 0
     assert normalized.get("department") == "Engineering", "Department should be extracted"
@@ -227,7 +244,13 @@ def test_normalized_job_has_required_fields(adapter, raw_job):
         assert normalized["salary_min"] == 90000
         assert normalized["salary_max"] == 110000
         assert normalized["salary_source"] == "ats_api"
+    elif raw_job.get("salary") and "adId" in raw_job:
+        # JobAdder salary (uses "salary" key, same as Workable but different fixture values)
+        assert normalized["salary_min"] == 90000
+        assert normalized["salary_max"] == 110000
+        assert normalized["salary_source"] == "ats_api"
     elif raw_job.get("salary"):
+        # Workable salary
         assert normalized["salary_min"] == 70000
         assert normalized["salary_max"] == 85000
         assert normalized["salary_source"] == "ats_api"
@@ -350,6 +373,19 @@ INVALID_JOBS = [
     (
         SmartrecruitersAdapter(),
         {"name": "Developer", "applyUrl": "http://x", "_ats_slug": "test"},
+    ),
+    # JobAdder missing attributes
+    (
+        JobAdderAdapter(),
+        {"title": "Dev", "applicationUri": "https://example.com", "_ats_slug": "test"},
+    ),
+    (
+        JobAdderAdapter(),
+        {"adId": 1, "applicationUri": "https://example.com", "_ats_slug": "test"},
+    ),
+    (
+        JobAdderAdapter(),
+        {"adId": None, "title": "Dev", "_ats_slug": "test"},
     ),
 ]
 

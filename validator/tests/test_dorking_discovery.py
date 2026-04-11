@@ -42,6 +42,21 @@ def test_extract_slug_from_url_invalid_or_empty():
     assert _extract_slug_from_url("https://jobs.unknown.com/slug", "unknown_provider") is None
 
 
+def test_extract_slug_from_url_jobadder():
+    assert _extract_slug_from_url("https://app.jobadder.com/jobboard/abc-123", "jobadder") == "abc-123"
+    assert (
+        _extract_slug_from_url(
+            "https://app.jobadder.com/jobboard/6e8f3a2b-4c1d-4e5f-9012-3456789abcde",
+            "jobadder",
+        )
+        == "6e8f3a2b-4c1d-4e5f-9012-3456789abcde"
+    )
+    # Brak board ID w ścieżce → None
+    assert _extract_slug_from_url("https://app.jobadder.com/jobboard/", "jobadder") is None
+    # Zły prefix ścieżki → None
+    assert _extract_slug_from_url("https://app.jobadder.com/other/abc-123", "jobadder") is None
+
+
 def test_run_dorking_discovery_success_path(monkeypatch):
     mock_list_providers = MagicMock(return_value=["greenhouse", "unknown"])
 
