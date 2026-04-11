@@ -50,6 +50,7 @@ Runtime path:
   - `app/adapters/ats/personio.py`
   - `app/adapters/ats/recruitee.py`
   - `app/adapters/ats/smartrecruiters.py`
+  - `app/adapters/ats/jobadder.py`
 - normalization happens inside adapters (`normalize()`)
 - policy tagging uses `app/domain/compliance/engine.py` (`apply_policy`)
 
@@ -314,6 +315,7 @@ The orchestrator aggregates `actions` and step-level `metrics`; failures are cap
   - `app/adapters/ats/personio.py`
   - `app/adapters/ats/recruitee.py`
   - `app/adapters/ats/smartrecruiters.py`
+  - `app/adapters/ats/jobadder.py`
 
 #### Ingestion runtime flow
 Main worker: `app/workers/ingestion/employer.py`
@@ -391,7 +393,7 @@ Discovery worker set:
 
 #### ATS guessing flow (`app/workers/discovery/ats_guessing.py`)
 1. Generate slug candidates from company name.
-2. Probe providers in fixed list (`greenhouse`, `lever`, `workable`, `ashby`, `personio`, `recruitee`, `smartrecruiters`).
+2. Probe providers in fixed list (`greenhouse`, `lever`, `workable`, `ashby`, `personio`, `recruitee`, `smartrecruiters`). JobAdder is excluded — its board IDs are assigned by the platform and cannot be derived from company names, so slug guessing does not apply.
 3. Apply same quality thresholds as crawler.
 4. Insert candidate into `company_ats` on successful probe.
 5. Update `companies.ats_guess_last_checked_at`.

@@ -4,6 +4,7 @@ from app.workers.discovery.careers_crawler import (
     run_careers_discovery,
 )
 import app.workers.discovery.careers_crawler as crawler_module
+import os
 
 
 def test_fetch_careers_page(monkeypatch):
@@ -161,6 +162,103 @@ def test_run_careers_discovery_happy_path(monkeypatch):
     assert metrics["ats_detected"] == 1
     assert metrics["ats_probed"] == 1
     assert metrics["ats_inserted"] == 1
+
+
+def test_detect_provider_jobadder():
+    assert crawler_module._detect_provider("https://app.jobadder.com/jobboard/abc-123") == (
+        "jobadder",
+        "abc-123",
+    )
+    assert crawler_module._detect_provider(
+        '<iframe src="https://app.jobadder.com/jobboard/6e8f3a2b-4c1d"></iframe>'
+    ) == ("jobadder", "6e8f3a2b-4c1d")
+    assert crawler_module._detect_provider("https://jobadder.com/somethingelse") is None
+
+
+def _make_jobadder_discovery_monkeypatches(monkeypatch, board_id="board-42"):
+    """Shared fixture helper for JobAdder discovery tests."""
+    mock_row = {"company_id": "999", "careers_url": "https://example.com/careers"}
+    monkeypatch.setattr(crawler_module, "load_discovery_companies", lambda *a, **kw: [mock_row])
+
+    class DummyCtx:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr(
+        crawler_module,
+        "get_engine",
+        lambda: MagicMock(connect=lambda: DummyCtx(), begin=lambda: DummyCtx()),
+    )
+
+    mock_resp = MagicMock()
+    mock_resp.url = f"https://app.jobadder.com/jobboard/{board_id}"
+    mock_resp.text = f'<a href="https://app.jobadder.com/jobboard/{board_id}">Jobs</a>'
+    mock_resp.history = []
+    monkeypatch.setattr(crawler_module, "_fetch_careers_page", lambda url: (mock_resp, None))
+    monkeypatch.setattr(
+        crawler_module,
+        "_detect_provider_from_redirects",
+        lambda r: ("jobadder", board_id),
+    )
+    monkeypatch.setattr(crawler_module, "update_discovery_last_checked_at", lambda *a, **kw: None)
+
+
+def test_jobadder_discovery_fallback_no_token(monkeypatch):
+    """Without JOBADDER_API_TOKEN the board is inserted directly without probe."""
+    _make_jobadder_discovery_monkeypatches(monkeypatch)
+
+    monkeypatch.delenv("JOBADDER_API_TOKEN", raising=False)
+
+    probe_called = []
+    monkeypatch.setattr(crawler_module, "probe_ats", lambda p, s: probe_called.append((p, s)) or {})
+    monkeypatch.setattr(crawler_module, "insert_discovered_company_ats", lambda *a, **kw: True)
+
+    metrics = crawler_module.run_careers_discovery()
+
+    assert probe_called == [], "probe_ats must not be called when token is absent"
+    assert metrics["ats_detected"] == 1
+    assert metrics["ats_probed"] == 0
+    assert metrics["ats_inserted_no_probe"] == 1
+    assert metrics["ats_inserted"] == 0
+
+
+def test_jobadder_discovery_with_token_probes_and_inserts(monkeypatch):
+    """With JOBADDER_API_TOKEN the normal probe + quality gate + insert flow runs."""
+    _make_jobadder_discovery_monkeypatches(monkeypatch)
+
+    monkeypatch.setenv("JOBADDER_API_TOKEN", "test-token-xyz")
+
+    monkeypatch.setattr(
+        crawler_module,
+        "probe_ats",
+        lambda p, s: {"jobs_total": 3, "remote_hits": 2, "recent_job_at": "2026-03-01T00:00:00Z"},
+    )
+    monkeypatch.setattr(crawler_module, "insert_discovered_company_ats", lambda *a, **kw: True)
+
+    metrics = crawler_module.run_careers_discovery()
+
+    assert metrics["ats_detected"] == 1
+    assert metrics["ats_probed"] == 1
+    assert metrics["ats_inserted"] == 1
+    assert metrics["ats_inserted_no_probe"] == 0
+
+
+def test_jobadder_discovery_with_token_probe_fails_skips(monkeypatch):
+    """With token present, a failed probe (401/network) blocks insertion."""
+    _make_jobadder_discovery_monkeypatches(monkeypatch)
+
+    monkeypatch.setenv("JOBADDER_API_TOKEN", "test-token-xyz")
+    monkeypatch.setattr(crawler_module, "probe_ats", lambda p, s: None)
+    monkeypatch.setattr(crawler_module, "insert_discovered_company_ats", lambda *a, **kw: True)
+
+    metrics = crawler_module.run_careers_discovery()
+
+    assert metrics["ats_probed"] == 1
+    assert metrics["ats_inserted"] == 0
+    assert metrics["ats_inserted_no_probe"] == 0
 
 
 def test_run_careers_discovery_handles_company_processing_error(monkeypatch):

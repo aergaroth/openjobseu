@@ -36,6 +36,17 @@ PROVIDER_PATTERNS: Dict[str, re.Pattern] = {
     "personio": re.compile(r"([a-zA-Z0-9_-]+)\.jobs\.personio\.[a-z]{2,4}", re.IGNORECASE),
     "recruitee": re.compile(r"([a-zA-Z0-9_-]+)\.recruitee\.com", re.IGNORECASE),
     "smartrecruiters": re.compile(r"jobs\.smartrecruiters\.com/([a-zA-Z0-9_-]+)", re.IGNORECASE),
+    # JobAdder board IDs are platform-assigned (not derivable from company name),
+    # so guessing is not applicable — careers crawler is the only automatic discovery path.
+    # Probe requires JOBADDER_API_TOKEN; fallback inserts without probe when token is absent.
+    "jobadder": re.compile(r"app\.jobadder\.com/jobboard/([a-zA-Z0-9_-]+)", re.IGNORECASE),
+}
+
+# Providers whose probe requires an API token that may not always be present.
+# When the token is absent the probe is skipped and the board is inserted
+# based solely on the careers-page detection signal.
+PROVIDERS_REQUIRING_TOKEN: Dict[str, str] = {
+    "jobadder": "JOBADDER_API_TOKEN",
 }
 
 INVALID_SLUG_KEYWORDS = {
@@ -222,6 +233,7 @@ def run_careers_discovery() -> Dict[str, int]:
         "ats_detected": 0,
         "ats_probed": 0,
         "ats_inserted": 0,
+        "ats_inserted_no_probe": 0,
         "ats_skipped_quality": 0,
         "ats_duplicates": 0,
         "errors_tls": 0,
@@ -300,6 +312,35 @@ def run_careers_discovery() -> Dict[str, int]:
                     )
                     continue
                 metrics["ats_detected"] += 1
+
+                # Providers like JobAdder require an API token to probe.
+                # When the token is absent, fall back to inserting the board
+                # directly — the careers-page detection is sufficient signal.
+                required_token_env = PROVIDERS_REQUIRING_TOKEN.get(provider)
+                if required_token_env and not os.environ.get(required_token_env):
+                    logger.warning(
+                        "discovery_probe_skipped_no_token",
+                        extra={
+                            "component": "discovery",
+                            "phase": "careers_discovery",
+                            "provider": provider,
+                            "slug": slug,
+                            "missing_env": required_token_env,
+                        },
+                    )
+                    with engine.begin() as conn:
+                        inserted = insert_discovered_company_ats(
+                            conn,
+                            company_id=str(company_id),
+                            provider=provider,
+                            ats_slug=slug,
+                            careers_url=careers_url,
+                        )
+                    if inserted:
+                        metrics["ats_inserted_no_probe"] += 1
+                    else:
+                        metrics["ats_duplicates"] += 1
+                    continue
 
                 probe_result = probe_ats(provider, slug)
                 metrics["ats_probed"] += 1
