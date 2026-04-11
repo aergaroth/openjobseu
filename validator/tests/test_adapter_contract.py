@@ -10,6 +10,7 @@ from app.adapters.ats.workable import WorkableAdapter
 from app.adapters.ats.ashby import AshbyAdapter
 from app.adapters.ats.personio import PersonioAdapter
 from app.adapters.ats.smartrecruiters import SmartrecruitersAdapter
+from app.adapters.ats.teamtailor import TeamtailorAdapter
 
 ADAPTERS = [
     GreenhouseAdapter(),
@@ -19,6 +20,7 @@ ADAPTERS = [
     AshbyAdapter(),
     PersonioAdapter(),
     SmartrecruitersAdapter(),
+    TeamtailorAdapter(),
 ]
 
 
@@ -201,6 +203,43 @@ VALID_JOBS = [
             "salary": {"min": 90000, "max": 110000, "currency": "GBP", "per": "annual"},
         },
     ),
+    (
+        TeamtailorAdapter(),
+        {
+            "id": "12345",
+            "type": "jobs",
+            "links": {"careersite-job-url": "https://jobs.company.com/jobs/12345"},
+            "attributes": {
+                "title": "Senior Python Developer",
+                "body": "<p>We are looking for a senior Python developer...</p>",
+                "remote-status": "none",
+                "status": "open",
+                "created-at": "2024-01-15T10:00:00.000Z",
+                "updated-at": "2024-01-15T10:00:00.000Z",
+                "salary-min": 80000,
+                "salary-max": 100000,
+                "salary-currency": "EUR",
+                "salary-time-unit": "yearly",
+            },
+            "relationships": {
+                "department": {"data": {"id": "99", "type": "departments"}},
+                "locations": {"data": [{"id": "77", "type": "locations"}]},
+            },
+            "_ats_slug": "test-company",
+            "_included": {
+                ("departments", "99"): {
+                    "id": "99",
+                    "type": "departments",
+                    "attributes": {"name": "Engineering"},
+                },
+                ("locations", "77"): {
+                    "id": "77",
+                    "type": "locations",
+                    "attributes": {"city": "Remote - Europe", "country": ""},
+                },
+            },
+        },
+    ),
 ]
 
 
@@ -253,6 +292,11 @@ def test_normalized_job_has_required_fields(adapter, raw_job):
         # Workable salary
         assert normalized["salary_min"] == 70000
         assert normalized["salary_max"] == 85000
+        assert normalized["salary_source"] == "ats_api"
+    elif (raw_job.get("attributes") or {}).get("salary-min"):
+        # Teamtailor salary (nested under attributes)
+        assert normalized["salary_min"] == 80000
+        assert normalized["salary_max"] == 100000
         assert normalized["salary_source"] == "ats_api"
 
 
@@ -386,6 +430,31 @@ INVALID_JOBS = [
     (
         JobAdderAdapter(),
         {"adId": None, "title": "Dev", "_ats_slug": "test"},
+    ),
+    # Teamtailor missing attributes
+    (
+        TeamtailorAdapter(),
+        {
+            "id": "123",
+            "type": "jobs",
+            "links": {"careersite-job-url": "https://example.com"},
+            "attributes": {"title": "", "body": "desc", "remote-status": "none"},
+            "relationships": {},
+            "_ats_slug": "test",
+            "_included": {},
+        },
+    ),
+    (
+        TeamtailorAdapter(),
+        {
+            "id": None,
+            "type": "jobs",
+            "links": {"careersite-job-url": "https://example.com"},
+            "attributes": {"title": "Dev", "body": "desc", "remote-status": "none"},
+            "relationships": {},
+            "_ats_slug": "test",
+            "_included": {},
+        },
     ),
 ]
 

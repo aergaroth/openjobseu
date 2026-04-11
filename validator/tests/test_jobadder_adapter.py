@@ -270,6 +270,7 @@ def test_jobadder_probe_success(monkeypatch):
     adapter = JobAdderAdapter()
     mock_resp = MagicMock()
     mock_resp.json.return_value = {
+        "total": 42,
         "items": [
             {
                 "title": "Remote Python Dev",
@@ -282,15 +283,32 @@ def test_jobadder_probe_success(monkeypatch):
                 "updatedAt": "2024-02-01T00:00:00Z",
             },
             "not a dict",
-        ]
+        ],
+    }
+    monkeypatch.setattr(adapter.session, "get", lambda *a, **kw: mock_resp)
+
+    result = adapter.probe_jobs("test-board")
+
+    assert result["jobs_total"] == 42
+    assert result["remote_hits"] == 1
+    assert result["recent_job_at"] is not None
+
+
+def test_jobadder_probe_total_falls_back_to_items_count(monkeypatch):
+    """When API omits 'total', falls back to len(items)."""
+    adapter = JobAdderAdapter()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "items": [
+            {"title": "Dev", "categories": {}, "updatedAt": "2024-01-01T00:00:00Z"},
+            {"title": "Dev2", "categories": {}, "updatedAt": "2024-01-02T00:00:00Z"},
+        ],
     }
     monkeypatch.setattr(adapter.session, "get", lambda *a, **kw: mock_resp)
 
     result = adapter.probe_jobs("test-board")
 
     assert result["jobs_total"] == 2
-    assert result["remote_hits"] == 1
-    assert result["recent_job_at"] is not None
 
 
 def test_jobadder_probe_empty(monkeypatch):

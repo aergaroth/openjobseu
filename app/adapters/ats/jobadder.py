@@ -180,7 +180,7 @@ class JobAdderAdapter(ATSAdapter):
         if not isinstance(jobs, list):
             raise ValueError("JobAdder probe API did not return an items list")
 
-        jobs_total = 0
+        jobs_total: int = data.get("total", len(jobs))
         remote_hits = 0
         recent_job_at: datetime | None = None
 
@@ -188,7 +188,6 @@ class JobAdderAdapter(ATSAdapter):
             if not isinstance(job, dict):
                 continue
 
-            jobs_total += 1
             job_updated_at = to_utc_datetime(job.get("updatedAt") or job.get("postedAt"))
 
             if job_updated_at and (recent_job_at is None or job_updated_at > recent_job_at):
