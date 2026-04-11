@@ -4,7 +4,6 @@ from app.workers.discovery.careers_crawler import (
     run_careers_discovery,
 )
 import app.workers.discovery.careers_crawler as crawler_module
-import os
 
 
 def test_fetch_careers_page(monkeypatch):

@@ -216,31 +216,37 @@ def test_jobadder_normalize_location_text_fallback():
 
 def test_jobadder_normalize_missing_id():
     adapter = JobAdderAdapter()
-    result = adapter.normalize({
-        "_ats_slug": "test-board",
-        "title": "Dev",
-        "applicationUri": "https://example.com",
-    })
+    result = adapter.normalize(
+        {
+            "_ats_slug": "test-board",
+            "title": "Dev",
+            "applicationUri": "https://example.com",
+        }
+    )
     assert result is None
 
 
 def test_jobadder_normalize_missing_title():
     adapter = JobAdderAdapter()
-    result = adapter.normalize({
-        "_ats_slug": "test-board",
-        "adId": 1,
-        "applicationUri": "https://example.com",
-    })
+    result = adapter.normalize(
+        {
+            "_ats_slug": "test-board",
+            "adId": 1,
+            "applicationUri": "https://example.com",
+        }
+    )
     assert result is None
 
 
 def test_jobadder_normalize_missing_url_and_id():
     adapter = JobAdderAdapter()
-    result = adapter.normalize({
-        "_ats_slug": "test-board",
-        "adId": None,
-        "title": "Dev",
-    })
+    result = adapter.normalize(
+        {
+            "_ats_slug": "test-board",
+            "adId": None,
+            "title": "Dev",
+        }
+    )
     assert result is None
 
 

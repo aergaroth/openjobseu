@@ -1,7 +1,7 @@
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any, Iterable
+from typing import Any
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
@@ -101,9 +101,7 @@ class JobAdderAdapter(ATSAdapter):
         first_seen_at = updated_at or datetime.now(timezone.utc).isoformat()
 
         advertiser = raw_job.get("advertiser") or {}
-        company_name = advertiser.get("name") or (
-            board_id.replace("-", " ").replace("_", " ").strip().title()
-        )
+        company_name = advertiser.get("name") or (board_id.replace("-", " ").replace("_", " ").strip().title())
 
         # Build description: full description first, then summary as fallback section
         description = self.build_description(

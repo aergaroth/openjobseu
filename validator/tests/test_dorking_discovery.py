@@ -43,10 +43,7 @@ def test_extract_slug_from_url_invalid_or_empty():
 
 
 def test_extract_slug_from_url_jobadder():
-    assert (
-        _extract_slug_from_url("https://app.jobadder.com/jobboard/abc-123", "jobadder")
-        == "abc-123"
-    )
+    assert _extract_slug_from_url("https://app.jobadder.com/jobboard/abc-123", "jobadder") == "abc-123"
     assert (
         _extract_slug_from_url(
             "https://app.jobadder.com/jobboard/6e8f3a2b-4c1d-4e5f-9012-3456789abcde",
