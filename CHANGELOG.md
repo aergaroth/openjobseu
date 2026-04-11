@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.33.0](https://github.com/aergaroth/openjobseu/compare/v2.32.0...v2.33.0) (2026-04-11)
+
+
+### Features
+
+* add JobAdder adapter and integrate with discovery processes ([2a75be7](https://github.com/aergaroth/openjobseu/commit/2a75be7d7cd7f081e7cb0b67f4b6e28da5045311))
+
 ## [2.32.0](https://github.com/aergaroth/openjobseu/compare/v2.31.1...v2.32.0) (2026-04-07)
 
 
