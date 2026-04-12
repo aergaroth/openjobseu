@@ -188,20 +188,13 @@ class TraffitAdapter(ATSAdapter):
         if not jobs:
             return None
 
-        recent_at = None
-        for j in jobs:
-            if isinstance(j, dict) and j.get("valid_start"):
-                recent_at = j.get("valid_start")
-                break
+        # API order is not guaranteed; use the latest valid_start for discovery freshness checks.
+        starts = [str(j["valid_start"]) for j in jobs if isinstance(j, dict) and j.get("valid_start")]
+        recent_at = max(starts) if starts else None
 
         return {
             "jobs_total": len(jobs),
-            "remote_hits": sum(
-                1
-                for j in jobs
-                if isinstance(j, dict)
-                and self._probe_job_remote(j)
-            ),
+            "remote_hits": sum(1 for j in jobs if isinstance(j, dict) and self._probe_job_remote(j)),
             "recent_job_at": recent_at,
         }
 
