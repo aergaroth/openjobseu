@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 class RecruiteeAdapter(ATSAdapter):
     dorking_target = "recruitee.com"
     source_name = "recruitee"
+    active = True
 
     def fetch(self, company: Dict, updated_since: Any = None) -> List[Dict]:
         slug = str(company.get("ats_slug") or "").strip()
@@ -112,10 +113,14 @@ class RecruiteeAdapter(ATSAdapter):
             "department": department,
         }
 
-    def probe_jobs(self, slug: str) -> Dict | None:
+    def probe_jobs(self, slug: str) -> Dict[str, Any]:
         jobs = self.fetch(company={"ats_slug": slug})
         if not jobs:
-            return None
+            return {
+                "jobs_total": 0,
+                "remote_hits": 0,
+                "recent_job_at": None,
+            }
 
         return {
             "jobs_total": len(jobs),

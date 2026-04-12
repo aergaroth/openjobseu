@@ -76,14 +76,14 @@ def test_traffit_probe_jobs(monkeypatch):
 
 def test_traffit_probe_jobs_empty_slug():
     adapter = TraffitAdapter()
-    assert adapter.probe_jobs("") is None
-    assert adapter.probe_jobs("   ") is None
+    assert adapter.probe_jobs("") == {}
+    assert adapter.probe_jobs("   ") == {}
 
 
 def test_traffit_probe_jobs_empty_fetch(monkeypatch):
     adapter = TraffitAdapter()
     monkeypatch.setattr(adapter, "fetch", lambda company, **kw: [])
-    assert adapter.probe_jobs("acme") is None
+    assert adapter.probe_jobs("acme") == {}
 
 
 def test_traffit_normalize_success():
@@ -105,6 +105,7 @@ def test_traffit_normalize_success():
         },
     }
     job = adapter.normalize(raw_job)
+    assert job is not None
     assert job["job_id"] == "traffit:acme-hr:42"
     assert job["source"] == "traffit:acme-hr"
     assert job["company_name"] == "Acme Hr"

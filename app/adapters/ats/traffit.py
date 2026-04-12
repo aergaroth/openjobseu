@@ -17,6 +17,7 @@ class TraffitAdapter(ATSAdapter):
 
     dorking_target = "traffit.com"
     source_name = "traffit"
+    active = True
     PAGE_SIZE = 30
 
     def _published_url(self, slug: str) -> str:
@@ -114,13 +115,15 @@ class TraffitAdapter(ATSAdapter):
             return None
         job_id = str(raw_id)
 
-        advert = raw_job.get("advert") if isinstance(raw_job.get("advert"), dict) else {}
+        advert_raw = raw_job.get("advert")
+        advert: dict[str, Any] = advert_raw if isinstance(advert_raw, dict) else {}
         title = (advert.get("name") or "").strip()
         if not title:
             return None
 
         values_map = self._values_by_field_id(advert)
-        options = raw_job.get("options") if isinstance(raw_job.get("options"), dict) else {}
+        options_raw = raw_job.get("options")
+        options: dict[str, Any] = options_raw if isinstance(options_raw, dict) else {}
 
         desc_payload = {
             "description": values_map.get("description"),
@@ -180,13 +183,13 @@ class TraffitAdapter(ATSAdapter):
             "department": department_str,
         }
 
-    def probe_jobs(self, slug: str) -> Dict[str, Any] | None:
+    def probe_jobs(self, slug: str) -> Dict[str, Any]:
         if not str(slug or "").strip():
-            return None
+            return {}
 
         jobs = list(self.fetch(company={"ats_slug": slug}))
         if not jobs:
-            return None
+            return {}
 
         # API order is not guaranteed; use the latest valid_start for discovery freshness checks.
         starts = [str(j["valid_start"]) for j in jobs if isinstance(j, dict) and j.get("valid_start")]
@@ -199,10 +202,12 @@ class TraffitAdapter(ATSAdapter):
         }
 
     def _probe_job_remote(self, raw_job: dict) -> bool:
-        advert = raw_job.get("advert") if isinstance(raw_job.get("advert"), dict) else {}
+        advert_raw = raw_job.get("advert")
+        advert: dict[str, Any] = advert_raw if isinstance(advert_raw, dict) else {}
         title = (advert.get("name") or "").strip()
         values_map = self._values_by_field_id(advert)
-        options = raw_job.get("options") if isinstance(raw_job.get("options"), dict) else {}
+        options_raw = raw_job.get("options")
+        options: dict[str, Any] = options_raw if isinstance(options_raw, dict) else {}
         loc_from_options = self._location_from_json_blob(options.get("job_location"))
         if not loc_from_options:
             loc_from_options = self._location_from_json_blob(values_map.get("geolocation"))
