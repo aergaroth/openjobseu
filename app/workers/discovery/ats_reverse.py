@@ -92,6 +92,7 @@ PROVIDERS_TO_PROBE = [
     "workable",
     "ashby",
     "smartrecruiters",
+    "traffit",
 ]
 
 

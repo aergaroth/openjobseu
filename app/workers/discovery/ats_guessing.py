@@ -28,6 +28,7 @@ PROVIDERS_TO_PROBE = [
     "personio",
     "recruitee",
     "smartrecruiters",
+    "traffit",
 ]
 MAX_SLUG_CANDIDATES = 30
 
