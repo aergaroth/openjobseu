@@ -11,6 +11,7 @@ from app.adapters.ats.ashby import AshbyAdapter
 from app.adapters.ats.personio import PersonioAdapter
 from app.adapters.ats.smartrecruiters import SmartrecruitersAdapter
 from app.adapters.ats.teamtailor import TeamtailorAdapter
+from app.adapters.ats.traffit import TraffitAdapter
 
 ADAPTERS = [
     GreenhouseAdapter(),
@@ -21,6 +22,7 @@ ADAPTERS = [
     PersonioAdapter(),
     SmartrecruitersAdapter(),
     TeamtailorAdapter(),
+    TraffitAdapter(),
 ]
 
 
@@ -240,6 +242,29 @@ VALID_JOBS = [
             },
         },
     ),
+    (
+        TraffitAdapter(),
+        {
+            "id": 2,
+            "url": "https://test-company.traffit.com/public/an/abc",
+            "valid_start": "2024-01-15 10:00:00",
+            "advert": {
+                "name": "Senior Python Developer",
+                "values": [
+                    {
+                        "field_id": "description",
+                        "value": "<p>We are looking for a senior Python developer...</p>",
+                    },
+                ],
+                "language": "en",
+            },
+            "options": {
+                "branches": "Engineering",
+                "job_location": '{"locality": "Remote - Europe", "country": ""}',
+            },
+            "_ats_slug": "test-company",
+        },
+    ),
 ]
 
 
@@ -454,6 +479,27 @@ INVALID_JOBS = [
             "relationships": {},
             "_ats_slug": "test",
             "_included": {},
+        },
+    ),
+    # Traffit missing attributes
+    (
+        TraffitAdapter(),
+        {
+            "id": 1,
+            "url": "",
+            "advert": {"name": "Dev", "values": []},
+            "options": {},
+            "_ats_slug": "test",
+        },
+    ),
+    (
+        TraffitAdapter(),
+        {
+            "id": 1,
+            "url": "https://example.com/public/an/x",
+            "advert": {"name": "", "values": []},
+            "options": {},
+            "_ats_slug": "test",
         },
     ),
 ]

@@ -52,6 +52,7 @@ Runtime path:
   - `app/adapters/ats/smartrecruiters.py`
   - `app/adapters/ats/jobadder.py`
   - `app/adapters/ats/teamtailor.py` *(token-based: `ats_slug` stores the API token, not a public board identifier)*
+  - `app/adapters/ats/traffit.py`
 - normalization happens inside adapters (`normalize()`)
 - policy tagging uses `app/domain/compliance/engine.py` (`apply_policy`)
 
@@ -318,6 +319,7 @@ The orchestrator aggregates `actions` and step-level `metrics`; failures are cap
   - `app/adapters/ats/smartrecruiters.py`
   - `app/adapters/ats/jobadder.py`
   - `app/adapters/ats/teamtailor.py`
+  - `app/adapters/ats/traffit.py`
 
 #### Ingestion runtime flow
 Main worker: `app/workers/ingestion/employer.py`
@@ -395,7 +397,7 @@ Discovery worker set:
 
 #### ATS guessing flow (`app/workers/discovery/ats_guessing.py`)
 1. Generate slug candidates from company name.
-2. Probe providers in fixed list (`greenhouse`, `lever`, `workable`, `ashby`, `personio`, `recruitee`, `smartrecruiters`). Token-based providers are excluded: JobAdder board IDs are platform-assigned and cannot be guessed from company names; Teamtailor uses per-company API tokens, so the identifier is a credential, not a derivable slug.
+2. Probe providers in fixed list (`greenhouse`, `lever`, `workable`, `ashby`, `personio`, `recruitee`, `smartrecruiters`, `traffit`). Token-based providers are excluded: JobAdder board IDs are platform-assigned and cannot be guessed from company names; Teamtailor uses per-company API tokens, so the identifier is a credential, not a derivable slug.
 3. Apply same quality thresholds as crawler.
 4. Insert candidate into `company_ats` on successful probe.
 5. Update `companies.ats_guess_last_checked_at`.

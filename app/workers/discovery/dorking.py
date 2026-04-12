@@ -23,7 +23,7 @@ def _extract_slug_from_url(url: str, provider: str) -> str | None:
         if not hostname:
             return None
 
-        if provider in ["personio", "recruitee"]:
+        if provider in ["personio", "recruitee", "traffit"]:
             # Subdomain-based slug: e.g., https://slug.jobs.personio.com
             match = re.match(r"([^.]+)\.", hostname)
             if match:
