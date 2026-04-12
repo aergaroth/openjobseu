@@ -5,6 +5,13 @@
 
 ### Features
 
+* add Traffit ATS adapter and update documentation for ATS support ([ea1a698](https://github.com/aergaroth/openjobseu/commit/ea1a698d8cf90686afa12f40f9918765bd547d8a))
+
+## [2.35.0](https://github.com/aergaroth/openjobseu/compare/v2.34.0...v2.35.0) (2026-04-12)
+
+
+### Features
+
 * add Traffit ATS adapter (public published job posts API) and discovery support
 
 ## [2.34.0](https://github.com/aergaroth/openjobseu/compare/v2.33.0...v2.34.0) (2026-04-11)
