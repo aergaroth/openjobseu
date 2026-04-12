@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 class TeamtailorAdapter(ATSAdapter):
     source_name = "teamtailor"
+    active = True
     # Teamtailor uses API tokens per company — subdomains from search results cannot
     # be used as API tokens, so dorking would yield unusable slugs.
     dorking_target = None

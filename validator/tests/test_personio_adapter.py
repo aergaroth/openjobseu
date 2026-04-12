@@ -75,27 +75,19 @@ def test_personio_fetch_invalid_xml(monkeypatch):
 
 def test_personio_normalize_deduces_remote_flag_correctly():
     adapter = PersonioAdapter()
+    job_remote_title = adapter.normalize({"id": "1", "_ats_slug": "a", "name": "Remote Engineer", "office": "Berlin"})
+    assert job_remote_title is not None
 
-    assert (
-        adapter.normalize({"id": "1", "_ats_slug": "a", "name": "Remote Engineer", "office": "Berlin"})[
-            "remote_source_flag"
-        ]
-        is False
-    )
-    assert (
-        adapter.normalize({"id": "2", "_ats_slug": "a", "name": "Engineer", "office": "Remote"})["remote_source_flag"]
-        is True
-    )
-    assert (
-        adapter.normalize({"id": "3", "_ats_slug": "a", "name": "Engineer", "office": "EU Remote"})[
-            "remote_source_flag"
-        ]
-        is True
-    )
-    assert (
-        adapter.normalize({"id": "3", "_ats_slug": "a", "name": "Engineer", "office": "Berlin"})["remote_source_flag"]
-        is False
-    )
+    assert job_remote_title["remote_source_flag"] is False
+    job_remote_office = adapter.normalize({"id": "2", "_ats_slug": "a", "name": "Engineer", "office": "Remote"})
+    assert job_remote_office is not None
+    assert job_remote_office["remote_source_flag"] is True
+    job_eu_remote = adapter.normalize({"id": "3", "_ats_slug": "a", "name": "Engineer", "office": "EU Remote"})
+    assert job_eu_remote is not None
+    assert job_eu_remote["remote_source_flag"] is True
+    job_berlin = adapter.normalize({"id": "3", "_ats_slug": "a", "name": "Engineer", "office": "Berlin"})
+    assert job_berlin is not None
+    assert job_berlin["remote_source_flag"] is False
 
 
 def test_personio_probe_jobs_success(monkeypatch):
@@ -121,4 +113,8 @@ def test_personio_probe_jobs_success(monkeypatch):
 def test_personio_probe_jobs_empty(monkeypatch):
     adapter = PersonioAdapter()
     monkeypatch.setattr(adapter, "fetch", lambda company, **kw: [])
-    assert adapter.probe_jobs("test") is None
+    assert adapter.probe_jobs("test") == {
+        "jobs_total": 0,
+        "remote_hits": 0,
+        "recent_job_at": None,
+    }

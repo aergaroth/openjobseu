@@ -1,6 +1,6 @@
 import logging
 import xml.etree.ElementTree as ET
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterator, List, cast
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 class PersonioAdapter(ATSAdapter):
     dorking_target = "jobs.personio.com"
     source_name = "personio"
+    active = True
 
     def fetch(self, company: Dict, updated_since: Any = None) -> List[Dict]:
         slug = str(company.get("ats_slug") or "").strip()
@@ -36,7 +37,8 @@ class PersonioAdapter(ATSAdapter):
                 # Na bieżąco karmimy parser paczkami z sieci
                 parser.feed(chunk)
 
-                for event, elem in parser.read_events():
+                events = cast(Iterator[tuple[str, ET.Element]], parser.read_events())
+                for _, elem in events:
                     if elem.tag == "position":
                         desc_texts = []
                         for desc_node in elem.findall(".//jobDescription"):
@@ -108,10 +110,14 @@ class PersonioAdapter(ATSAdapter):
             "department": raw_job.get("department", ""),
         }
 
-    def probe_jobs(self, slug: str) -> Dict | None:
+    def probe_jobs(self, slug: str) -> Dict[str, Any]:
         jobs = self.fetch(company={"ats_slug": slug})
         if not jobs:
-            return None
+            return {
+                "jobs_total": 0,
+                "remote_hits": 0,
+                "recent_job_at": None,
+            }
 
         remote_hits = sum(
             1

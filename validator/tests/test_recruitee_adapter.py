@@ -56,7 +56,11 @@ def test_recruitee_probe_jobs(monkeypatch):
 def test_recruitee_probe_jobs_empty(monkeypatch):
     adapter = RecruiteeAdapter()
     monkeypatch.setattr(adapter, "fetch", lambda company, **kw: [])
-    assert adapter.probe_jobs("test") is None
+    assert adapter.probe_jobs("test") == {
+        "jobs_total": 0,
+        "remote_hits": 0,
+        "recent_job_at": None,
+    }
 
 
 def test_recruitee_fetch_missing_slug():
@@ -86,6 +90,7 @@ def test_recruitee_normalize_success():
         "company_name": "Test Co Explicit",
     }
     job = adapter.normalize(raw_job)
+    assert job is not None
     assert job["job_id"] == "recruitee:test-co:123"
     assert job["company_name"] == "Test Co Explicit"
     assert job["remote_source_flag"] is True
@@ -95,4 +100,6 @@ def test_recruitee_normalize_success():
 
 def test_recruitee_normalize_fallback_company_name():
     adapter = RecruiteeAdapter()
-    assert adapter.normalize({"_ats_slug": "acme-inc", "id": 456})["company_name"] == "Acme Inc"
+    job = adapter.normalize({"_ats_slug": "acme-inc", "id": 456})
+    assert job is not None
+    assert job["company_name"] == "Acme Inc"
