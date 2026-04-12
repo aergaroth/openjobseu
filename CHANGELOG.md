@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.36.0](https://github.com/aergaroth/openjobseu/compare/v2.35.0...v2.36.0) (2026-04-12)
+
+
+### Features
+
+* **jobs_repository:** add deduplication for job fingerprints during bulk upsert ([d2e92ef](https://github.com/aergaroth/openjobseu/commit/d2e92ef7ee255c1afda42eeb79692e448d0a98f5))
+
+
+### Bug Fixes
+
+* **careers_crawler:** validate URLs to exclude local addresses ([d2e92ef](https://github.com/aergaroth/openjobseu/commit/d2e92ef7ee255c1afda42eeb79692e448d0a98f5))
+
 ## [2.35.0](https://github.com/aergaroth/openjobseu/compare/v2.34.0...v2.35.0) (2026-04-12)
 
 
