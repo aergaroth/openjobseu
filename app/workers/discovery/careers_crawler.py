@@ -116,11 +116,15 @@ def _fetch_careers_page(url: str) -> tuple[requests.Response | None, str | None]
     if not url or not url.startswith(("http://", "https://")):
         return None, "invalid_url"
 
+    parsed_url = urlparse(url)
+    host = (parsed_url.hostname or "").lower()
+    if host in ("localhost", "127.0.0.1", "::1") or host.startswith(("192.168.", "10.", "172.")):
+        return None, "invalid_url"
+
     start_time = time.perf_counter()
 
     # Allow bypassing TLS for specific broken domains (comma-separated list)
     bypass_domains = [d.strip() for d in os.getenv("DISCOVERY_TLS_BYPASS_DOMAINS", "").split(",") if d.strip()]
-    parsed_url = urlparse(url)
     verify_tls = parsed_url.hostname not in bypass_domains
 
     try:
