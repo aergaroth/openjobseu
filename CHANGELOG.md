@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.37.0](https://github.com/aergaroth/openjobseu/compare/v2.36.0...v2.37.0) (2026-04-12)
+
+
+### Features
+
+* add active flag and improve probe_jobs return structure for ATS adapters ([ae89b5d](https://github.com/aergaroth/openjobseu/commit/ae89b5d86a3b3d10eae3a44d00597cc2b853635d))
+
 ## [2.36.0](https://github.com/aergaroth/openjobseu/compare/v2.35.0...v2.36.0) (2026-04-12)
 
 
