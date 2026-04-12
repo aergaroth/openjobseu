@@ -719,6 +719,19 @@ def bulk_upsert_jobs(
             fingerprint_to_id.get(p["job_fingerprint"]) or source_to_id.get(src_key) or p["incoming_job_id"]
         )
 
+    # --- Phase 4b: Deduplicate within-batch fingerprint collisions ---
+    # Two source jobs with identical content (same fingerprint) that are both new (no DB match
+    # in Phase 2/3) would otherwise get different canonical_job_ids and the second INSERT would
+    # violate idx_jobs_job_fingerprint_unique. Redirect duplicates to the first winner's ID so
+    # both end up in job_sources pointing at the same canonical job row.
+    seen_fps: dict[str, str] = {}
+    for p in prepared:
+        fp = p["job_fingerprint"]
+        if fp in seen_fps:
+            p["canonical_job_id"] = seen_fps[fp]
+        else:
+            seen_fps[fp] = p["canonical_job_id"]
+
     # --- Phase 5: Batch fetch existing job states for snapshot comparison (1 query) ---
     all_canonical_ids = list({p["canonical_job_id"] for p in prepared})
     existing_jobs: dict[str, dict] = {}
