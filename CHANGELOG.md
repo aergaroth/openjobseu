@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.38.0](https://github.com/aergaroth/openjobseu/compare/v2.37.0...v2.38.0) (2026-04-13)
+
+
+### Features
+
+* add Breezy ATS adapter and integrate into discovery pipeline ([d8cccaa](https://github.com/aergaroth/openjobseu/commit/d8cccaa999809866bc7b089f355fdbf1654cbe99))
+
 ## [2.37.0](https://github.com/aergaroth/openjobseu/compare/v2.36.0...v2.37.0) (2026-04-12)
 
 
