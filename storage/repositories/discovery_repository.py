@@ -216,3 +216,29 @@ def insert_discovered_slugs(conn: Connection, slugs: list[dict]):
         ON CONFLICT (provider, slug) DO NOTHING
     """)
     conn.execute(stmt, slugs)
+
+
+def get_pending_discovered_slugs(conn: Connection, limit: int = 200) -> list[dict]:
+    """Returns pending slugs from discovered_slugs ordered by creation time."""
+    rows = (
+        conn.execute(
+            text("""
+            SELECT id, provider, slug
+            FROM discovered_slugs
+            WHERE status = 'pending'
+            ORDER BY created_at
+            LIMIT :limit
+        """),
+            {"limit": limit},
+        )
+        .mappings()
+        .all()
+    )
+    return [dict(row) for row in rows]
+
+
+def update_discovered_slug_status(conn: Connection, slug_id: int, status: str) -> None:
+    conn.execute(
+        text("UPDATE discovered_slugs SET status = :status WHERE id = :id"),
+        {"status": status, "id": slug_id},
+    )

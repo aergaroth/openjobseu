@@ -9,6 +9,9 @@ def test_discovery_pipeline_steps_configured():
         "careers",
         "ats_reverse",
         "ats_guessing",
+        "dorking",
+        "dorking_crt",
+        "promote_discovered",
     ]
 
 
