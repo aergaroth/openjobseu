@@ -29,6 +29,7 @@ PROVIDERS_TO_PROBE = [
     "recruitee",
     "smartrecruiters",
     "traffit",
+    "breezy",
 ]
 MAX_SLUG_CANDIDATES = 30
 
