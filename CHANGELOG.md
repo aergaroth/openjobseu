@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.39.0](https://github.com/aergaroth/openjobseu/compare/v2.38.0...v2.39.0) (2026-04-14)
+
+
+### Features
+
+* enhance discovery and testing capabilities ([dc66e7e](https://github.com/aergaroth/openjobseu/commit/dc66e7ea9bea36f4ee6e9068b8080260af9d4215))
+
 ## [2.38.0](https://github.com/aergaroth/openjobseu/compare/v2.37.0...v2.38.0) (2026-04-13)
 
 
