@@ -94,7 +94,7 @@ class BreezyAdapter(ATSAdapter):
         dept_obj = raw_job.get("department") or {}
         department = (dept_obj.get("name") or "").strip() or None
 
-        company_name = str(slug).replace("-", " ").replace("_", " ").strip().title()
+        company_name = self._extract_company_name_from_job(raw_job) or str(slug).replace("-", " ").replace("_", " ").strip().title()
 
         return {
             "job_id": f"breezy:{slug}:{job_id}",
@@ -120,11 +120,13 @@ class BreezyAdapter(ATSAdapter):
 
         dates = [str(j["published_date"]) for j in jobs if isinstance(j, dict) and j.get("published_date")]
         recent_at = max(dates) if dates else None
+        company_name = self._extract_company_name(jobs) or str(slug).replace("-", " ").replace("_", " ").strip().title()
 
         return {
             "jobs_total": len(jobs),
             "remote_hits": sum(1 for j in jobs if self._probe_job_remote(j)),
             "recent_job_at": recent_at,
+            "company_name": company_name,
         }
 
     def _probe_job_remote(self, raw_job: dict) -> bool:
@@ -140,6 +142,30 @@ class BreezyAdapter(ATSAdapter):
             extra_text=tag_text,
             is_probe=True,
         )
+
+    @staticmethod
+    def _extract_company_name_from_job(raw_job: dict) -> str:
+        if not isinstance(raw_job, dict):
+            return ""
+        company = raw_job.get("company") or {}
+        owner = raw_job.get("owner") or {}
+        candidates = [
+            raw_job.get("company_name"),
+            company.get("name") if isinstance(company, dict) else None,
+            owner.get("name") if isinstance(owner, dict) else None,
+        ]
+        for value in candidates:
+            text = str(value or "").strip()
+            if text:
+                return text
+        return ""
+
+    def _extract_company_name(self, jobs: list[dict]) -> str:
+        for job in jobs:
+            name = self._extract_company_name_from_job(job)
+            if name:
+                return name
+        return ""
 
 
 register(BreezyAdapter.source_name, BreezyAdapter)

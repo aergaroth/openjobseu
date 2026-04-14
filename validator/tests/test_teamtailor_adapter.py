@@ -31,6 +31,7 @@ def _make_job(
     dept_id="99",
     loc_ids=None,
     with_salary=True,
+    company_name=None,
 ):
     loc_ids = loc_ids or ["77"]
     attrs = {
@@ -50,6 +51,8 @@ def _make_job(
                 "salary-time-unit": "yearly",
             }
         )
+    if company_name:
+        attrs["company-name"] = company_name
     return {
         "id": job_id,
         "type": "jobs",
@@ -228,7 +231,10 @@ def test_teamtailor_probe_invalid_payload(monkeypatch):
 def test_teamtailor_probe_success(monkeypatch):
     adapter = TeamtailorAdapter()
     payload = _make_response(
-        [_make_job("1", remote_status="full"), _make_job("2", remote_status="none")],
+        [
+            _make_job("1", remote_status="full", company_name="Teamtailor Example AB"),
+            _make_job("2", remote_status="none"),
+        ],
         [INCLUDED_DEPT, INCLUDED_LOC],
         record_count=5,
     )
@@ -239,6 +245,7 @@ def test_teamtailor_probe_success(monkeypatch):
     assert result["jobs_total"] == 5
     assert result["remote_hits"] == 1
     assert result["recent_job_at"] is not None
+    assert result["company_name"] == "Teamtailor Example AB"
 
 
 def test_teamtailor_probe_empty_result(monkeypatch):

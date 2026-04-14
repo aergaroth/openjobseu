@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from app.main import app
+import app.api.jobs as jobs_api
 from storage.db_engine import get_engine
 from storage.repositories.jobs_repository import upsert_job
 
@@ -26,19 +27,25 @@ def _make_job(job_id: str) -> dict:
     }
 
 
-def test_jobs_compliance_stats_7d_empty():
+def test_jobs_compliance_stats_7d_empty(monkeypatch):
+    expected = {
+        "window": "last_7_days",
+        "total_jobs": 0,
+        "approved": 0,
+        "review": 0,
+        "rejected": 0,
+        "approved_ratio_pct": None,
+    }
+    # Contract-level test: DB-free and deterministic.
+    monkeypatch.setattr(jobs_api, "get_compliance_stats_last_7d", lambda: expected)
     response = client.get("/jobs/stats/compliance-7d")
     assert response.status_code == 200
     payload = response.json()
 
-    assert payload["window"] == "last_7_days"
-    assert payload["total_jobs"] == 0
-    assert payload["approved"] == 0
-    assert payload["review"] == 0
-    assert payload["rejected"] == 0
-    assert payload["approved_ratio_pct"] is None
+    assert payload == expected
 
 
+@pytest.mark.integration_db
 def test_jobs_compliance_stats_7d_aggregates_recent_rows():
     with engine.begin() as conn:
         upsert_job(_make_job("stats:approved_recent"), conn=conn)

@@ -14,6 +14,7 @@ from app.workers.discovery.company_sources import run_company_source_discovery
 from app.workers.discovery.ats_reverse import run_ats_reverse_discovery
 from app.workers.discovery.dorking import run_dorking_discovery
 from app.workers.discovery.dorking_crt import run_dorking_crt_discovery
+from app.workers.discovery.slug_harvest import run_slug_harvest
 from app.workers.discovery.promote_discovered_slugs import run_promote_discovered_slugs
 from app.utils.pipeline_runner import run_pipeline_steps
 
@@ -26,6 +27,7 @@ PIPELINE_STEPS = [
     ("ats_guessing", run_ats_guessing),
     ("dorking", run_dorking_discovery),
     ("dorking_crt", run_dorking_crt_discovery),
+    ("slug_harvest", run_slug_harvest),
     ("promote_discovered", run_promote_discovered_slugs),
 ]
 

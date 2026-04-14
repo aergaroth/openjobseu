@@ -1,6 +1,9 @@
+import pytest
 import uuid
 from sqlalchemy import text
 from storage.repositories.jobs_repository import get_jobs, get_jobs_paginated, upsert_job
+
+pytestmark = pytest.mark.integration_db
 
 
 def test_upsert_job_extracts_and_normalizes_salary_to_eur(db_factory):

@@ -218,6 +218,23 @@ def insert_discovered_slugs(conn: Connection, slugs: list[dict]):
     conn.execute(stmt, slugs)
 
 
+def insert_discovered_slug(conn: Connection, *, provider: str, slug: str, discovery_source: str) -> int | None:
+    """
+    Inserts a single discovered slug and returns its id when inserted.
+    Useful when the caller needs to immediately update status (e.g. needs_token).
+    """
+    row = conn.execute(
+        text("""
+            INSERT INTO discovered_slugs (provider, slug, discovery_source)
+            VALUES (:provider, :slug, :discovery_source)
+            ON CONFLICT (provider, slug) DO NOTHING
+            RETURNING id
+        """),
+        {"provider": provider, "slug": slug, "discovery_source": discovery_source},
+    ).fetchone()
+    return int(row[0]) if row else None
+
+
 def get_pending_discovered_slugs(conn: Connection, limit: int = 200) -> list[dict]:
     """Returns pending slugs from discovered_slugs ordered by creation time."""
     rows = (
@@ -230,6 +247,41 @@ def get_pending_discovered_slugs(conn: Connection, limit: int = 200) -> list[dic
             LIMIT :limit
         """),
             {"limit": limit},
+        )
+        .mappings()
+        .all()
+    )
+    return [dict(row) for row in rows]
+
+
+def get_discovered_slugs(
+    conn: Connection,
+    *,
+    provider: str | None = None,
+    status: str | None = None,
+    limit: int = 100,
+) -> list[dict]:
+    clauses: list[str] = []
+    params: dict[str, object] = {"limit": int(limit)}
+
+    if provider:
+        clauses.append("provider = :provider")
+        params["provider"] = provider
+    if status:
+        clauses.append("status = :status")
+        params["status"] = status
+
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    rows = (
+        conn.execute(
+            text(f"""
+            SELECT id, provider, slug, discovery_source, status, created_at
+            FROM discovered_slugs
+            {where_sql}
+            ORDER BY created_at DESC
+            LIMIT :limit
+        """),
+            params,
         )
         .mappings()
         .all()

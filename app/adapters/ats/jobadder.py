@@ -100,8 +100,9 @@ class JobAdderAdapter(ATSAdapter):
         updated_at = normalize_source_datetime(raw_job.get("updatedAt") or raw_job.get("postedAt"))
         first_seen_at = updated_at or datetime.now(timezone.utc).isoformat()
 
-        advertiser = raw_job.get("advertiser") or {}
-        company_name = advertiser.get("name") or (board_id.replace("-", " ").replace("_", " ").strip().title())
+        company_name = self._extract_company_name_from_job(raw_job) or (
+            board_id.replace("-", " ").replace("_", " ").strip().title()
+        )
 
         # Build description: full description first, then summary as fallback section
         description = self.build_description(
@@ -183,6 +184,7 @@ class JobAdderAdapter(ATSAdapter):
         jobs_total: int = data.get("total", len(jobs))
         remote_hits = 0
         recent_job_at: datetime | None = None
+        company_name = self._extract_company_name(jobs) or board_id.replace("-", " ").replace("_", " ").strip().title()
 
         for job in jobs:
             if not isinstance(job, dict):
@@ -208,7 +210,31 @@ class JobAdderAdapter(ATSAdapter):
             "jobs_total": jobs_total,
             "recent_job_at": recent_job_at,
             "remote_hits": remote_hits,
+            "company_name": company_name,
         }
+
+    @staticmethod
+    def _extract_company_name_from_job(raw_job: dict) -> str:
+        if not isinstance(raw_job, dict):
+            return ""
+        advertiser = raw_job.get("advertiser") or {}
+        candidates = [
+            advertiser.get("name") if isinstance(advertiser, dict) else None,
+            raw_job.get("company"),
+            raw_job.get("companyName"),
+        ]
+        for value in candidates:
+            text = str(value or "").strip()
+            if text:
+                return text
+        return ""
+
+    def _extract_company_name(self, jobs: list[dict]) -> str:
+        for job in jobs:
+            name = self._extract_company_name_from_job(job)
+            if name:
+                return name
+        return ""
 
 
 register(JobAdderAdapter.source_name, JobAdderAdapter)
