@@ -94,7 +94,10 @@ class BreezyAdapter(ATSAdapter):
         dept_obj = raw_job.get("department") or {}
         department = (dept_obj.get("name") or "").strip() or None
 
-        company_name = self._extract_company_name_from_job(raw_job) or str(slug).replace("-", " ").replace("_", " ").strip().title()
+        company_name = (
+            self._extract_company_name_from_job(raw_job)
+            or str(slug).replace("-", " ").replace("_", " ").strip().title()
+        )
 
         return {
             "job_id": f"breezy:{slug}:{job_id}",

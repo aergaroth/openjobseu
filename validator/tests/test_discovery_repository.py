@@ -177,7 +177,11 @@ def test_insert_single_discovered_slug_returns_id_and_can_update_status():
         assert inserted_id is not None
 
         update_discovered_slug_status(conn, inserted_id, "needs_token")
-        row = conn.execute(text("SELECT status FROM discovered_slugs WHERE id = :id"), {"id": inserted_id}).mappings().one()
+        row = (
+            conn.execute(text("SELECT status FROM discovered_slugs WHERE id = :id"), {"id": inserted_id})
+            .mappings()
+            .one()
+        )
         assert row["status"] == "needs_token"
 
 

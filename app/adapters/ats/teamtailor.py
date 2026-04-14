@@ -166,7 +166,9 @@ class TeamtailorAdapter(ATSAdapter):
         # --- Dates ---
         first_seen_at = normalize_source_datetime(attrs.get("created-at")) or datetime.now(timezone.utc).isoformat()
 
-        company_name = self._extract_company_name_from_job(raw_job) or slug.replace("-", " ").replace("_", " ").strip().title()
+        company_name = (
+            self._extract_company_name_from_job(raw_job) or slug.replace("-", " ").replace("_", " ").strip().title()
+        )
 
         return {
             "job_id": f"teamtailor:{slug}:{job_id}",
@@ -212,7 +214,9 @@ class TeamtailorAdapter(ATSAdapter):
         jobs_total: int = (data.get("meta") or {}).get("record-count", len(job_items))
         remote_hits = 0
         recent_job_at: datetime | None = None
-        company_name = self._extract_company_name(job_items, included) or token.replace("-", " ").replace("_", " ").strip().title()
+        company_name = (
+            self._extract_company_name(job_items, included) or token.replace("-", " ").replace("_", " ").strip().title()
+        )
 
         for job in job_items:
             if not isinstance(job, dict):

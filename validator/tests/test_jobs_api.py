@@ -10,9 +10,33 @@ client = TestClient(app)
 
 def test_list_jobs_with_q_parameter_searches_title_and_company(monkeypatch):
     expected_items = [
-        {"job_id": "job1", "source": "s", "source_url": "u", "title": "Senior Backend Engineer", "company_name": "Acme", "status": "active", "first_seen_at": "2026-01-01T00:00:00+00:00"},
-        {"job_id": "job2", "source": "s", "source_url": "u", "title": "Frontend Developer", "company_name": "Engineer Corp", "status": "active", "first_seen_at": "2026-01-01T00:00:00+00:00"},
-        {"job_id": "job4", "source": "s", "source_url": "u", "title": "Backend Engineer", "company_name": "Acme", "status": "active", "first_seen_at": "2026-01-01T00:00:00+00:00"},
+        {
+            "job_id": "job1",
+            "source": "s",
+            "source_url": "u",
+            "title": "Senior Backend Engineer",
+            "company_name": "Acme",
+            "status": "active",
+            "first_seen_at": "2026-01-01T00:00:00+00:00",
+        },
+        {
+            "job_id": "job2",
+            "source": "s",
+            "source_url": "u",
+            "title": "Frontend Developer",
+            "company_name": "Engineer Corp",
+            "status": "active",
+            "first_seen_at": "2026-01-01T00:00:00+00:00",
+        },
+        {
+            "job_id": "job4",
+            "source": "s",
+            "source_url": "u",
+            "title": "Backend Engineer",
+            "company_name": "Acme",
+            "status": "active",
+            "first_seen_at": "2026-01-01T00:00:00+00:00",
+        },
     ]
     monkeypatch.setattr(jobs_api, "get_jobs_paginated", lambda **kwargs: (expected_items, 3))
 
@@ -42,7 +66,15 @@ def test_list_jobs_with_q_parameter_empty_result(monkeypatch):
 
 def test_list_jobs_with_q_and_other_filters(monkeypatch):
     expected_items = [
-        {"job_id": "job6", "source": "s", "source_url": "u", "title": "DevOps Engineer", "company_name": "Acme", "status": "active", "first_seen_at": "2026-01-01T00:00:00+00:00"},
+        {
+            "job_id": "job6",
+            "source": "s",
+            "source_url": "u",
+            "title": "DevOps Engineer",
+            "company_name": "Acme",
+            "status": "active",
+            "first_seen_at": "2026-01-01T00:00:00+00:00",
+        },
     ]
     monkeypatch.setattr(jobs_api, "get_jobs_paginated", lambda **kwargs: (expected_items, 1))
 
@@ -67,8 +99,24 @@ def test_list_jobs_with_q_parameter_ignores_description_text(monkeypatch):
 
 def test_list_jobs_pagination_structure(monkeypatch):
     expected_items = [
-        {"job_id": "job_page_2", "source": "s", "source_url": "u", "title": "Frontend", "company_name": "Acme", "status": "active", "first_seen_at": "2026-01-01T00:00:00+00:00"},
-        {"job_id": "job_page_3", "source": "s", "source_url": "u", "title": "DevOps", "company_name": "Acme", "status": "active", "first_seen_at": "2026-01-01T00:00:00+00:00"},
+        {
+            "job_id": "job_page_2",
+            "source": "s",
+            "source_url": "u",
+            "title": "Frontend",
+            "company_name": "Acme",
+            "status": "active",
+            "first_seen_at": "2026-01-01T00:00:00+00:00",
+        },
+        {
+            "job_id": "job_page_3",
+            "source": "s",
+            "source_url": "u",
+            "title": "DevOps",
+            "company_name": "Acme",
+            "status": "active",
+            "first_seen_at": "2026-01-01T00:00:00+00:00",
+        },
     ]
     monkeypatch.setattr(jobs_api, "get_jobs_paginated", lambda **kwargs: (expected_items, 3))
 
