@@ -75,6 +75,13 @@ Non-goals remain unchanged:
 - [x] Add scheduler/tick failure alerting
 - [x] Add trend dashboards for per-source quality drift and rejection reasons
 
+### P5 – Discovery maturity
+- [x] Multi-stage ATS discovery pipeline (`company-sources`, `careers`, `ats-reverse`, `guess`, `dorking`, `dorking-crt`, `slug_harvest`, promotion)
+- [x] Introduce `discovered_slugs` as a staging layer before promotion to `company_ats`
+- [x] Add `slug_harvest` worker with robots-aware shallow crawl and confidence-based slug extraction
+- [x] Teamtailor discovery candidate flow with `needs_token` status (manual token binding instead of false auto-promotion)
+- [x] Internal discovery UI endpoint for slug candidates (`/internal/discovery/slug-candidates`)
+
 ---
 
 ## Future Direction
