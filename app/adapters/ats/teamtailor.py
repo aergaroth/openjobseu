@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, Dict
 import logging
+from urllib.parse import urlparse
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
@@ -165,7 +166,7 @@ class TeamtailorAdapter(ATSAdapter):
         # --- Dates ---
         first_seen_at = normalize_source_datetime(attrs.get("created-at")) or datetime.now(timezone.utc).isoformat()
 
-        company_name = slug.replace("-", " ").replace("_", " ").strip().title()
+        company_name = self._extract_company_name_from_job(raw_job) or slug.replace("-", " ").replace("_", " ").strip().title()
 
         return {
             "job_id": f"teamtailor:{slug}:{job_id}",
@@ -211,6 +212,7 @@ class TeamtailorAdapter(ATSAdapter):
         jobs_total: int = (data.get("meta") or {}).get("record-count", len(job_items))
         remote_hits = 0
         recent_job_at: datetime | None = None
+        company_name = self._extract_company_name(job_items, included) or token.replace("-", " ").replace("_", " ").strip().title()
 
         for job in job_items:
             if not isinstance(job, dict):
@@ -246,7 +248,52 @@ class TeamtailorAdapter(ATSAdapter):
             "jobs_total": jobs_total,
             "recent_job_at": recent_job_at,
             "remote_hits": remote_hits,
+            "company_name": company_name,
         }
+
+    @staticmethod
+    def _company_from_link(url: str | None) -> str:
+        parsed = urlparse(str(url or "").strip())
+        host = (parsed.hostname or "").strip().lower()
+        if not host:
+            return ""
+        parts = [part for part in host.split(".") if part and part not in {"www", "jobs", "careers", "career"}]
+        if not parts:
+            return ""
+        return parts[0].replace("-", " ").replace("_", " ").strip().title()
+
+    @classmethod
+    def _extract_company_name_from_job(cls, raw_job: dict) -> str:
+        if not isinstance(raw_job, dict):
+            return ""
+        attrs = raw_job.get("attributes") or {}
+        links = raw_job.get("links") or {}
+        candidates = [
+            attrs.get("company-name") if isinstance(attrs, dict) else None,
+            attrs.get("company") if isinstance(attrs, dict) else None,
+            cls._company_from_link(links.get("careersite-company-url") if isinstance(links, dict) else None),
+        ]
+        for value in candidates:
+            text = str(value or "").strip()
+            if text:
+                return text
+        return ""
+
+    @classmethod
+    def _extract_company_name(cls, jobs: list[dict], included: dict) -> str:
+        for job in jobs:
+            name = cls._extract_company_name_from_job(job)
+            if name:
+                return name
+        for item in (included or {}).values():
+            if not isinstance(item, dict):
+                continue
+            attrs = item.get("attributes") or {}
+            for key in ("name", "company-name", "company"):
+                candidate = str(attrs.get(key) or "").strip()
+                if candidate:
+                    return candidate
+        return ""
 
 
 register(TeamtailorAdapter.source_name, TeamtailorAdapter)

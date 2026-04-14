@@ -167,7 +167,7 @@ class TraffitAdapter(ATSAdapter):
         department = options.get("branches")
         department_str = str(department).strip() if department else None
 
-        company_name = str(slug).replace("-", " ").replace("_", " ").strip().title()
+        company_name = self._extract_company_name_from_job(raw_job) or str(slug).replace("-", " ").replace("_", " ").strip().title()
 
         return {
             "job_id": f"traffit:{slug}:{job_id}",
@@ -194,11 +194,13 @@ class TraffitAdapter(ATSAdapter):
         # API order is not guaranteed; use the latest valid_start for discovery freshness checks.
         starts = [str(j["valid_start"]) for j in jobs if isinstance(j, dict) and j.get("valid_start")]
         recent_at = max(starts) if starts else None
+        company_name = self._extract_company_name(jobs) or str(slug).replace("-", " ").replace("_", " ").strip().title()
 
         return {
             "jobs_total": len(jobs),
             "remote_hits": sum(1 for j in jobs if isinstance(j, dict) and self._probe_job_remote(j)),
             "recent_job_at": recent_at,
+            "company_name": company_name,
         }
 
     def _probe_job_remote(self, raw_job: dict) -> bool:
@@ -222,6 +224,33 @@ class TraffitAdapter(ATSAdapter):
             extra_text=extra_text,
             is_probe=True,
         )
+
+    @staticmethod
+    def _extract_company_name_from_job(raw_job: dict) -> str:
+        if not isinstance(raw_job, dict):
+            return ""
+        options = raw_job.get("options") or {}
+        advert = raw_job.get("advert") or {}
+        candidates = [
+            raw_job.get("company_name"),
+            raw_job.get("company"),
+            options.get("company_name") if isinstance(options, dict) else None,
+            options.get("company") if isinstance(options, dict) else None,
+            advert.get("company_name") if isinstance(advert, dict) else None,
+            advert.get("company") if isinstance(advert, dict) else None,
+        ]
+        for value in candidates:
+            text = str(value or "").strip()
+            if text:
+                return text
+        return ""
+
+    def _extract_company_name(self, jobs: list[dict]) -> str:
+        for job in jobs:
+            name = self._extract_company_name_from_job(job)
+            if name:
+                return name
+        return ""
 
 
 register(TraffitAdapter.source_name, TraffitAdapter)

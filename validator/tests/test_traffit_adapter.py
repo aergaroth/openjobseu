@@ -63,7 +63,7 @@ def test_traffit_probe_jobs(monkeypatch):
             {
                 "id": 1,
                 "valid_start": "2023-01-01 00:00:00",
-                "advert": {"name": "Dev", "values": []},
+                "advert": {"name": "Dev", "values": [], "company_name": "Acme Sp. z o.o."},
                 "options": {"remote": "1"},
             }
         ],
@@ -72,6 +72,7 @@ def test_traffit_probe_jobs(monkeypatch):
     assert res["jobs_total"] == 1
     assert res["remote_hits"] == 1
     assert res["recent_job_at"] == "2023-01-01 00:00:00"
+    assert res["company_name"] == "Acme Sp. z o.o."
 
 
 def test_traffit_probe_jobs_empty_slug():

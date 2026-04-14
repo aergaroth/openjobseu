@@ -19,6 +19,16 @@ QUALITY_MIN_JOBS = 1
 QUALITY_MAX_AGE_DAYS = 120
 
 
+def _fallback_company_name(slug: str) -> str:
+    return str(slug or "").replace("-", " ").replace("_", " ").strip().title()
+
+
+def _resolve_company_name(probe_result: dict, slug: str) -> str:
+    raw_name = probe_result.get("company_name") if isinstance(probe_result, dict) else None
+    name = str(raw_name or "").strip()
+    return name or _fallback_company_name(slug)
+
+
 def _is_recent(recent_job_at: object) -> bool:
     if not recent_job_at:
         return True
@@ -56,6 +66,13 @@ def run_promote_discovered_slugs() -> dict[str, int]:
         metrics["slugs_processed"] += 1
 
         try:
+            # Teamtailor tokens cannot be inferred from discovered public URLs.
+            # Candidates are tracked separately with status=needs_token.
+            if provider == "teamtailor":
+                with engine.begin() as conn:
+                    update_discovered_slug_status(conn, slug_id, "needs_token")
+                continue
+
             probe_result = probe_ats(provider, slug)
             if not probe_result:
                 with engine.begin() as conn:
@@ -77,7 +94,8 @@ def run_promote_discovered_slugs() -> dict[str, int]:
                 continue
 
             with engine.begin() as conn:
-                company_id = get_or_create_placeholder_company(conn, slug.capitalize())
+                company_name = _resolve_company_name(probe_result, slug)
+                company_id = get_or_create_placeholder_company(conn, company_name)
                 inserted = insert_discovered_company_ats(
                     conn,
                     company_id=company_id,

@@ -276,6 +276,7 @@ def test_jobadder_probe_success(monkeypatch):
                 "title": "Remote Python Dev",
                 "categories": {"location": "Europe", "locationType": "remote"},
                 "updatedAt": "2024-03-01T00:00:00Z",
+                "advertiser": {"name": "Remote First Ltd"},
             },
             {
                 "title": "Onsite Engineer",
@@ -292,6 +293,7 @@ def test_jobadder_probe_success(monkeypatch):
     assert result["jobs_total"] == 42
     assert result["remote_hits"] == 1
     assert result["recent_job_at"] is not None
+    assert result["company_name"] == "Remote First Ltd"
 
 
 def test_jobadder_probe_total_falls_back_to_items_count(monkeypatch):

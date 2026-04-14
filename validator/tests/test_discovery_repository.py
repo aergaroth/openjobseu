@@ -4,13 +4,16 @@ from sqlalchemy import text
 from storage.db_engine import get_engine
 from storage.repositories.discovery_repository import (
     check_ats_exists,
+    get_discovered_slugs,
     get_existing_brand_names,
     get_or_create_placeholder_company,
+    insert_discovered_slug,
     insert_discovered_company_ats,
     insert_discovered_slugs,
     insert_source_company,
     load_discovery_companies,
     update_discovery_last_checked_at,
+    update_discovered_slug_status,
 )
 
 engine = get_engine()
@@ -158,3 +161,37 @@ def test_insert_discovered_slugs_empty_list():
     with engine.begin() as conn:
         # Pusta tablica nie powinna wykrzaczyć składni SQLAlchemy
         insert_discovered_slugs(conn, [])
+
+
+def test_insert_single_discovered_slug_returns_id_and_can_update_status():
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM discovered_slugs;"))
+        inserted_id = insert_discovered_slug(
+            conn,
+            provider="teamtailor",
+            slug="career",
+            discovery_source="slug_harvest",
+        )
+        assert inserted_id is not None
+
+        update_discovered_slug_status(conn, inserted_id, "needs_token")
+        row = conn.execute(text("SELECT status FROM discovered_slugs WHERE id = :id"), {"id": inserted_id}).mappings().one()
+        assert row["status"] == "needs_token"
+
+
+def test_get_discovered_slugs_filters_by_provider_and_status():
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM discovered_slugs;"))
+        conn.execute(
+            text("""
+                INSERT INTO discovered_slugs (provider, slug, discovery_source, status)
+                VALUES
+                    ('teamtailor', 'career', 'slug_harvest', 'needs_token'),
+                    ('traffit', 'acme-hr', 'slug_harvest', 'pending')
+            """)
+        )
+
+        teamtailor_rows = get_discovered_slugs(conn, provider="teamtailor", status="needs_token", limit=50)
+        assert len(teamtailor_rows) == 1
+        assert teamtailor_rows[0]["provider"] == "teamtailor"
+        assert teamtailor_rows[0]["status"] == "needs_token"

@@ -11,6 +11,7 @@ def test_discovery_pipeline_steps_configured():
         "ats_guessing",
         "dorking",
         "dorking_crt",
+        "slug_harvest",
         "promote_discovered",
     ]
 

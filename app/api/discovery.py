@@ -3,9 +3,11 @@ from pydantic import BaseModel, ConfigDict
 from typing import Any
 from fastapi import APIRouter, Query
 
+from storage.db_engine import get_engine
 from storage.repositories.discovery_repository import (
     get_discovered_company_ats,
     get_discovery_candidates,
+    get_discovered_slugs,
 )
 from app.workers.discovery.ats_guessing import run_ats_guessing
 from app.workers.discovery.careers_crawler import run_careers_discovery
@@ -53,6 +55,17 @@ def discovery_candidates(
     q: str | None = Query(None, description="Fuzzy search across company names"),
 ):
     results = get_discovery_candidates(q=q, limit=50)
+    return {"count": len(results), "results": results}
+
+
+@discovery_ui_router.get("/slug-candidates", response_model=DiscoveryListResponse)
+def discovery_slug_candidates(
+    provider: str | None = Query(None, description="Filter by ATS provider, e.g. teamtailor"),
+    status: str | None = Query("needs_token", description="Filter by discovered slug status"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of rows to return"),
+):
+    with get_engine().connect() as conn:
+        results = get_discovered_slugs(conn, provider=provider, status=status, limit=limit)
     return {"count": len(results), "results": results}
 
 

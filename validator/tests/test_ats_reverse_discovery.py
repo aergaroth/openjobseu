@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 from datetime import datetime, timezone, timedelta
-from app.workers.discovery.ats_reverse import _load_slugs, _is_recent
+from app.workers.discovery.ats_reverse import _load_slugs, _is_recent, _resolve_company_name
 import app.workers.discovery.ats_reverse as reverse_module
 
 
@@ -33,3 +33,11 @@ def test_is_recent():
     assert _is_recent((now - timedelta(days=10)).isoformat()) is True
     # Pół roku temu - poza limitem (False)
     assert _is_recent((now - timedelta(days=150)).isoformat()) is False
+
+
+def test_resolve_company_name_prefers_probe_value():
+    assert _resolve_company_name({"company_name": "Acme GmbH"}, "acme-group") == "Acme GmbH"
+
+
+def test_resolve_company_name_falls_back_to_slug_format():
+    assert _resolve_company_name({}, "acme-group") == "Acme Group"

@@ -97,6 +97,16 @@ PROVIDERS_TO_PROBE = [
 ]
 
 
+def _fallback_company_name(slug: str) -> str:
+    return str(slug or "").replace("-", " ").replace("_", " ").strip().title()
+
+
+def _resolve_company_name(probe_result: dict, slug: str) -> str:
+    raw_name = probe_result.get("company_name") if isinstance(probe_result, dict) else None
+    name = str(raw_name or "").strip()
+    return name or _fallback_company_name(slug)
+
+
 def _load_slugs() -> list[str]:
     """Loads slugs from an external URL if configured, falling back to POPULAR_SLUGS."""
     slugs = set(POPULAR_SLUGS)
@@ -203,7 +213,7 @@ def run_ats_reverse_discovery() -> dict[str, int]:
                         continue
 
                     with engine.begin() as conn:
-                        name = slug.capitalize()
+                        name = _resolve_company_name(probe_result, slug)
                         company_id = get_or_create_placeholder_company(conn, name)
 
                         inserted = insert_discovered_company_ats(
