@@ -237,13 +237,10 @@ def run_slug_harvest() -> dict[str, int]:
         metrics["companies_scanned"] += 1
 
         if hasattr(row, "_mapping"):
-            company_id = str(row._mapping.get("company_id") or "")
             careers_url = row._mapping.get("careers_url")
         elif hasattr(row, "get"):
-            company_id = str(row.get("company_id") or "")
             careers_url = row.get("careers_url")
         else:
-            company_id = str(getattr(row, "company_id", ""))
             careers_url = getattr(row, "careers_url", None)
 
         if not careers_url:
@@ -322,4 +319,3 @@ def run_slug_harvest() -> dict[str, int]:
     metrics["duration_ms"] = int((time.perf_counter() - started) * 1000)
     logger.info("slug_harvest_done", extra={"component": "discovery", "phase": "slug_harvest", **metrics})
     return metrics
-

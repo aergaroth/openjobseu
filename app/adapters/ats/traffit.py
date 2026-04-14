@@ -167,7 +167,10 @@ class TraffitAdapter(ATSAdapter):
         department = options.get("branches")
         department_str = str(department).strip() if department else None
 
-        company_name = self._extract_company_name_from_job(raw_job) or str(slug).replace("-", " ").replace("_", " ").strip().title()
+        company_name = (
+            self._extract_company_name_from_job(raw_job)
+            or str(slug).replace("-", " ").replace("_", " ").strip().title()
+        )
 
         return {
             "job_id": f"traffit:{slug}:{job_id}",

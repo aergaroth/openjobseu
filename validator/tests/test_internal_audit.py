@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import os
+
 # guarantee that the database mode is configured even during module import.
 os.environ.setdefault("DB_MODE", "standard")
 
@@ -119,7 +120,13 @@ def test_internal_audit_company_stats(monkeypatch):
         audit_api,
         "get_audit_company_compliance_stats",
         lambda min_total_jobs: [
-            {"legal_name": f"{marker}-high", "total_jobs": 12, "approved": 9, "rejected": 3, "approved_ratio_pct": 75.0},
+            {
+                "legal_name": f"{marker}-high",
+                "total_jobs": 12,
+                "approved": 9,
+                "rejected": 3,
+                "approved_ratio_pct": 75.0,
+            },
             {"legal_name": f"{marker}-low", "total_jobs": 12, "approved": 3, "rejected": 9, "approved_ratio_pct": 25.0},
         ],
     )
