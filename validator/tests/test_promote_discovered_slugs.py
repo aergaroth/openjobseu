@@ -33,7 +33,11 @@ def test_teamtailor_is_not_auto_promoted(monkeypatch):
             return DummyCtx()
 
     monkeypatch.setattr(mod, "get_engine", lambda: DummyEngine())
-    monkeypatch.setattr(mod, "get_pending_discovered_slugs", lambda conn: [{"id": 1, "provider": "teamtailor", "slug": "career"}])
+    monkeypatch.setattr(
+        mod,
+        "get_pending_discovered_slugs",
+        lambda conn: [{"id": 1, "provider": "teamtailor", "slug": "career"}],
+    )
 
     calls = {"probe": 0, "status": []}
 

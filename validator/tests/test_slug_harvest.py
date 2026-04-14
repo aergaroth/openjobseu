@@ -30,4 +30,3 @@ def test_score_requires_final_url_to_hit_threshold():
     assert _score_candidate(c, occurrences=1, from_final_url=False) < 2
     assert _score_candidate(c, occurrences=2, from_final_url=False) < 2
     assert _score_candidate(c, occurrences=1, from_final_url=True) >= 2
-
