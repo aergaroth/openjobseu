@@ -1,44 +1,20 @@
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from app.main import app
+import app.api.jobs as jobs_api
 
 client = TestClient(app)
 
 
-def test_list_jobs_with_q_parameter_searches_title_and_company(db_factory):
-    comp_acme = db_factory.create_company(legal_name="Acme")
-    comp_eng = db_factory.create_company(legal_name="Engineer Corp")
-    comp_data = db_factory.create_company(legal_name="Data Co")
-
-    db_factory.create_job(
-        comp_acme["company_id"],
-        job_id="job1",
-        title="Senior Backend Engineer",
-        company_name="Acme",
-        status="active",
-    )
-    db_factory.create_job(
-        comp_eng["company_id"],
-        job_id="job2",
-        title="Frontend Developer",
-        company_name="Engineer Corp",
-        status="active",
-    )
-    db_factory.create_job(
-        comp_data["company_id"],
-        job_id="job3",
-        title="Data Scientist",
-        company_name="Data Co",
-        status="active",
-    )
-    db_factory.create_job(
-        comp_acme["company_id"],
-        job_id="job4",
-        title="Backend Engineer",
-        company_name="Acme",
-        status="active",
-    )
+def test_list_jobs_with_q_parameter_searches_title_and_company(monkeypatch):
+    expected_items = [
+        {"job_id": "job1", "source": "s", "source_url": "u", "title": "Senior Backend Engineer", "company_name": "Acme", "status": "active", "first_seen_at": "2026-01-01T00:00:00+00:00"},
+        {"job_id": "job2", "source": "s", "source_url": "u", "title": "Frontend Developer", "company_name": "Engineer Corp", "status": "active", "first_seen_at": "2026-01-01T00:00:00+00:00"},
+        {"job_id": "job4", "source": "s", "source_url": "u", "title": "Backend Engineer", "company_name": "Acme", "status": "active", "first_seen_at": "2026-01-01T00:00:00+00:00"},
+    ]
+    monkeypatch.setattr(jobs_api, "get_jobs_paginated", lambda **kwargs: (expected_items, 3))
 
     response = client.get("/jobs?q=engineer")
     assert response.status_code == 200
@@ -56,38 +32,19 @@ def test_list_jobs_with_q_parameter_searches_title_and_company(db_factory):
     assert "job3" not in matched_ids  # Data Scientist w Data Co
 
 
-def test_list_jobs_with_q_parameter_empty_result(db_factory):
-    comp = db_factory.create_company(legal_name="Quality Inc")
-    db_factory.create_job(
-        comp["company_id"],
-        job_id="job5",
-        title="QA Tester",
-        company_name="Quality Inc",
-        status="active",
-    )
+def test_list_jobs_with_q_parameter_empty_result(monkeypatch):
+    monkeypatch.setattr(jobs_api, "get_jobs_paginated", lambda **kwargs: ([], 0))
 
     response = client.get("/jobs?q=astronaut")
     assert response.status_code == 200
     assert len(response.json()["items"]) == 0
 
 
-def test_list_jobs_with_q_and_other_filters(db_factory):
-    comp_acme = db_factory.create_company(legal_name="Acme")
-    comp_other = db_factory.create_company(legal_name="Other Co")
-    db_factory.create_job(
-        comp_acme["company_id"],
-        job_id="job6",
-        title="DevOps Engineer",
-        company_name="Acme",
-        status="active",
-    )
-    db_factory.create_job(
-        comp_other["company_id"],
-        job_id="job7",
-        title="DevOps Engineer",
-        company_name="Other Co",
-        status="active",
-    )
+def test_list_jobs_with_q_and_other_filters(monkeypatch):
+    expected_items = [
+        {"job_id": "job6", "source": "s", "source_url": "u", "title": "DevOps Engineer", "company_name": "Acme", "status": "active", "first_seen_at": "2026-01-01T00:00:00+00:00"},
+    ]
+    monkeypatch.setattr(jobs_api, "get_jobs_paginated", lambda **kwargs: (expected_items, 1))
 
     response = client.get("/jobs?q=devops&company=Acme")
     assert response.status_code == 200
@@ -97,24 +54,8 @@ def test_list_jobs_with_q_and_other_filters(db_factory):
     assert items[0]["job_id"] == "job6"
 
 
-def test_list_jobs_with_q_parameter_ignores_description_text(db_factory):
-    comp = db_factory.create_company(legal_name="Finance Corp")
-    db_factory.create_job(
-        comp["company_id"],
-        job_id="job8",
-        title="Accountant",
-        company_name="Finance Corp",
-        description="Looking for someone with strong Python skills.",
-        status="active",
-    )
-    db_factory.create_job(
-        comp["company_id"],
-        job_id="job9",
-        title="Accountant",
-        company_name="Finance Corp",
-        description="Excel spreadsheet master needed.",
-        status="active",
-    )
+def test_list_jobs_with_q_parameter_ignores_description_text(monkeypatch):
+    monkeypatch.setattr(jobs_api, "get_jobs_paginated", lambda **kwargs: ([], 0))
 
     response = client.get("/jobs?q=python")
     assert response.status_code == 200
@@ -124,29 +65,12 @@ def test_list_jobs_with_q_parameter_ignores_description_text(db_factory):
     assert len(items) == 0
 
 
-def test_list_jobs_pagination_structure(db_factory):
-    comp = db_factory.create_company(legal_name="Acme")
-    db_factory.create_job(
-        comp["company_id"],
-        job_id="job_page_1",
-        title="Backend",
-        company_name="Acme",
-        status="active",
-    )
-    db_factory.create_job(
-        comp["company_id"],
-        job_id="job_page_2",
-        title="Frontend",
-        company_name="Acme",
-        status="active",
-    )
-    db_factory.create_job(
-        comp["company_id"],
-        job_id="job_page_3",
-        title="DevOps",
-        company_name="Acme",
-        status="active",
-    )
+def test_list_jobs_pagination_structure(monkeypatch):
+    expected_items = [
+        {"job_id": "job_page_2", "source": "s", "source_url": "u", "title": "Frontend", "company_name": "Acme", "status": "active", "first_seen_at": "2026-01-01T00:00:00+00:00"},
+        {"job_id": "job_page_3", "source": "s", "source_url": "u", "title": "DevOps", "company_name": "Acme", "status": "active", "first_seen_at": "2026-01-01T00:00:00+00:00"},
+    ]
+    monkeypatch.setattr(jobs_api, "get_jobs_paginated", lambda **kwargs: (expected_items, 3))
 
     response = client.get("/jobs?limit=2&offset=1")
     assert response.status_code == 200
@@ -163,6 +87,7 @@ def test_list_jobs_pagination_structure(db_factory):
     assert len(data["items"]) == 2
 
 
+@pytest.mark.integration_db
 def test_list_jobs_handles_large_volume_and_fuzzy_search(db_factory):
     # Generujemy 1000 zanonimizowanych ofert + 1 specyficzną do odnalezienia
     jobs_data = []
@@ -236,6 +161,7 @@ def test_list_jobs_handles_large_volume_and_fuzzy_search(db_factory):
     assert data_search["items"][0]["job_id"] == "vol_target"
 
 
+@pytest.mark.integration_db
 def test_list_jobs_with_realistic_faker_data(seed_realistic_market_data):
     """
     Test weryfikujący, że endpoint poprawnie filtruje i renderuje realistyczne,

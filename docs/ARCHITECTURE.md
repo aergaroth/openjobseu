@@ -53,6 +53,7 @@ Runtime path:
   - `app/adapters/ats/jobadder.py`
   - `app/adapters/ats/teamtailor.py` *(token-based: `ats_slug` stores the API token, not a public board identifier)*
   - `app/adapters/ats/traffit.py`
+  - `app/adapters/ats/breezy.py`
 - normalization happens inside adapters (`normalize()`)
 - policy tagging uses `app/domain/compliance/engine.py` (`apply_policy`)
 
@@ -165,6 +166,7 @@ Internal endpoints:
 - `POST /internal/discovery/guess`
 - `POST /internal/discovery/dorking`
 - `POST /internal/discovery/run`
+- `GET /internal/discovery/slug-candidates` *(UI/API view for discovered slug candidates; defaults to `status=needs_token`)*
 
 Audit panel data shape:
 - `/internal/audit/filters` returns canonical filter lists and dynamic `source` values from DB
@@ -320,6 +322,7 @@ The orchestrator aggregates `actions` and step-level `metrics`; failures are cap
   - `app/adapters/ats/jobadder.py`
   - `app/adapters/ats/teamtailor.py`
   - `app/adapters/ats/traffit.py`
+  - `app/adapters/ats/breezy.py`
 
 #### Ingestion runtime flow
 Main worker: `app/workers/ingestion/employer.py`
@@ -378,6 +381,10 @@ Discovery worker set:
 - `run_careers_discovery()` (`careers_crawler.py`)
 - `run_ats_reverse_discovery()` (`ats_reverse.py`)
 - `run_ats_guessing()` (`ats_guessing.py`)
+- `run_dorking_discovery()` (`dorking.py`)
+- `run_dorking_crt_discovery()` (`dorking_crt.py`)
+- `run_slug_harvest()` (`slug_harvest.py`)
+- `run_promote_discovered_slugs()` (`promote_discovered_slugs.py`)
 
 #### Careers crawler flow (`app/workers/discovery/careers_crawler.py`)
 1. Load candidate companies via `load_discovery_companies` where:
@@ -401,6 +408,23 @@ Discovery worker set:
 3. Apply same quality thresholds as crawler.
 4. Insert candidate into `company_ats` on successful probe.
 5. Update `companies.ats_guess_last_checked_at`.
+
+#### Dorking flows (`app/workers/discovery/dorking.py`, `app/workers/discovery/dorking_crt.py`)
+1. Search/index-driven discovery of provider candidates.
+2. Extract slug candidates by provider-specific URL patterns.
+3. Save candidates to `discovered_slugs` with `discovery_source` metadata.
+
+#### Slug harvest flow (`app/workers/discovery/slug_harvest.py`)
+1. Load discovery companies and crawl public careers URLs with shallow 1-hop link expansion.
+2. Respect `robots.txt` and per-host request pacing.
+3. Extract provider/slug candidates from final URL, redirects, HTML, and discovered links.
+4. Score candidates and persist only high-confidence entries to `discovered_slugs`.
+5. Teamtailor candidates are persisted with status `needs_token` (manual token binding required).
+
+#### Promotion flow (`app/workers/discovery/promote_discovered_slugs.py`)
+1. Load pending discovered slugs.
+2. Probe provider adapters for job quality signals.
+3. Promote valid slugs into `company_ats` (or mark as `rejected` / `needs_token`).
 
 #### Company sources flow (`app/workers/discovery/company_sources.py`)
 1. Fetch external seed companies (currently RemoteInTech).
@@ -456,6 +480,18 @@ Discovery worker set:
 - `run_ats_guessing`
   - Reads: `companies`
   - Writes: `company_ats`, `companies.ats_guess_last_checked_at`
+- `run_dorking_discovery`
+  - Reads: search-index results
+  - Writes: `discovered_slugs`
+- `run_dorking_crt_discovery`
+  - Reads: certificate transparency data
+  - Writes: `discovered_slugs`
+- `run_slug_harvest`
+  - Reads: `companies` (+ public careers pages)
+  - Writes: `discovered_slugs`
+- `run_promote_discovered_slugs`
+  - Reads: `discovered_slugs`
+  - Writes: `companies`, `company_ats`, `discovered_slugs.status`
 
 #### Utility/backfill workers exposed via internal API
 - Direct ops endpoints in `app/api/system.py`: `POST /internal/backfill-compliance`, `POST /internal/backfill-salary`, `POST /internal/backfill-department`, `POST /internal/backfill-remote-ratio`

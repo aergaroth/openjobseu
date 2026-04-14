@@ -18,7 +18,7 @@ Every record goes through:
 - **Type:** Curated company list + ATS API fetch
 - **Worker:** `app/workers/ingestion/employer.py`
 - **Adapter registry:** `app/adapters/ats/registry.py`
-- **Current ATS support:** Greenhouse, Lever, Workable, Ashby, Personio, Recruitee, SmartRecruiters, JobAdder, Teamtailor, Traffit.
+- **Current ATS support:** Greenhouse, Lever, Workable, Ashby, Personio, Recruitee, SmartRecruiters, JobAdder, Teamtailor, Traffit, Breezy.
 
 Input set is loaded from `companies` rows where:
 - `is_active = true`
@@ -61,3 +61,18 @@ A provider is enabled only after:
 - test coverage for adapter + ingestion integration
 
 Scraping closed/protected platforms remains out of scope.
+
+---
+
+## Discovery Sources (ATS slug discovery)
+
+Discovery uses multiple read-only sources for provider/slug candidates:
+- careers-page crawler (`careers_crawler`)
+- ATS guessing from company names (`ats_guessing`)
+- reverse slug probing (`ats_reverse`)
+- search-index dorking (`dorking`)
+- certificate transparency logs (`dorking_crt`)
+- shallow public URL harvesting (`slug_harvest`, `robots.txt` aware)
+
+Candidate slugs are first stored in `discovered_slugs` and only promoted to `company_ats` after quality checks/probing.  
+For Teamtailor, public discovery stores account candidates with `needs_token` status, because API access requires a per-company token not derivable from public URLs.

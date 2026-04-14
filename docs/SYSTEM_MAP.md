@@ -26,6 +26,10 @@ Entrypoint: `app/workers/discovery/pipeline.py`
 - `run_careers_discovery`
 - `run_ats_reverse_discovery`
 - `run_ats_guessing`
+- `run_dorking_discovery`
+- `run_dorking_crt_discovery`
+- `run_slug_harvest`
+- `run_promote_discovered_slugs`
 
 Goal:
 - detecting ATS/provider+slug for companies,
@@ -100,6 +104,10 @@ Automation path:
 - `run_careers_discovery` (`app/workers/discovery/careers_crawler.py`)
 - `run_ats_reverse_discovery` (`app/workers/discovery/ats_reverse.py`)
 - `run_ats_guessing` (`app/workers/discovery/ats_guessing.py`)
+- `run_dorking_discovery` (`app/workers/discovery/dorking.py`)
+- `run_dorking_crt_discovery` (`app/workers/discovery/dorking_crt.py`)
+- `run_slug_harvest` (`app/workers/discovery/slug_harvest.py`)
+- `run_promote_discovered_slugs` (`app/workers/discovery/promote_discovered_slugs.py`)
 
 ### Utility/backfill workers (internal ops)
 - direct system ops: `POST /internal/backfill-compliance`, `POST /internal/backfill-salary`, `POST /internal/backfill-department`, `POST /internal/backfill-remote-ratio`

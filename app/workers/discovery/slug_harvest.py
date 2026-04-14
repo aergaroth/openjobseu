@@ -52,7 +52,10 @@ _PATTERNS: dict[str, re.Pattern] = {
     "jobadder": re.compile(r"https?://app\.jobadder\.com/jobboard/([a-zA-Z0-9_-]+)", re.I),
     # Teamtailor public career sites are typically hosted on *.teamtailor.com with /jobs routes.
     # Token is not derivable; we only collect the account subdomain as a candidate.
-    "teamtailor": re.compile(r"https?://([a-z0-9-]+)\.teamtailor\.com/(?:[a-z]{2}(?:-[A-Z]{2})?/)?jobs(?:/|\\b)", re.I),
+    "teamtailor": re.compile(
+        r"https?://([a-z0-9-]+)\.teamtailor\.com/(?:[a-z]{2}(?:-[A-Z]{2})?/)?jobs(?:/|\b|\?|$)",
+        re.I,
+    ),
 }
 
 

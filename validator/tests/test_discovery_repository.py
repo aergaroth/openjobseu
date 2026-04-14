@@ -1,3 +1,4 @@
+import pytest
 import uuid
 from sqlalchemy import text
 
@@ -17,6 +18,7 @@ from storage.repositories.discovery_repository import (
 )
 
 engine = get_engine()
+pytestmark = pytest.mark.integration_db
 
 
 def test_insert_source_company():
