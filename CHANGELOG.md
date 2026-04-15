@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.0](https://github.com/aergaroth/openjobseu/compare/v2.39.0...v2.40.0) (2026-04-15)
+
+
+### Features
+
+* implement paid API with key management and analytics endpoints ([067bad1](https://github.com/aergaroth/openjobseu/commit/067bad15f0260990c5bb929c1776e769301ab4ce))
+
 ## [2.39.0](https://github.com/aergaroth/openjobseu/compare/v2.38.0...v2.39.0) (2026-04-14)
 
 
