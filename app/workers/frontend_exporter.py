@@ -180,7 +180,7 @@ def _build_chart_set(stats: list[DailyStats], days: int) -> dict[str, bytes]:
         dates,
     )
     salary_svg = generate_line_chart(
-        [s.avg_salary_eur for s in subset],
+        [s.median_salary_eur for s in subset],
         dates,
         "#0D9488",
         lambda v: f"€{int(v):,}/yr",
@@ -189,7 +189,7 @@ def _build_chart_set(stats: list[DailyStats], days: int) -> dict[str, bytes]:
         [s.remote_ratio for s in subset],
         dates,
         "#D97706",
-        lambda v: f"{int(v * 100)}%",
+        lambda v: f"{v * 100:.1f}%",
     )
 
     return {
