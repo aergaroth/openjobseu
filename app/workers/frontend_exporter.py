@@ -13,9 +13,10 @@ from app.workers.chart_generator import (
     generate_volume_chart,
     svg_to_file,
 )
-from app.workers.market_types import DailyStats, MarketStatsMeta, MarketStatsResponse
+from app.workers.market_types import DailyStats, MarketStatsMeta, MarketStatsResponse, SegmentItem, SegmentsMeta, SegmentsResponse
 from storage.db_engine import get_engine
 from storage.repositories.market_repository import get_active_jobs_compliance_counts, get_market_daily_stats
+from storage.repositories.market_segments_repository import get_market_segments_snapshot
 
 logger = logging.getLogger("openjobseu.runtime")
 
@@ -245,12 +246,48 @@ def _export_market_stats(bucket, chart_base_url: str) -> tuple[int, int]:
     return len(stats), charts_uploaded
 
 
+def _export_market_segments(bucket) -> int:
+    """
+    1. Query market_daily_stats_segments for the most recent snapshot.
+    2. Group rows by segment_type.
+    3. Serialize as SegmentsResponse and upload as market-segments.json.
+    Returns count of segment rows exported.
+    """
+    engine = get_engine()
+    with engine.connect() as conn:
+        raw_rows = get_market_segments_snapshot(conn)
+
+    grouped: dict[str, list[SegmentItem]] = {}
+    for row in raw_rows:
+        segment_type = row["segment_type"]
+        item = SegmentItem(
+            value=row["segment_value"],
+            jobs_active=row["jobs_active"],
+            jobs_created=row["jobs_created"],
+            avg_salary_eur=row["avg_salary_eur"],
+            median_salary_eur=row["median_salary_eur"],
+        )
+        grouped.setdefault(segment_type, []).append(item)
+
+    meta = SegmentsMeta(generated_at=datetime.now(timezone.utc).isoformat())
+    response = SegmentsResponse(meta=meta, segments=grouped)
+
+    blob = bucket.blob("market-segments.json")
+    blob.cache_control = _DEFAULT_MARKET_STATS_CACHE_CONTROL
+    blob.upload_from_string(
+        response.model_dump_json(),
+        content_type="application/json",
+    )
+    return len(raw_rows)
+
+
 def run_frontend_export(
     sync_assets: bool = False,
     *,
     asset_version: str | None = None,
     export_feed: bool = True,
     export_market_stats: bool = True,
+    export_market_segments: bool = True,
 ) -> dict:
     bucket_name = os.getenv("PUBLIC_FEED_BUCKET")
     if not bucket_name:
@@ -265,6 +302,7 @@ def run_frontend_export(
             "sync_assets": sync_assets,
             "export_feed": export_feed,
             "export_market_stats": export_market_stats,
+            "export_market_segments": export_market_segments,
             "asset_version": asset_version,
         },
     )
@@ -277,6 +315,7 @@ def run_frontend_export(
         uploaded_files = 0
         exported_jobs = 0
         exported_stats = 0
+        exported_segments = 0
 
         if sync_assets:
             uploaded_files += _upload_frontend_assets(bucket, asset_version=asset_version)
@@ -297,15 +336,24 @@ def run_frontend_export(
         except Exception:
             logger.exception("market_stats_export_failed")
 
+    if export_market_segments:
+        try:
+            exported_segments = _export_market_segments(bucket)
+            uploaded_files += 1
+        except Exception:
+            logger.exception("market_segments_export_failed")
+
     logger.info(
         "frontend_exported_to_gcs",
         extra={
             "job_count": exported_jobs,
             "stats_count": exported_stats,
+            "segments_count": exported_segments,
             "uploaded_files": uploaded_files,
             "sync_assets": sync_assets,
             "export_feed": export_feed,
             "export_market_stats": export_market_stats,
+            "export_market_segments": export_market_segments,
             "asset_version": asset_version,
         },
     )
@@ -313,9 +361,11 @@ def run_frontend_export(
         "status": "ok",
         "exported_jobs": exported_jobs,
         "exported_stats": exported_stats,
+        "exported_segments": exported_segments,
         "uploaded_files": uploaded_files,
         "synced_assets": sync_assets,
         "exported_feed": export_feed,
         "exported_market_stats": export_market_stats,
+        "exported_market_segments": export_market_segments,
         "asset_version": asset_version,
     }

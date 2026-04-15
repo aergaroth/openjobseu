@@ -3,7 +3,14 @@
 
   const FEED_URL = "/feed.json";
   const MARKET_STATS_URL = "/market-stats.json";
+  const MARKET_SEGMENTS_URL = "/market-segments.json";
   const DEBOUNCE_MS = 200;
+
+  const SEGMENT_TYPE_LABELS = {
+    job_family: "By department",
+    seniority:  "By seniority",
+    country:    "By scope",
+  };
 
   const JOB_FAMILY_LABELS = {
     software_development: "Engineering",
@@ -482,6 +489,77 @@
     });
   }
 
+  // ── Market breakdown ───────────────────────────────────
+
+  function renderBreakdownPanel(title, items, labelMap) {
+    if (!items || items.length === 0) return null;
+
+    const maxActive = Math.max(...items.map(i => i.jobs_active));
+
+    const panel = el("div", { class: "breakdown-panel" });
+    panel.appendChild(el("h3", { class: "breakdown-panel-title" }, [title]));
+
+    const list = el("ul", { class: "breakdown-list", role: "list" });
+    items.slice(0, 8).forEach(item => {
+      const label = (labelMap && labelMap[item.value]) || item.value.replace(/_/g, " ");
+      const pct = maxActive > 0 ? Math.round((item.jobs_active / maxActive) * 100) : 0;
+      const salary = item.median_salary_eur
+        ? `€${Math.round(item.median_salary_eur / 1000)}k`
+        : null;
+
+      const row = el("li", { class: "breakdown-row" });
+      const labelEl = el("span", { class: "breakdown-label" }, [label]);
+      const barWrap = el("div", { class: "breakdown-bar-wrap" }, [
+        el("div", { class: "breakdown-bar", style: `width:${pct}%` }),
+      ]);
+      const count = el("span", { class: "breakdown-count" }, [`${item.jobs_active}`]);
+      row.appendChild(labelEl);
+      row.appendChild(barWrap);
+      row.appendChild(count);
+      if (salary) {
+        row.appendChild(el("span", { class: "breakdown-salary" }, [salary]));
+      }
+      list.appendChild(row);
+    });
+
+    panel.appendChild(list);
+    return panel;
+  }
+
+  function renderMarketBreakdown(data) {
+    const section = document.getElementById("market-breakdown");
+    const grid = document.getElementById("breakdown-grid");
+    if (!section || !grid) return;
+
+    const ORDER = ["job_family", "seniority", "country"];
+    let rendered = 0;
+
+    ORDER.forEach(segType => {
+      const items = data.segments[segType];
+      if (!items || items.length === 0) return;
+
+      const labelMap = segType === "job_family" ? JOB_FAMILY_LABELS : null;
+      const title = SEGMENT_TYPE_LABELS[segType] || segType;
+      const panel = renderBreakdownPanel(title, items, labelMap);
+      if (panel) {
+        grid.appendChild(panel);
+        rendered++;
+      }
+    });
+
+    if (rendered > 0) section.removeAttribute("hidden");
+  }
+
+  function loadMarketSegments(baseUrl = "") {
+    fetch(`${baseUrl}${MARKET_SEGMENTS_URL}`)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(data => renderMarketBreakdown(data))
+      .catch(err => console.error("Market segments error:", err));
+  }
+
   // ── Market stats ───────────────────────────────────────
 
   function computeMetrics(stats, days) {
@@ -616,6 +694,7 @@
       injectStructuredData(allJobs);
       setupEventListeners();
       loadMarketStats();
+      loadMarketSegments();
 
       if (metaEl && data.meta?.generated_at) {
         const generated = new Date(data.meta.generated_at);

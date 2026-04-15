@@ -767,6 +767,86 @@ select:focus  { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,82,22
   border-radius: var(--radius-sm);
 }
 
+/* ── Market breakdown ──────────────────────────────────── */
+.market-breakdown {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.breakdown-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.breakdown-panel-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.breakdown-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.breakdown-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 40px 36px;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.breakdown-label {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: capitalize;
+}
+
+.breakdown-bar-wrap {
+  height: 6px;
+  background: var(--bg-tag);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.breakdown-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  min-width: 2px;
+  transition: width 0.3s ease;
+}
+
+.breakdown-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.breakdown-salary {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+@media (min-width: 960px) {
+  .breakdown-grid { grid-template-columns: repeat(3, 1fr); }
+  .breakdown-row { grid-template-columns: 120px 1fr 40px 36px; }
+}
+
 @media (min-width: 960px) {
   .chart-grid { grid-template-columns: repeat(3, 1fr); }
   .metric-cards { grid-template-columns: repeat(3, 1fr); }

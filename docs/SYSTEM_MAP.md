@@ -126,11 +126,13 @@ Automation path:
 | `GET /feed.json` | Public | GCS + CDN |
 | `GET /health`, `GET /ready` | Internal/admin | Private Cloud Run |
 | `GET /jobs`, `GET /companies`, `GET /jobs/stats/compliance-7d` | Internal/admin | Private Cloud Run |
+| `GET /api/v1/jobs`, `GET /api/v1/analytics/*` | External (API key) | Private Cloud Run |
 | `POST /internal/tick`, `POST /internal/tick/execute`, `GET /internal/audit*`, `POST /internal/tasks/*`, `POST /internal/backfill-*` | Internal/admin | Private Cloud Run |
 
 Notes:
 - `GET /jobs`, `GET /companies`, and `GET /jobs/stats/compliance-7d` exist in FastAPI, but are not public internet endpoints in `dev` or `prod` because Cloud Run invocation is restricted via IAM.
 - `GET /feed.json` remains the public dataset contract used by the static frontend.
+- `/api/v1/*` requires `Authorization: Bearer ojeu_<key>` — API key auth backed by the `api_keys` table; daily quota enforced via atomic `UPDATE … RETURNING` in PostgreSQL. See `docs/PAID_API.md`.
 - Production and dev schedulers use `POST /internal/tasks/*` for automated discovery phases; `POST /internal/discovery/run` remains a manual synchronous operator endpoint.
 
 ---
