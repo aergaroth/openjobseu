@@ -200,7 +200,7 @@ def generate_line_chart(
     Suitable for jobs_active (count) and salary series (EUR values).
     Returns a complete <svg> string.
     """
-    pad_l, pad_r, pad_t, pad_b = 72, 15, 12, 36
+    pad_l, pad_r, pad_t, pad_b = 72, 30, 12, 36
     x_start = float(pad_l)
     x_end = float(width - pad_r)
     y_top = float(pad_t)
@@ -268,13 +268,16 @@ def generate_volume_chart(
     height: int = 160,
 ) -> str:
     """
-    Three polylines on a shared y-axis:
+    Two polylines (created/expired) on a shared auto-scaled y-axis.
+    The `active` parameter is accepted but intentionally not plotted — the
+    active-jobs snapshot is orders of magnitude larger than daily flow counts
+    and collapses created/expired to invisible lines when mixed on one axis.
+    Active jobs are already shown in the "Total active" stat card.
       created = blue (#3B82F6)
       expired = red  (#EF4444)
-      active  = gray (#6B7280)
     Returns a complete <svg> string.
     """
-    pad_l, pad_r, pad_t, pad_b = 72, 15, 12, 36
+    pad_l, pad_r, pad_t, pad_b = 72, 30, 12, 36
     x_start = float(pad_l)
     x_end = float(width - pad_r)
     y_top = float(pad_t)
@@ -282,9 +285,8 @@ def generate_volume_chart(
 
     norm_created = normalize_series(created, "zero")
     norm_expired = normalize_series(expired, "zero")
-    norm_active = normalize_series(active, "interpolate")
 
-    all_values = norm_created + norm_expired + norm_active
+    all_values = norm_created + norm_expired
     global_min = min(all_values) if all_values else 0.0
     global_max = max(all_values) if all_values else 0.0
     v_range = global_max - global_min
@@ -304,7 +306,6 @@ def generate_volume_chart(
 
     pts_created = _map(norm_created)
     pts_expired = _map(norm_expired)
-    pts_active = _map(norm_active)
 
     gridlines_parts = []
     for gy, gv in [
@@ -333,7 +334,6 @@ def generate_volume_chart(
         + "\n"
         + f'  <polyline fill="none" stroke="#3B82F6" stroke-width="1.5" points="{pts_created}"/>\n'
         + f'  <polyline fill="none" stroke="#EF4444" stroke-width="1.5" points="{pts_expired}"/>\n'
-        + f'  <polyline fill="none" stroke="#6B7280" stroke-width="1.5" points="{pts_active}"/>\n'
         + (x_labels + "\n" if x_labels else "")
         + "</svg>"
     )
