@@ -1,5 +1,5 @@
 from datetime import date
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -29,3 +29,23 @@ class MarketStatsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     meta: MarketStatsMeta
     stats: List[DailyStats]  # 30 entries max, chronological order
+
+
+class SegmentItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    value: str
+    jobs_active: int
+    jobs_created: int
+    avg_salary_eur: Optional[float] = None
+    median_salary_eur: Optional[float] = None
+
+
+class SegmentsMeta(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    generated_at: str  # ISO 8601
+
+
+class SegmentsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    meta: SegmentsMeta
+    segments: Dict[str, List[SegmentItem]]  # key = segment_type, value = ordered list

@@ -132,7 +132,7 @@ def render_x_labels(
         label = dates[i].strftime("%b %d")
         parts.append(
             f'<text x="{x:.2f}" y="{y:.2f}" text-anchor="middle"'
-            f' font-size="11" font-family="system-ui, sans-serif" fill="#9898a8">{label}</text>'
+            f' font-size="13" font-family="system-ui, sans-serif" fill="#9898a8">{label}</text>'
         )
     return "\n".join(parts)
 
@@ -200,7 +200,7 @@ def generate_line_chart(
     Suitable for jobs_active (count) and salary series (EUR values).
     Returns a complete <svg> string.
     """
-    pad_l, pad_r, pad_t, pad_b = 62, 15, 12, 30
+    pad_l, pad_r, pad_t, pad_b = 72, 15, 12, 36
     x_start = float(pad_l)
     x_end = float(width - pad_r)
     y_top = float(pad_t)
@@ -225,11 +225,11 @@ def generate_line_chart(
         )
         gridlines_parts.append(
             f'  <text x="{x_start - 5:.2f}" y="{gy + 4:.2f}" text-anchor="end"'
-            f' font-size="11" font-family="system-ui, sans-serif"'
+            f' font-size="13" font-family="system-ui, sans-serif"'
             f' fill="#9898a8">{y_label(gv)}</text>'
         )
 
-    x_labels = render_x_labels(dates, x_start, x_end, y_bottom + 15)
+    x_labels = render_x_labels(dates, x_start, x_end, y_bottom + 18)
 
     no_data = ""
     if all_none:
@@ -274,7 +274,7 @@ def generate_volume_chart(
       active  = gray (#6B7280)
     Returns a complete <svg> string.
     """
-    pad_l, pad_r, pad_t, pad_b = 62, 15, 12, 30
+    pad_l, pad_r, pad_t, pad_b = 72, 15, 12, 36
     x_start = float(pad_l)
     x_end = float(width - pad_r)
     y_top = float(pad_t)
@@ -318,11 +318,11 @@ def generate_volume_chart(
         )
         gridlines_parts.append(
             f'  <text x="{x_start - 5:.2f}" y="{gy + 4:.2f}" text-anchor="end"'
-            f' font-size="11" font-family="system-ui, sans-serif"'
+            f' font-size="13" font-family="system-ui, sans-serif"'
             f' fill="#9898a8">{int(gv)}</text>'
         )
 
-    x_labels = render_x_labels(dates, x_start, x_end, y_bottom + 15)
+    x_labels = render_x_labels(dates, x_start, x_end, y_bottom + 18)
 
     return (
         f'<svg viewBox="0 0 {width} {height}" width="100%" role="img"'

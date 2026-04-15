@@ -93,5 +93,5 @@ Non-goals remain unchanged:
 ### Planned features
 
 - public dataset API
-- labour market analytics
-- commercial API plans
+- ~~labour market analytics~~ — static segment export (`market-segments.json`) + breakdown UI delivered; time-series API and employment-type schema expansion remain
+- ~~commercial API plans~~ — `/api/v1/` tier delivered: API key auth (SHA-256, `ojeu_<32chars>` format), three tiers (`free`/`pro`/`enterprise`), PostgreSQL-backed daily rate limiting

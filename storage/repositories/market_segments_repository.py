@@ -52,6 +52,28 @@ def compute_market_segments(conn: Connection, date: date) -> list[dict]:
     return rows
 
 
+def get_market_segments_snapshot(conn: Connection) -> list[dict]:
+    """Return the most recent day's segment rows from market_daily_stats_segments.
+
+    Returns all segment_type/segment_value pairs for the latest available date,
+    ordered by segment_type and jobs_active descending.
+    """
+    rows = (
+        conn.execute(
+            text("""
+                SELECT segment_type, segment_value, jobs_active, jobs_created,
+                       avg_salary_eur, median_salary_eur
+                FROM market_daily_stats_segments
+                WHERE date = (SELECT MAX(date) FROM market_daily_stats_segments)
+                ORDER BY segment_type, jobs_active DESC
+            """)
+        )
+        .mappings()
+        .all()
+    )
+    return [dict(row) for row in rows]
+
+
 def insert_market_segments(conn: Connection, rows: list[dict]) -> None:
     if not rows:
         return

@@ -191,6 +191,7 @@ def test_all_api_endpoints_have_response_model():
         "/internal/audit/tick-dev",  # Zwraca Response z tekstem
         "/internal/preview-job",  # Zwraca Response (konsolowy output w przeglądarce)
         "/internal/audit/ats-force-sync/{company_ats_id}",  # Zwraca surowy Response
+        "/internal/api-keys/{key_id}",  # DELETE 204 — brak ciała odpowiedzi by design
     }
 
     for route in app.routes:

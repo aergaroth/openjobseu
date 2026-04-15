@@ -93,7 +93,7 @@ def test_frontend_export_success(mock_storage_client, monkeypatch, tmp_path, job
 
     assert result["status"] == "ok"
     assert result["exported_jobs"] == len(jobs_payload)
-    assert result["uploaded_files"] == 11  # 3 assets + 1 feed.json + 6 chart SVGs + 1 market-stats.json
+    assert result["uploaded_files"] == 12  # 3 assets + 1 feed.json + 6 chart SVGs + 1 market-stats.json + 1 market-segments.json
     assert result["synced_assets"] is True
     assert result["exported_feed"] is True
     assert result["asset_version"] == "release-123"
@@ -174,7 +174,7 @@ def test_frontend_export_skips_unchanged_assets(mock_storage_client, monkeypatch
     result = run_frontend_export(sync_assets=True)
 
     assert result["status"] == "ok"
-    assert result["uploaded_files"] == 8  # 0 assets (skipped) + 1 feed.json + 6 chart SVGs + 1 market-stats.json
+    assert result["uploaded_files"] == 9  # 0 assets (skipped) + 1 feed.json + 6 chart SVGs + 1 market-stats.json + 1 market-segments.json
 
 
 def test_render_asset_file_injects_release_cache_busting(tmp_path):
