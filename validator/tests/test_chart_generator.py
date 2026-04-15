@@ -73,12 +73,13 @@ def test_generate_line_chart_returns_valid_svg():
     ET.fromstring(chart)  # raises if not valid XML
 
 
-def test_generate_volume_chart_three_polylines():
+def test_generate_volume_chart_two_polylines():
     created = [10, 12, 8, 15, 11, 9, 13]
     expired = [5, 6, 4, 7, 5, 4, 6]
     active = [100, 106, 110, 118, 124, 129, 136]
     chart = generate_volume_chart(created, expired, active, _dates_7)
-    assert chart.count("<polyline") == 3
+    # active series is intentionally excluded — it dwarfs created/expired on a shared axis
+    assert chart.count("<polyline") == 2
 
 
 def test_generate_sparkline_no_axes():
