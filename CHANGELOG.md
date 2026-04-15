@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.1](https://github.com/aergaroth/openjobseu/compare/v2.40.0...v2.40.1) (2026-04-15)
+
+
+### Bug Fixes
+
+* update IAM condition to include market-segments.json for runtime management ([a9af7ca](https://github.com/aergaroth/openjobseu/commit/a9af7ca9eaa86fd55602fde9c8bcecffaa8da3e7))
+
 ## [2.40.0](https://github.com/aergaroth/openjobseu/compare/v2.39.0...v2.40.0) (2026-04-15)
 
 
