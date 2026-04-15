@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.2](https://github.com/aergaroth/openjobseu/compare/v2.40.1...v2.40.2) (2026-04-15)
+
+
+### Bug Fixes
+
+* update salary chart to use median salary and format remote ratio percentage ([9a10c50](https://github.com/aergaroth/openjobseu/commit/9a10c5054e3f3172908728af0a8e5fccecb92210))
+* update volume chart test to reflect two polylines instead of three ([868c9b3](https://github.com/aergaroth/openjobseu/commit/868c9b3837bc27d7262628659c3372d8f455e88c))
+
 ## [2.40.1](https://github.com/aergaroth/openjobseu/compare/v2.40.0...v2.40.1) (2026-04-15)
 
 
