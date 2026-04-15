@@ -175,8 +175,8 @@ resource "google_storage_bucket_iam_member" "cloud_run_feed_write" {
 
   condition {
     title       = "frontend_exports"
-    description = "Allow runtime to manage feed.json, market-stats.json and charts"
-    expression  = "resource.name == \"projects/_/buckets/openjobseu.org/objects/feed.json\" || resource.name == \"projects/_/buckets/openjobseu.org/objects/market-stats.json\" || resource.name.startsWith(\"projects/_/buckets/openjobseu.org/objects/charts/\")"
+    description = "Allow runtime to manage feed.json, market-stats.json, market-segments.json and charts"
+    expression  = "resource.name == \"projects/_/buckets/openjobseu.org/objects/feed.json\" || resource.name == \"projects/_/buckets/openjobseu.org/objects/market-stats.json\" || resource.name == \"projects/_/buckets/openjobseu.org/objects/market-segments.json\" || resource.name.startsWith(\"projects/_/buckets/openjobseu.org/objects/charts/\")"
   }
 }
 

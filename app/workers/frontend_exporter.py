@@ -13,7 +13,14 @@ from app.workers.chart_generator import (
     generate_volume_chart,
     svg_to_file,
 )
-from app.workers.market_types import DailyStats, MarketStatsMeta, MarketStatsResponse, SegmentItem, SegmentsMeta, SegmentsResponse
+from app.workers.market_types import (
+    DailyStats,
+    MarketStatsMeta,
+    MarketStatsResponse,
+    SegmentItem,
+    SegmentsMeta,
+    SegmentsResponse,
+)
 from storage.db_engine import get_engine
 from storage.repositories.market_repository import get_active_jobs_compliance_counts, get_market_daily_stats
 from storage.repositories.market_segments_repository import get_market_segments_snapshot
