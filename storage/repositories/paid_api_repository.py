@@ -89,10 +89,7 @@ def _build_paid_jobs_where(
 
     if source:
         clauses.append(
-            "EXISTS ("
-            "SELECT 1 FROM job_sources js_f "
-            f"WHERE js_f.job_id = jobs.job_id AND js_f.source = {_p(source)}"
-            ")"
+            f"EXISTS (SELECT 1 FROM job_sources js_f WHERE js_f.job_id = jobs.job_id AND js_f.source = {_p(source)})"
         )
 
     if remote_scope:
@@ -198,6 +195,8 @@ def get_paid_api_jobs(
     engine = _get_engine()
     with engine.connect() as conn:
         rows = conn.execute(text(data_sql), params).mappings().all()
-        total = conn.execute(text(count_sql), {k: v for k, v in params.items() if k not in ("limit", "offset")}).scalar_one()
+        total = conn.execute(
+            text(count_sql), {k: v for k, v in params.items() if k not in ("limit", "offset")}
+        ).scalar_one()
 
     return [dict(row) for row in rows], int(total)
