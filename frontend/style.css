@@ -752,6 +752,13 @@ select:focus  { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,82,22
 
 .chart-figure {
   margin: 0;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.chart-figure:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .chart-figure figcaption {
