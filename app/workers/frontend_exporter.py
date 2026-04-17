@@ -10,7 +10,6 @@ from urllib.parse import quote
 
 from app.workers.chart_generator import (
     generate_line_chart,
-    generate_volume_chart,
     svg_to_file,
 )
 from app.workers.market_types import (
@@ -173,11 +172,11 @@ def _build_chart_set(stats: list[DailyStats], days: int) -> dict[str, bytes]:
     subset = stats[-days:] if stats else []
     dates = [s.date for s in subset]
 
-    volume_svg = generate_volume_chart(
-        [s.jobs_created for s in subset],
-        [s.jobs_expired for s in subset],
+    volume_svg = generate_line_chart(
         [s.jobs_active for s in subset],
         dates,
+        "#3B82F6",
+        lambda v: f"{int(v):,}",
     )
     salary_svg = generate_line_chart(
         [s.median_salary_eur for s in subset],
