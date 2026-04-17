@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.41.0](https://github.com/aergaroth/openjobseu/compare/v2.40.2...v2.41.0) (2026-04-17)
+
+
+### Features
+
+* enhance market segment computation by adding compliance score filter and update breakdown panel rendering logic ([92d2d5d](https://github.com/aergaroth/openjobseu/commit/92d2d5da8063a3a40bc1716ea4015fca72b09f66))
+
 ## [2.40.2](https://github.com/aergaroth/openjobseu/compare/v2.40.1...v2.40.2) (2026-04-15)
 
 
