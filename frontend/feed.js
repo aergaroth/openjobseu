@@ -491,16 +491,25 @@
 
   // ── Market breakdown ───────────────────────────────────
 
-  function renderBreakdownPanel(title, items, labelMap) {
+  function renderBreakdownPanel(title, items, labelMap, segType) {
     if (!items || items.length === 0) return null;
 
-    const maxActive = Math.max(...items.map(i => i.jobs_active));
+    let displayItems;
+    if (segType === "country") {
+      const nonEu = items.find(i => i.value === "Non EU");
+      const euItems = items.filter(i => i.value !== "Non EU").slice(0, 7);
+      displayItems = nonEu ? [...euItems, nonEu] : euItems;
+    } else {
+      displayItems = items.slice(0, 8);
+    }
+
+    const maxActive = Math.max(...displayItems.map(i => i.jobs_active));
 
     const panel = el("div", { class: "breakdown-panel" });
     panel.appendChild(el("h3", { class: "breakdown-panel-title" }, [title]));
 
     const list = el("ul", { class: "breakdown-list", role: "list" });
-    items.slice(0, 8).forEach(item => {
+    displayItems.forEach(item => {
       const label = (labelMap && labelMap[item.value]) || item.value.replace(/_/g, " ");
       const pct = maxActive > 0 ? Math.round((item.jobs_active / maxActive) * 100) : 0;
       const salary = item.median_salary_eur
@@ -540,7 +549,7 @@
 
       const labelMap = segType === "job_family" ? JOB_FAMILY_LABELS : null;
       const title = SEGMENT_TYPE_LABELS[segType] || segType;
-      const panel = renderBreakdownPanel(title, items, labelMap);
+      const panel = renderBreakdownPanel(title, items, labelMap, segType);
       if (panel) {
         grid.appendChild(panel);
         rendered++;

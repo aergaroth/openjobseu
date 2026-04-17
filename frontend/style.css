@@ -848,6 +848,5 @@ select:focus  { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,82,22
 }
 
 @media (min-width: 960px) {
-  .chart-grid { grid-template-columns: repeat(3, 1fr); }
   .metric-cards { grid-template-columns: repeat(3, 1fr); }
 }
