@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.41.1](https://github.com/aergaroth/openjobseu/compare/v2.41.0...v2.41.1) (2026-04-17)
+
+
+### Bug Fixes
+
+* update salary display format in chart and enhance chart figure styling ([9067fc1](https://github.com/aergaroth/openjobseu/commit/9067fc18696d5d151ee275e99cc06611cf04f2a0))
+
 ## [2.41.0](https://github.com/aergaroth/openjobseu/compare/v2.40.2...v2.41.0) (2026-04-17)
 
 
