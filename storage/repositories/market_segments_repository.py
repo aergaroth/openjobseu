@@ -27,6 +27,7 @@ def compute_market_segments(conn: Connection, date: date) -> list[dict]:
             FROM jobs
             WHERE geo_class IS NOT NULL
               AND compliance_status = 'approved'
+              AND compliance_score >= 80
               AND (availability_status = 'active'
                    OR (first_seen_at >= :start_time AND first_seen_at < :end_time))
             GROUP BY segment_value
@@ -62,6 +63,7 @@ def compute_market_segments(conn: Connection, date: date) -> list[dict]:
                 FROM jobs
                 WHERE {column_name} IS NOT NULL
                   AND compliance_status = 'approved'
+                  AND compliance_score >= 80
                   AND (availability_status = 'active'
                        OR (first_seen_at >= :start_time AND first_seen_at < :end_time))
                 GROUP BY {column_name}
