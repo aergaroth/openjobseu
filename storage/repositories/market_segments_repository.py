@@ -1,7 +1,28 @@
+import re as _re
 from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
+
+_EXCLUDE_SCOPE_KEYWORDS = ["americ", "apac", "latam", "asia pacific"]
+
+
+def _normalize_country_rows(rows: list[dict]) -> list[dict]:
+    normalized = []
+    for row in rows:
+        val = row["segment_value"] or ""
+        if any(kw in val.lower() for kw in _EXCLUDE_SCOPE_KEYWORDS):
+            continue
+        val = _re.sub(r"(?i)^home\s+based\s*[-–]\s*", "Remote - ", val)
+        normalized.append({**row, "segment_value": val})
+
+    all_values = {r["segment_value"] for r in normalized}
+    has_remote_variant = {
+        val.replace(" (Remote)", "")
+        for val in all_values
+        if val.endswith(" (Remote)") and val.replace(" (Remote)", "") in all_values
+    }
+    return [r for r in normalized if r["segment_value"] not in has_remote_variant]
 
 
 def compute_market_segments(conn: Connection, date: date) -> list[dict]:
@@ -23,7 +44,7 @@ def compute_market_segments(conn: Connection, date: date) -> list[dict]:
                 COUNT(*) FILTER (WHERE first_seen_at >= :start_time AND first_seen_at < :end_time) AS jobs_created,
                 AVG(salary_min_eur) AS avg_salary_eur,
                 percentile_cont(0.5)
-                    WITHIN GROUP (ORDER BY salary_min_eur) AS median_salary_eur
+                    WITHIN GROUP (ORDER BY NULLIF(salary_min_eur, 0)) AS median_salary_eur
             FROM jobs
             WHERE geo_class IS NOT NULL
               AND compliance_status = 'approved'
@@ -35,8 +56,9 @@ def compute_market_segments(conn: Connection, date: date) -> list[dict]:
         {"start_time": start_time, "end_time": end_time},
     )
 
+    country_rows = []
     for item in country_result.mappings():
-        rows.append(
+        country_rows.append(
             {
                 "date": date,
                 "segment_type": "country",
@@ -47,6 +69,7 @@ def compute_market_segments(conn: Connection, date: date) -> list[dict]:
                 "median_salary_eur": item["median_salary_eur"],
             }
         )
+    rows.extend(_normalize_country_rows(country_rows))
 
     # job_family and seniority segments: filter to approved offers only
     for segment_type, column_name in [("job_family", "job_family"), ("seniority", "seniority")]:
@@ -59,7 +82,7 @@ def compute_market_segments(conn: Connection, date: date) -> list[dict]:
                     COUNT(*) FILTER (WHERE first_seen_at >= :start_time AND first_seen_at < :end_time) AS jobs_created,
                     AVG(salary_min_eur) AS avg_salary_eur,
                     percentile_cont(0.5)
-                        WITHIN GROUP (ORDER BY salary_min_eur) AS median_salary_eur
+                        WITHIN GROUP (ORDER BY NULLIF(salary_min_eur, 0)) AS median_salary_eur
                 FROM jobs
                 WHERE {column_name} IS NOT NULL
                   AND compliance_status = 'approved'
