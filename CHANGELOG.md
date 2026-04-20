@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.42.0](https://github.com/aergaroth/openjobseu/compare/v2.41.1...v2.42.0) (2026-04-20)
+
+
+### Features
+
+* implement audit bastion with internal access and user session support ([f201370](https://github.com/aergaroth/openjobseu/commit/f20137031131ca34c50c4c3f85e10e970d6a7d2f))
+
 ## [2.41.1](https://github.com/aergaroth/openjobseu/compare/v2.41.0...v2.41.1) (2026-04-17)
 
 
