@@ -398,7 +398,7 @@ resource "google_compute_instance" "audit_bastion" {
 
   depends_on = [
     google_project_iam_member.github_deploy_instance_admin,
-    google_project_iam_member.github_deploy_audit_bastion_user,
+    google_service_account_iam_member.github_deploy_audit_bastion_user,
     google_compute_firewall.audit_bastion_iap_ssh,
   ]
 }
