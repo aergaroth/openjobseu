@@ -28,6 +28,10 @@ resource "google_project_iam_custom_role" "audit_bastion_operator" {
     "compute.instances.stop",
     "compute.zoneOperations.get",
   ]
+
+  depends_on = [
+    google_project_iam_member.github_deploy_iam_role_admin,
+  ]
 }
 
 resource "google_project_iam_custom_role" "audit_bastion_self_stop" {
@@ -39,6 +43,31 @@ resource "google_project_iam_custom_role" "audit_bastion_self_stop" {
     "compute.instances.get",
     "compute.instances.stop",
     "compute.zoneOperations.get",
+  ]
+
+  depends_on = [
+    google_project_iam_member.github_deploy_iam_role_admin,
+  ]
+}
+
+resource "google_project_iam_custom_role" "audit_bastion_firewall_admin" {
+  role_id     = "auditBastionFirewallAdmin"
+  title       = "Audit Bastion Firewall Admin"
+  description = "Allows GitHub deploy automation to manage only the bastion firewall rule in the default network."
+
+  permissions = [
+    "compute.firewalls.create",
+    "compute.firewalls.delete",
+    "compute.firewalls.get",
+    "compute.firewalls.list",
+    "compute.firewalls.update",
+    "compute.globalOperations.get",
+    "compute.networks.get",
+    "compute.networks.updatePolicy",
+  ]
+
+  depends_on = [
+    google_project_iam_member.github_deploy_iam_role_admin,
   ]
 }
 
@@ -53,6 +82,10 @@ resource "google_compute_firewall" "audit_bastion_iap_ssh" {
 
   source_ranges = ["35.235.240.0/20"]
   target_tags   = ["audit-bastion"]
+
+  depends_on = [
+    google_project_iam_member.github_deploy_audit_bastion_firewall_admin,
+  ]
 }
 
 resource "google_compute_instance" "audit_bastion" {
@@ -362,6 +395,12 @@ resource "google_compute_instance" "audit_bastion" {
     enable_vtpm                 = true
     enable_integrity_monitoring = true
   }
+
+  depends_on = [
+    google_project_iam_member.github_deploy_instance_admin,
+    google_service_account_iam_member.github_deploy_audit_bastion_user,
+    google_compute_firewall.audit_bastion_iap_ssh,
+  ]
 }
 
 resource "google_cloud_run_v2_service_iam_member" "audit_bastion_invoker" {
