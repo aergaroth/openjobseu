@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.44.0](https://github.com/aergaroth/openjobseu/compare/v2.43.0...v2.44.0) (2026-04-20)
+
+
+### Features
+
+* add BASTION_SA_EMAIL environment variable for internal access ([c823ba9](https://github.com/aergaroth/openjobseu/commit/c823ba9f56b24bc63fd2ccd68032eb3358c9469b))
+
 ## [2.43.0](https://github.com/aergaroth/openjobseu/compare/v2.42.0...v2.43.0) (2026-04-20)
 
 
