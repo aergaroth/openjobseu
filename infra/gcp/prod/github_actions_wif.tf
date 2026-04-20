@@ -155,9 +155,21 @@ resource "google_project_iam_member" "github_deploy_logging_config_writer" {
   member  = "serviceAccount:${google_service_account.github_deploy.email}"
 }
 
-resource "google_project_iam_member" "github_deploy_compute_admin" {
+resource "google_project_iam_member" "github_deploy_instance_admin" {
   project = var.project_id
-  role    = "roles/compute.admin"
+  role    = "roles/compute.instanceAdmin.v1"
+  member  = "serviceAccount:${google_service_account.github_deploy.email}"
+}
+
+resource "google_project_iam_member" "github_deploy_audit_bastion_firewall_admin" {
+  project = var.project_id
+  role    = google_project_iam_custom_role.audit_bastion_firewall_admin.name
+  member  = "serviceAccount:${google_service_account.github_deploy.email}"
+}
+
+resource "google_project_iam_member" "github_deploy_iam_role_admin" {
+  project = var.project_id
+  role    = "roles/iam.roleAdmin"
   member  = "serviceAccount:${google_service_account.github_deploy.email}"
 }
 
