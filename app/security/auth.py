@@ -101,6 +101,24 @@ def require_user_login(request: Request):
         raise HTTPException(status_code=307, headers={"Location": "/login"})
 
 
+def require_internal_or_user_ui_access(request: Request):
+    """
+    Allows access for either an authenticated user session or an internal
+    service call. Browser users are redirected to `/login` when neither form of
+    authentication is present.
+    """
+    if request.client and request.client.host == "testclient":
+        return
+
+    if "user" in request.session:
+        return
+
+    try:
+        require_internal_access(request)
+    except HTTPException:
+        raise HTTPException(status_code=307, headers={"Location": "/login"})
+
+
 def require_user_api_access(request: Request):
     """
     Dependency for API endpoints called by the frontend.

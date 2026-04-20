@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.security.auth import (
-    require_user_login,
-    require_user_api_access,
+    require_internal_or_user_ui_access,
     require_internal_or_user_api_access,
 )
 from app.security.internal_access import require_internal_access
@@ -18,12 +17,12 @@ from app.api.v1.analytics import router as v1_analytics_router
 
 router = APIRouter(prefix="/internal")
 
-# 1. Frontend Admin Panel (HTML Views) - Wymaga poprawnej sesji w przeglądarce
-admin_ui = APIRouter(dependencies=[Depends(require_user_login)])
+# 1. Frontend Admin Panel (HTML Views) - Sesja użytkownika lub wewnętrzny proxy/bastion
+admin_ui = APIRouter(dependencies=[Depends(require_internal_or_user_ui_access)])
 admin_ui.include_router(audit_ui_router)
 
-# 2. Frontend Admin Panel (API calls) - Wymaga poprawnej sesji, zwraca czysty JSON
-admin_api = APIRouter(dependencies=[Depends(require_user_api_access)])
+# 2. Frontend Admin Panel (API calls) - Sesja użytkownika lub wewnętrzny proxy/bastion
+admin_api = APIRouter(dependencies=[Depends(require_internal_or_user_api_access)])
 admin_api.include_router(audit_api_router)
 admin_api.include_router(discovery_ui_router)
 admin_api.include_router(key_mgmt_router)
