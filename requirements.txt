@@ -26,7 +26,7 @@ asn1crypto==1.5.1
     # via scramp
 attrs==26.1.0
     # via aiohttp
-authlib==1.6.10
+authlib==1.7.0
     # via -r requirements.in
 beautifulsoup4==4.14.3
     # via -r requirements.in
@@ -43,16 +43,17 @@ charset-normalizer==3.4.6
     # via requests
 click==8.3.1
     # via uvicorn
-cloud-sql-python-connector[pg8000]==1.20.1
+cloud-sql-python-connector[pg8000]==1.20.2
     # via -r requirements.in
 cryptography==46.0.5
     # via
     #   authlib
     #   cloud-sql-python-connector
     #   google-auth
+    #   joserfc
 dnspython==2.8.0
     # via cloud-sql-python-connector
-fastapi==0.135.3
+fastapi==0.136.0
     # via -r requirements.in
 frozenlist==1.8.0
     # via
@@ -99,6 +100,8 @@ idna==3.11
     #   yarl
 itsdangerous==2.2.0
     # via -r requirements.in
+joserfc==1.6.4
+    # via authlib
 mako==1.3.10
     # via alembic
 markupsafe==3.0.3
