@@ -24,6 +24,13 @@
     operations:           "Operations",
   };
 
+  const COUNTRY_LABELS = {
+    "Home Based - Emea": "Remote - Emea",
+    "Home Based - EMEA": "Remote - Emea",
+  };
+
+  const _AMERICAS_RE = /americ|apac|latam/i;
+
   // ── DOM refs ───────────────────────────────────────────
   const metaEl               = document.getElementById("meta");
   const jobsList             = document.getElementById("jobs-list");
@@ -496,6 +503,21 @@
 
     let displayItems;
     if (segType === "country") {
+      // Normalize "Home Based - X" labels for any data stored before the pipeline fix
+      items = items.map(i => ({
+        ...i,
+        value: i.value.replace(/^home\s+based\s*[-–]\s*/i, "Remote - "),
+      }));
+      // Remove Americas/APAC entries
+      items = items.filter(i => !_AMERICAS_RE.test(i.value));
+      // Remove plain country name if a "(Remote)" variant exists
+      const hasRemote = new Set(
+        items
+          .filter(i => i.value.endsWith(" (Remote)"))
+          .map(i => i.value.slice(0, -" (Remote)".length))
+      );
+      items = items.filter(i => !hasRemote.has(i.value));
+
       const nonEu = items.find(i => i.value === "Non EU");
       const euItems = items.filter(i => i.value !== "Non EU").slice(0, 7);
       displayItems = nonEu ? [...euItems, nonEu] : euItems;
@@ -512,9 +534,8 @@
     displayItems.forEach(item => {
       const label = (labelMap && labelMap[item.value]) || item.value.replace(/_/g, " ");
       const pct = maxActive > 0 ? Math.round((item.jobs_active / maxActive) * 100) : 0;
-      const salary = item.median_salary_eur
-        ? `€${Math.round(item.median_salary_eur / 1000)}k`
-        : null;
+      const salaryK = item.median_salary_eur ? Math.round(item.median_salary_eur / 1000) : 0;
+      const salary = salaryK > 0 ? `€${salaryK}k` : null;
 
       const row = el("li", { class: "breakdown-row" });
       const labelEl = el("span", { class: "breakdown-label" }, [label]);
@@ -526,7 +547,7 @@
       row.appendChild(barWrap);
       row.appendChild(count);
       if (salary) {
-        row.appendChild(el("span", { class: "breakdown-salary" }, [salary]));
+        row.appendChild(el("span", { class: "breakdown-salary", title: "Median salary" }, [salary]));
       }
       list.appendChild(row);
     });
@@ -547,7 +568,9 @@
       const items = data.segments[segType];
       if (!items || items.length === 0) return;
 
-      const labelMap = segType === "job_family" ? JOB_FAMILY_LABELS : null;
+      const labelMap = segType === "job_family" ? JOB_FAMILY_LABELS
+                     : segType === "country"    ? COUNTRY_LABELS
+                     : null;
       const title = SEGMENT_TYPE_LABELS[segType] || segType;
       const panel = renderBreakdownPanel(title, items, labelMap, segType);
       if (panel) {
