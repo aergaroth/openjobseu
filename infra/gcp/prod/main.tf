@@ -102,6 +102,10 @@ resource "google_cloud_run_v2_service" "this" {
         value = google_service_account.scheduler_sa.email
       }
       env {
+        name  = "BASTION_SA_EMAIL"
+        value = google_service_account.audit_bastion_sa.email
+      }
+      env {
         name  = "TICK_TASK_QUEUE_PROJECT"
         value = var.project_id
       }

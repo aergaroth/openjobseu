@@ -49,6 +49,7 @@ def require_internal_access(request: Request):
             allowed_emails = [
                 os.getenv("ALLOWED_AUTH_EMAIL"),
                 os.getenv("SCHEDULER_SA_EMAIL"),
+                os.getenv("BASTION_SA_EMAIL"),
             ]
 
             if email and email in allowed_emails:
