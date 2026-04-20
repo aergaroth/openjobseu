@@ -40,8 +40,8 @@ resource "google_secret_manager_secret_iam_member" "cloud_run_google_cse_id" {
 }
 
 resource "google_cloud_run_v2_service" "this" {
-  name     = var.service_name
-  location = var.region
+  name                = var.service_name
+  location            = var.region
   deletion_protection = false
 
   template {
@@ -198,4 +198,4 @@ resource "google_service_account_iam_member" "cloud_run_can_act_as_scheduler" {
   service_account_id = google_service_account.scheduler_sa.name
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:cloudrun-prod-runtime@openjobseu.iam.gserviceaccount.com"
-} 
+}

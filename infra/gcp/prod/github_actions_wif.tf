@@ -1,7 +1,7 @@
 locals {
   github_repository_full_name = "${var.github_repository_owner}/${var.github_repository_name}"
-  github_ref_subject         = "repo:${var.github_repository_owner}/${var.github_repository_name}:ref:refs/heads/main"
-  github_pr_subject          = "repo:${var.github_repository_owner}/${var.github_repository_name}:pull_request"
+  github_ref_subject          = "repo:${var.github_repository_owner}/${var.github_repository_name}:ref:refs/heads/main"
+  github_pr_subject           = "repo:${var.github_repository_owner}/${var.github_repository_name}:pull_request"
 }
 
 data "google_service_account" "cloud_run_runtime" {
@@ -155,6 +155,12 @@ resource "google_project_iam_member" "github_deploy_logging_config_writer" {
   member  = "serviceAccount:${google_service_account.github_deploy.email}"
 }
 
+resource "google_project_iam_member" "github_deploy_compute_admin" {
+  project = var.project_id
+  role    = "roles/compute.admin"
+  member  = "serviceAccount:${google_service_account.github_deploy.email}"
+}
+
 resource "google_service_account_iam_member" "github_deploy_runtime_user" {
   service_account_id = data.google_service_account.cloud_run_runtime.name
   role               = "roles/iam.serviceAccountUser"
@@ -163,6 +169,12 @@ resource "google_service_account_iam_member" "github_deploy_runtime_user" {
 
 resource "google_service_account_iam_member" "github_deploy_scheduler_user" {
   service_account_id = google_service_account.scheduler_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.github_deploy.email}"
+}
+
+resource "google_service_account_iam_member" "github_deploy_audit_bastion_user" {
+  service_account_id = google_service_account.audit_bastion_sa.name
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.github_deploy.email}"
 }

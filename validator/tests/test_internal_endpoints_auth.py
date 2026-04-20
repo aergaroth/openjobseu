@@ -7,6 +7,7 @@ from google.oauth2 import id_token
 
 from app.main import app
 from app.security.auth import (
+    require_internal_or_user_ui_access,
     require_user_login,
     require_user_api_access,
     require_internal_or_user_api_access,
@@ -34,6 +35,7 @@ def test_all_internal_routes_are_protected_structurally():
         has_auth = False
         for dep in route.dependencies:
             if dep.dependency in (
+                require_internal_or_user_ui_access,
                 require_user_login,
                 require_user_api_access,
                 require_internal_or_user_api_access,
@@ -79,6 +81,7 @@ def test_internal_endpoints_functional_auth_rejection():
         raise HTTPException(status_code=401, detail="Mocked Auth Reject")
 
     app.dependency_overrides[require_user_login] = mock_unauthorized
+    app.dependency_overrides[require_internal_or_user_ui_access] = mock_unauthorized
     app.dependency_overrides[require_user_api_access] = mock_unauthorized
     app.dependency_overrides[require_internal_or_user_api_access] = mock_unauthorized
     app.dependency_overrides[require_internal_access] = mock_unauthorized

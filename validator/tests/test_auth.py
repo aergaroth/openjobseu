@@ -8,6 +8,7 @@ import app.security.auth as auth_module
 from app.security.auth import (
     auth_callback,
     configure_oauth,
+    require_internal_or_user_ui_access,
     login,
     logout,
     require_internal_or_user_api_access,
@@ -221,6 +222,44 @@ def test_require_internal_or_user_api_access_allows_user_session():
     request = Request(scope)
 
     require_internal_or_user_api_access(request)
+
+
+def test_require_internal_or_user_ui_access_allows_user_session():
+    scope = {
+        "type": "http",
+        "client": ("192.168.1.1", 12345),
+        "session": {"user": {"email": "test@example.com"}},
+    }
+    request = Request(scope)
+
+    require_internal_or_user_ui_access(request)
+
+
+def test_require_internal_or_user_ui_access_allows_testclient():
+    scope = {
+        "type": "http",
+        "client": ("testclient", 50000),
+        "session": {},
+    }
+    request = Request(scope)
+
+    require_internal_or_user_ui_access(request)
+
+
+def test_require_internal_or_user_ui_access_redirects_unauthenticated_external():
+    scope = {
+        "type": "http",
+        "client": ("192.168.1.1", 12345),
+        "session": {},
+        "headers": [],
+    }
+    request = Request(scope)
+
+    with pytest.raises(HTTPException) as exc_info:
+        require_internal_or_user_ui_access(request)
+
+    assert exc_info.value.status_code == 307
+    assert exc_info.value.headers["Location"] == "/login"
 
 
 def test_require_internal_or_user_api_access_allows_testclient():
