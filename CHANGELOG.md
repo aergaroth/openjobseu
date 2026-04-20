@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.43.0](https://github.com/aergaroth/openjobseu/compare/v2.42.0...v2.43.0) (2026-04-20)
+
+
+### Features
+
+* update IAM roles for audit bastion and GitHub deploy automation ([35c566e](https://github.com/aergaroth/openjobseu/commit/35c566ea4eac2ecbcb54af1d0bf01f2a0eb2d926))
+
+
+### Bug Fixes
+
+* update dependency reference for audit bastion instance ([413b60d](https://github.com/aergaroth/openjobseu/commit/413b60d715f0100af2fb9da3a58dc583dc8d5d81))
+
 ## [2.42.0](https://github.com/aergaroth/openjobseu/compare/v2.41.1...v2.42.0) (2026-04-20)
 
 
