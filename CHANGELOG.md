@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.46.0](https://github.com/aergaroth/openjobseu/compare/v2.45.0...v2.46.0) (2026-04-21)
+
+
+### Features
+
+* add support for Breezy provider in careers crawler and dorking modules; enhance logging for quality checks ([1de23b8](https://github.com/aergaroth/openjobseu/commit/1de23b89a117b463aa30ded2c56939f445cd61ca))
+
 ## [2.45.0](https://github.com/aergaroth/openjobseu/compare/v2.44.0...v2.45.0) (2026-04-20)
 
 
