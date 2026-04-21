@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.45.0](https://github.com/aergaroth/openjobseu/compare/v2.44.0...v2.45.0) (2026-04-20)
+
+
+### Features
+
+* normalize country labels and filter out specific regions in market segments ([6e610bf](https://github.com/aergaroth/openjobseu/commit/6e610bfc14d689d4685b65174743d7a1c06c9972))
+
 ## [2.44.0](https://github.com/aergaroth/openjobseu/compare/v2.43.0...v2.44.0) (2026-04-20)
 
 
