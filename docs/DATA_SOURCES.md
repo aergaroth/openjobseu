@@ -76,3 +76,50 @@ Discovery uses multiple read-only sources for provider/slug candidates:
 
 Candidate slugs are first stored in `discovered_slugs` and only promoted to `company_ats` after quality checks/probing.  
 For Teamtailor, public discovery stores account candidates with `needs_token` status, because API access requires a per-company token not derivable from public URLs.
+
+JobAdder uses a mixed contract:
+- `company_ats.ats_slug` stores the public `board_id` extracted from careers URLs
+- `JOBADDER_API_TOKEN` is a global environment secret used by the adapter for authenticated `fetch()` and `probe_jobs()`
+
+## Discovery Diagnostics
+
+When a provider seems missing from the final dataset, check the pipeline in this order:
+- `discovered_slugs` — was a candidate provider/slug found at all?
+- `company_ats` — was the candidate promoted to an active ATS integration?
+- `job_sources` — did ingestion persist source mappings for this provider?
+- `jobs` — did canonical jobs get created from those source mappings?
+
+Example drill-down for one provider:
+
+```sql
+SELECT provider, slug, discovery_source, status, created_at
+FROM discovered_slugs
+WHERE provider = 'breezy'
+ORDER BY created_at DESC
+LIMIT 50;
+```
+
+```sql
+SELECT provider, ats_slug, is_active, last_sync_at, updated_at
+FROM company_ats
+WHERE provider = 'breezy'
+ORDER BY updated_at DESC
+LIMIT 50;
+```
+
+```sql
+SELECT source, source_job_id, last_seen_at
+FROM job_sources
+WHERE source LIKE 'breezy:%'
+ORDER BY last_seen_at DESC
+LIMIT 50;
+```
+
+```sql
+SELECT DISTINCT j.job_id, j.title, js.source
+FROM jobs j
+JOIN job_sources js ON js.job_id = j.job_id
+WHERE js.source LIKE 'breezy:%'
+ORDER BY js.source, j.job_id
+LIMIT 50;
+```

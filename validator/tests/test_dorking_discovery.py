@@ -17,6 +17,10 @@ def test_extract_slug_from_url_subdomain_based():
     assert _extract_slug_from_url("https://acme-inc.traffit.com/public/an/abc", "traffit") == "acme-inc"
     assert _extract_slug_from_url("https://my-startup.traffit.com", "traffit") == "my-startup"
 
+    # Breezy
+    assert _extract_slug_from_url("https://acme.breezy.hr/json", "breezy") == "acme"
+    assert _extract_slug_from_url("https://my-startup.breezy.hr/p/123", "breezy") == "my-startup"
+
 
 def test_extract_slug_from_url_path_based():
     # Lever
