@@ -88,6 +88,18 @@ def run_promote_discovered_slugs() -> dict[str, int]:
             recent_job_at = probe_result.get("recent_job_at")
 
             if jobs_total < QUALITY_MIN_JOBS or not _is_recent(recent_job_at):
+                logger.info(
+                    "promote_discovered_slug_quality_rejected",
+                    extra={
+                        "component": "discovery",
+                        "phase": "promote_discovered",
+                        "provider": provider,
+                        "slug": slug,
+                        "jobs_total": jobs_total,
+                        "recent_job_at": recent_job_at,
+                        "min_jobs_required": QUALITY_MIN_JOBS,
+                    },
+                )
                 with engine.begin() as conn:
                     update_discovered_slug_status(conn, slug_id, "rejected")
                 metrics["slugs_rejected"] += 1

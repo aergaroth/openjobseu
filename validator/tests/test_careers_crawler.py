@@ -174,6 +174,14 @@ def test_detect_provider_jobadder():
     assert crawler_module._detect_provider("https://jobadder.com/somethingelse") is None
 
 
+def test_detect_provider_breezy():
+    assert crawler_module._detect_provider("https://acme.breezy.hr/") == ("breezy", "acme")
+    assert crawler_module._detect_provider('<a href="https://my-company.breezy.hr/json">Jobs</a>') == (
+        "breezy",
+        "my-company",
+    )
+
+
 def _make_jobadder_discovery_monkeypatches(monkeypatch, board_id="board-42"):
     """Shared fixture helper for JobAdder discovery tests."""
     mock_row = {"company_id": "999", "careers_url": "https://example.com/careers"}

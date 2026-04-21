@@ -36,6 +36,7 @@ PROVIDER_PATTERNS: Dict[str, re.Pattern] = {
     "personio": re.compile(r"([a-zA-Z0-9_-]+)\.jobs\.personio\.[a-z]{2,4}", re.IGNORECASE),
     "recruitee": re.compile(r"([a-zA-Z0-9_-]+)\.recruitee\.com", re.IGNORECASE),
     "traffit": re.compile(r"([a-zA-Z0-9_-]+)\.traffit\.com", re.IGNORECASE),
+    "breezy": re.compile(r"([a-zA-Z0-9_-]+)\.breezy\.hr", re.IGNORECASE),
     "smartrecruiters": re.compile(r"jobs\.smartrecruiters\.com/([a-zA-Z0-9_-]+)", re.IGNORECASE),
     # JobAdder board IDs are platform-assigned (not derivable from company name),
     # so guessing is not applicable — careers crawler is the only automatic discovery path.
@@ -318,7 +319,8 @@ def run_careers_discovery() -> Dict[str, int]:
                     continue
                 metrics["ats_detected"] += 1
 
-                # Providers like JobAdder require an API token to probe.
+                # JobAdder probing requires a global API token, but the discovered
+                # slug itself is still the public board_id from the careers URL.
                 # When the token is absent, fall back to inserting the board
                 # directly — the careers-page detection is sufficient signal.
                 required_token_env = PROVIDERS_REQUIRING_TOKEN.get(provider)
@@ -368,6 +370,20 @@ def run_careers_discovery() -> Dict[str, int]:
                     or remote_hits < QUALITY_MIN_REMOTE_HITS
                     or not _is_recent(recent_job_at)
                 ):
+                    logger.info(
+                        "discovery_quality_gate_rejected",
+                        extra={
+                            "component": "discovery",
+                            "phase": "careers_discovery",
+                            "provider": provider,
+                            "slug": slug,
+                            "jobs_total": jobs_total,
+                            "remote_hits": remote_hits,
+                            "recent_job_at": recent_job_at,
+                            "min_jobs_required": QUALITY_MIN_JOBS,
+                            "min_remote_hits_required": QUALITY_MIN_REMOTE_HITS,
+                        },
+                    )
                     metrics["ats_skipped_quality"] += 1
                     continue
 

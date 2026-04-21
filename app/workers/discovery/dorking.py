@@ -23,14 +23,14 @@ def _extract_slug_from_url(url: str, provider: str) -> str | None:
         if not hostname:
             return None
 
-        if provider in ["personio", "recruitee", "traffit"]:
+        if provider in ["personio", "recruitee", "traffit", "breezy"]:
             # Subdomain-based slug: e.g., https://slug.jobs.personio.com
             match = re.match(r"([^.]+)\.", hostname)
             if match:
                 return match.group(1)
 
         elif provider == "jobadder":
-            # Path structure: /jobboard/{boardId}
+            # Path structure: /jobboard/{board_id}
             # e.g., https://app.jobadder.com/jobboard/abc-123
             parts = path.strip("/").split("/")
             if len(parts) >= 2 and parts[0] == "jobboard" and parts[1]:
