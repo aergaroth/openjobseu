@@ -512,7 +512,7 @@
       items = items.filter(i => !_AMERICAS_RE.test(i.value));
       // Deduplicate: for each canonical region keep the highest-priority remote label.
       // Priority: "Remote - X" > "X (Remote)" > plain "X"  (mirrors backend _normalize_country_rows)
-      const _canon = v => v.replace(/^remote\s*[-–]\s*/i, "").replace(/\s*\(remote\)\s*$/i, "").trim();
+      const _canon = v => v.replace(/^republic\s+of\s+/i, "").replace(/^remote\s*[-–]\s*/i, "").replace(/\s*\(remote\)\s*$/i, "").trim();
       const _prio  = v => /^remote\s*[-–]/i.test(v) ? 0 : /\s*\(remote\)$/i.test(v) ? 1 : 2;
       const canonMap = new Map();
       items.forEach(i => {
@@ -541,9 +541,10 @@
       const label = (labelMap && labelMap[item.value]) || item.value.replace(/_/g, " ");
       const pct = maxActive > 0 ? Math.round((item.jobs_active / maxActive) * 100) : 0;
       const salaryK = item.median_salary_eur ? Math.round(item.median_salary_eur / 1000) : 0;
-      // salary_count undefined = stary JSON bez pola → fallback: pokazuj salary jak poprzednio
+      // salary_count undefined = stary JSON bez pola → fallback: pokazuj salary jak poprzednio,
+      // ale zawsze wymagaj minimum €10k mediany (filtr sanity niezależny od salary_count)
       const sc = item.salary_count;
-      const salaryReliable = salaryK > 0 && (
+      const salaryReliable = salaryK >= 10 && (
         sc === undefined
           ? true
           : sc >= 3 && item.jobs_active > 0 && sc / item.jobs_active >= 0.25

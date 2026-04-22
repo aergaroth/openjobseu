@@ -92,6 +92,20 @@ def test_preserves_row_fields_after_normalization():
     assert result[0]["salary_count"] == 2
 
 
+def test_republic_of_merges_with_remote_variant():
+    rows = [_row("Republic Of Ireland"), _row("Remote - Ireland")]
+    result = _normalize_country_rows(rows)
+    values = [r["segment_value"] for r in result]
+    assert "Remote - Ireland" in values
+    assert "Republic Of Ireland" not in values
+
+
+def test_republic_of_kept_when_no_remote_variant():
+    rows = [_row("Republic Of Cyprus")]
+    result = _normalize_country_rows(rows)
+    assert len(result) == 1
+
+
 def test_dedup_keeps_salary_count_of_winning_variant():
     rows = [_row("EMEA", jobs_active=52, salary_count=10), _row("Remote - EMEA", jobs_active=83, salary_count=30)]
     result = _normalize_country_rows(rows)
