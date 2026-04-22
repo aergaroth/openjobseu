@@ -849,6 +849,13 @@ select:focus  { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,82,22
   text-align: right;
 }
 
+.breakdown-footnote {
+  margin-top: 1rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
 @media (min-width: 960px) {
   .breakdown-grid { grid-template-columns: repeat(3, 1fr); }
   .breakdown-row { grid-template-columns: 120px 1fr 40px 36px; }

@@ -503,11 +503,14 @@
 
     let displayItems;
     if (segType === "country") {
-      // Normalize "Home Based - X" labels for any data stored before the pipeline fix
-      items = items.map(i => ({
-        ...i,
-        value: i.value.replace(/^home\s+based\s*[-–]\s*/i, "Remote - "),
-      }));
+      // Normalize labels for any data stored before the pipeline fix
+      items = items.map(i => {
+        let v = i.value;
+        v = v.replace(/^home\s+based\s*[-–]\s*/i, "Remote - ");
+        v = v.replace(/^remote\s+job\s*[,\s]+\s*/i,  "Remote - ");
+        v = v.replace(/^(.+?)\s*\(remote\)\s*$/i,    "Remote - $1");
+        return { ...i, value: v };
+      });
       // Remove Americas/APAC entries
       items = items.filter(i => !_AMERICAS_RE.test(i.value));
       // Deduplicate: for each canonical region keep the highest-priority remote label.
