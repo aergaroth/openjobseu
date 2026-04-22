@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.47.1](https://github.com/aergaroth/openjobseu/compare/v2.47.0...v2.47.1) (2026-04-22)
+
+
+### Bug Fixes
+
+* **feed:** handle undefined salary_count and improve region deduplication ([8291b45](https://github.com/aergaroth/openjobseu/commit/8291b45f847b210b1e6fb6b50d47fc6f6f475467))
+
 ## [2.47.0](https://github.com/aergaroth/openjobseu/compare/v2.46.0...v2.47.0) (2026-04-22)
 
 
