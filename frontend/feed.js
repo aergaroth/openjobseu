@@ -510,13 +510,19 @@
       }));
       // Remove Americas/APAC entries
       items = items.filter(i => !_AMERICAS_RE.test(i.value));
-      // Remove plain country name if a "(Remote)" variant exists
-      const hasRemote = new Set(
-        items
-          .filter(i => i.value.endsWith(" (Remote)"))
-          .map(i => i.value.slice(0, -" (Remote)".length))
-      );
-      items = items.filter(i => !hasRemote.has(i.value));
+      // Deduplicate: for each canonical region keep the highest-priority remote label.
+      // Priority: "Remote - X" > "X (Remote)" > plain "X"  (mirrors backend _normalize_country_rows)
+      const _canon = v => v.replace(/^remote\s*[-–]\s*/i, "").replace(/\s*\(remote\)\s*$/i, "").trim();
+      const _prio  = v => /^remote\s*[-–]/i.test(v) ? 0 : /\s*\(remote\)$/i.test(v) ? 1 : 2;
+      const canonMap = new Map();
+      items.forEach(i => {
+        const c = _canon(i.value);
+        if (!c) return;
+        const prev = canonMap.get(c);
+        if (!prev || _prio(i.value) < _prio(prev.value)) canonMap.set(c, i);
+      });
+      const bestSet = new Set([...canonMap.values()].map(i => i.value));
+      items = items.filter(i => bestSet.has(i.value));
 
       const nonEu = items.find(i => i.value === "Non EU");
       const euItems = items.filter(i => i.value !== "Non EU").slice(0, 7);
@@ -535,10 +541,13 @@
       const label = (labelMap && labelMap[item.value]) || item.value.replace(/_/g, " ");
       const pct = maxActive > 0 ? Math.round((item.jobs_active / maxActive) * 100) : 0;
       const salaryK = item.median_salary_eur ? Math.round(item.median_salary_eur / 1000) : 0;
-      const salaryReliable = salaryK > 0
-        && (item.salary_count || 0) >= 3
-        && item.jobs_active > 0
-        && (item.salary_count / item.jobs_active) >= 0.25;
+      // salary_count undefined = stary JSON bez pola → fallback: pokazuj salary jak poprzednio
+      const sc = item.salary_count;
+      const salaryReliable = salaryK > 0 && (
+        sc === undefined
+          ? true
+          : sc >= 3 && item.jobs_active > 0 && sc / item.jobs_active >= 0.25
+      );
       const salary = salaryReliable ? `€${salaryK}k` : null;
 
       const row = el("li", { class: "breakdown-row" });
