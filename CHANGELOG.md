@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.47.0](https://github.com/aergaroth/openjobseu/compare/v2.46.0...v2.47.0) (2026-04-22)
+
+
+### Features
+
+* add salary_count to market segments and improve normalization logic ([1316e33](https://github.com/aergaroth/openjobseu/commit/1316e33280cbdd27383696a8f21377449e3ed702))
+
+
+### Bug Fixes
+
+* increase delay in health check to allow more time for service startup ([7069be1](https://github.com/aergaroth/openjobseu/commit/7069be1a7d5702728fef2ce5f5e77f13eb3959fb))
+* increase delay in health check to allow more time for service startup ([e0ccf7f](https://github.com/aergaroth/openjobseu/commit/e0ccf7f236c68e559577abcc6345336f2826772b))
+
 ## [2.46.0](https://github.com/aergaroth/openjobseu/compare/v2.45.0...v2.46.0) (2026-04-21)
 
 
