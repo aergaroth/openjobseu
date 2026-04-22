@@ -31,6 +31,8 @@ def _normalize_country_rows(rows: list[dict]) -> list[dict]:
         if any(kw in val.lower() for kw in _EXCLUDE_SCOPE_KEYWORDS):
             continue
         val = _re.sub(r"(?i)^home\s+based\s*[-–]\s*", "Remote - ", val)
+        # "Remote Job, Warsaw" → "Remote - Warsaw"
+        val = _re.sub(r"(?i)^remote\s+job\s*[,\s]+\s*", "Remote - ", val)
         normalized.append({**row, "segment_value": val})
 
     # For each canonical region, keep only the highest-priority label.
