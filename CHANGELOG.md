@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.47.3](https://github.com/aergaroth/openjobseu/compare/v2.47.2...v2.47.3) (2026-04-22)
+
+
+### Bug Fixes
+
+* Enhance label normalization for remote job entries and add breakdown footnote ([58e97db](https://github.com/aergaroth/openjobseu/commit/58e97dba86f3f999fb959f42bffbc0b8ea707094))
+
 ## [2.47.2](https://github.com/aergaroth/openjobseu/compare/v2.47.1...v2.47.2) (2026-04-22)
 
 
