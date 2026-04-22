@@ -8,7 +8,8 @@ _EXCLUDE_SCOPE_KEYWORDS = ["americ", "apac", "latam", "asia pacific"]
 
 
 def _canonical_region(val: str) -> str:
-    """Strip all remote markers to get the base region name."""
+    """Strip remote markers and formal country name prefixes to get the base region name."""
+    val = _re.sub(r"(?i)^republic\s+of\s+", "", val)
     val = _re.sub(r"(?i)^remote\s*[-–]\s*", "", val)
     val = _re.sub(r"(?i)\s*\(remote\)\s*$", "", val)
     return val.strip()
