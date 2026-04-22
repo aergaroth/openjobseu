@@ -535,7 +535,11 @@
       const label = (labelMap && labelMap[item.value]) || item.value.replace(/_/g, " ");
       const pct = maxActive > 0 ? Math.round((item.jobs_active / maxActive) * 100) : 0;
       const salaryK = item.median_salary_eur ? Math.round(item.median_salary_eur / 1000) : 0;
-      const salary = salaryK > 0 ? `€${salaryK}k` : null;
+      const salaryReliable = salaryK > 0
+        && (item.salary_count || 0) >= 3
+        && item.jobs_active > 0
+        && (item.salary_count / item.jobs_active) >= 0.25;
+      const salary = salaryReliable ? `€${salaryK}k` : null;
 
       const row = el("li", { class: "breakdown-row" });
       const labelEl = el("span", { class: "breakdown-label" }, [label]);

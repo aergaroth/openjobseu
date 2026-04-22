@@ -22,7 +22,7 @@ from app.workers.market_types import (
 )
 from storage.db_engine import get_engine
 from storage.repositories.market_repository import get_active_jobs_compliance_counts, get_market_daily_stats
-from storage.repositories.market_segments_repository import get_market_segments_snapshot
+from storage.repositories.market_segments_repository import _normalize_country_rows, get_market_segments_snapshot
 
 logger = logging.getLogger("openjobseu.runtime")
 
@@ -263,6 +263,10 @@ def _export_market_segments(bucket) -> int:
     with engine.connect() as conn:
         raw_rows = get_market_segments_snapshot(conn)
 
+    country_rows = [r for r in raw_rows if r["segment_type"] == "country"]
+    other_rows = [r for r in raw_rows if r["segment_type"] != "country"]
+    raw_rows = _normalize_country_rows(country_rows) + other_rows
+
     grouped: dict[str, list[SegmentItem]] = {}
     for row in raw_rows:
         segment_type = row["segment_type"]
@@ -270,6 +274,7 @@ def _export_market_segments(bucket) -> int:
             value=row["segment_value"],
             jobs_active=row["jobs_active"],
             jobs_created=row["jobs_created"],
+            salary_count=row.get("salary_count") or 0,
             avg_salary_eur=row["avg_salary_eur"],
             median_salary_eur=row["median_salary_eur"],
         )

@@ -20,4 +20,5 @@ unfixable = ["F401"]
 env_files = [".env"]
 markers = [
   "integration_db: tests that require real PostgreSQL integration",
+  "no_db: tests that do not require a database connection",
 ]
