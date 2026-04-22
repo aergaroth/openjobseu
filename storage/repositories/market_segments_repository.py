@@ -33,8 +33,6 @@ def _normalize_country_rows(rows: list[dict]) -> list[dict]:
         val = _re.sub(r"(?i)^home\s+based\s*[-–]\s*", "Remote - ", val)
         # "Remote Job, Warsaw" → "Remote - Warsaw"
         val = _re.sub(r"(?i)^remote\s+job\s*[,\s]+\s*", "Remote - ", val)
-        # "Sweden (Remote)" → "Remote - Sweden"
-        val = _re.sub(r"(?i)^(.+?)\s*\(remote\)\s*$", r"Remote - \1", val)
         normalized.append({**row, "segment_value": val})
 
     # For each canonical region, keep only the highest-priority label.
