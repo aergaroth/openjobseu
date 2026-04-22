@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.47.2](https://github.com/aergaroth/openjobseu/compare/v2.47.1...v2.47.2) (2026-04-22)
+
+
+### Bug Fixes
+
+* normalize "Republic of" country prefix and require €10k minimum salary ([9747135](https://github.com/aergaroth/openjobseu/commit/97471354148a1edfef2acce78995509724c678d7))
+
 ## [2.47.1](https://github.com/aergaroth/openjobseu/compare/v2.47.0...v2.47.1) (2026-04-22)
 
 
