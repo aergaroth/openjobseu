@@ -7,6 +7,22 @@ from sqlalchemy.engine import Connection
 _EXCLUDE_SCOPE_KEYWORDS = ["americ", "apac", "latam", "asia pacific"]
 
 
+def _canonical_region(val: str) -> str:
+    """Strip all remote markers to get the base region name."""
+    val = _re.sub(r"(?i)^remote\s*[-–]\s*", "", val)
+    val = _re.sub(r"(?i)\s*\(remote\)\s*$", "", val)
+    return val.strip()
+
+
+def _remote_priority(val: str) -> int:
+    """Lower = preferred. 'Remote - X' > 'X (Remote)' > plain 'X'."""
+    if _re.match(r"(?i)^remote\s*[-–]", val):
+        return 0
+    if val.lower().endswith(" (remote)"):
+        return 1
+    return 2
+
+
 def _normalize_country_rows(rows: list[dict]) -> list[dict]:
     normalized = []
     for row in rows:
@@ -16,13 +32,19 @@ def _normalize_country_rows(rows: list[dict]) -> list[dict]:
         val = _re.sub(r"(?i)^home\s+based\s*[-–]\s*", "Remote - ", val)
         normalized.append({**row, "segment_value": val})
 
-    all_values = {r["segment_value"] for r in normalized}
-    has_remote_variant = {
-        val.replace(" (Remote)", "")
-        for val in all_values
-        if val.endswith(" (Remote)") and val.replace(" (Remote)", "") in all_values
-    }
-    return [r for r in normalized if r["segment_value"] not in has_remote_variant]
+    # For each canonical region, keep only the highest-priority label.
+    # e.g. "Remote - EMEA" wins over "EMEA"; "Spain (Remote)" wins over "Spain".
+    canonical_to_best: dict[str, str] = {}
+    for r in normalized:
+        v = r["segment_value"]
+        c = _canonical_region(v)
+        if not c:
+            continue
+        if c not in canonical_to_best or _remote_priority(v) < _remote_priority(canonical_to_best[c]):
+            canonical_to_best[c] = v
+
+    best_labels = set(canonical_to_best.values())
+    return [r for r in normalized if r["segment_value"] in best_labels]
 
 
 def compute_market_segments(conn: Connection, date: date) -> list[dict]:
@@ -42,9 +64,10 @@ def compute_market_segments(conn: Connection, date: date) -> list[dict]:
                 END AS segment_value,
                 COUNT(*) FILTER (WHERE availability_status = 'active') AS jobs_active,
                 COUNT(*) FILTER (WHERE first_seen_at >= :start_time AND first_seen_at < :end_time) AS jobs_created,
-                AVG(salary_min_eur) AS avg_salary_eur,
+                COUNT(*) FILTER (WHERE salary_min_eur >= 10000) AS salary_count,
+                AVG(CASE WHEN salary_min_eur >= 10000 THEN salary_min_eur END) AS avg_salary_eur,
                 percentile_cont(0.5)
-                    WITHIN GROUP (ORDER BY NULLIF(salary_min_eur, 0)) AS median_salary_eur
+                    WITHIN GROUP (ORDER BY CASE WHEN salary_min_eur >= 10000 THEN salary_min_eur END) AS median_salary_eur
             FROM jobs
             WHERE geo_class IS NOT NULL
               AND compliance_status = 'approved'
@@ -65,6 +88,7 @@ def compute_market_segments(conn: Connection, date: date) -> list[dict]:
                 "segment_value": item["segment_value"],
                 "jobs_active": int(item["jobs_active"] or 0),
                 "jobs_created": int(item["jobs_created"] or 0),
+                "salary_count": int(item["salary_count"] or 0),
                 "avg_salary_eur": item["avg_salary_eur"],
                 "median_salary_eur": item["median_salary_eur"],
             }
@@ -80,9 +104,10 @@ def compute_market_segments(conn: Connection, date: date) -> list[dict]:
                     {column_name} AS segment_value,
                     COUNT(*) FILTER (WHERE availability_status = 'active') AS jobs_active,
                     COUNT(*) FILTER (WHERE first_seen_at >= :start_time AND first_seen_at < :end_time) AS jobs_created,
-                    AVG(salary_min_eur) AS avg_salary_eur,
+                    COUNT(*) FILTER (WHERE salary_min_eur >= 10000) AS salary_count,
+                    AVG(CASE WHEN salary_min_eur >= 10000 THEN salary_min_eur END) AS avg_salary_eur,
                     percentile_cont(0.5)
-                        WITHIN GROUP (ORDER BY NULLIF(salary_min_eur, 0)) AS median_salary_eur
+                        WITHIN GROUP (ORDER BY CASE WHEN salary_min_eur >= 10000 THEN salary_min_eur END) AS median_salary_eur
                 FROM jobs
                 WHERE {column_name} IS NOT NULL
                   AND compliance_status = 'approved'
@@ -103,6 +128,7 @@ def compute_market_segments(conn: Connection, date: date) -> list[dict]:
                     "segment_value": item["segment_value"],
                     "jobs_active": int(item["jobs_active"] or 0),
                     "jobs_created": int(item["jobs_created"] or 0),
+                    "salary_count": int(item["salary_count"] or 0),
                     "avg_salary_eur": item["avg_salary_eur"],
                     "median_salary_eur": item["median_salary_eur"],
                 }
@@ -121,7 +147,7 @@ def get_market_segments_snapshot(conn: Connection) -> list[dict]:
         conn.execute(
             text("""
                 SELECT segment_type, segment_value, jobs_active, jobs_created,
-                       avg_salary_eur, median_salary_eur
+                       salary_count, avg_salary_eur, median_salary_eur
                 FROM market_daily_stats_segments
                 WHERE date = (SELECT MAX(date) FROM market_daily_stats_segments)
                 ORDER BY segment_type, jobs_active DESC
@@ -146,6 +172,7 @@ def insert_market_segments(conn: Connection, rows: list[dict]) -> None:
                 segment_value,
                 jobs_active,
                 jobs_created,
+                salary_count,
                 avg_salary_eur,
                 median_salary_eur
             )
@@ -155,11 +182,17 @@ def insert_market_segments(conn: Connection, rows: list[dict]) -> None:
                 :segment_value,
                 :jobs_active,
                 :jobs_created,
+                :salary_count,
                 :avg_salary_eur,
                 :median_salary_eur
             )
             ON CONFLICT (date, segment_type, segment_value)
-            DO NOTHING
+            DO UPDATE SET
+                jobs_active = EXCLUDED.jobs_active,
+                jobs_created = EXCLUDED.jobs_created,
+                salary_count = EXCLUDED.salary_count,
+                avg_salary_eur = EXCLUDED.avg_salary_eur,
+                median_salary_eur = EXCLUDED.median_salary_eur
             """
         ),
         rows,

@@ -52,6 +52,7 @@ from alembic import command
 from alembic.config import Config
 
 _engine = None
+_db_available = True
 _DB_PROFILE_ENABLED = os.environ.get("PYTEST_DB_PROFILE") == "1"
 _logger = logging.getLogger(__name__)
 _db_profile_stats = {
@@ -117,8 +118,9 @@ def db_engine_setup():
         upgrade_started = perf_counter()
         command.upgrade(alembic_cfg, "head")
         _db_profile_stats["alembic_upgrade_s"] = perf_counter() - upgrade_started
-    except (OperationalError, InterfaceError) as exc:  # pragma: no cover
-        pytest.skip(f"database unavailable, skipping tests: {exc}")
+    except (OperationalError, InterfaceError):  # pragma: no cover
+        global _db_available
+        _db_available = False
     except ProgrammingError as exc:
         raise RuntimeError("test database schema is missing. Ensure Alembic migrations are up to date.") from exc
     finally:
@@ -132,18 +134,18 @@ def db_engine_setup():
 
 
 @pytest.fixture(autouse=True)
-def clean_db(db_engine_setup):
+def clean_db(db_engine_setup, request):
     """Truncate the main tables before each test so state doesn't leak.
 
     We deliberately use ``BEGIN/COMMIT`` semantics rather than ``DROP`` so
     that the migration state remains intact and Alembic migrations can be invoked
     multiple times in a single session without any special handling.
-    If the database is unreachable we skip the entire test session rather
-    than hard-fail; that keeps the repository usable without a running
-    backend (e.g. for linting or editing).
+    Tests marked ``no_db`` run even when the database is unreachable.
     """
-    global _engine
-    if _engine is None:
+    if not _db_available:
+        if not request.node.get_closest_marker("no_db"):
+            pytest.skip("database unavailable")
+        yield
         return
 
     clean_started = perf_counter()

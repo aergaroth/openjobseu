@@ -36,6 +36,7 @@ class SegmentItem(BaseModel):
     value: str
     jobs_active: int
     jobs_created: int
+    salary_count: int = 0
     avg_salary_eur: Optional[float] = None
     median_salary_eur: Optional[float] = None
 
