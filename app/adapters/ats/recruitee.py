@@ -1,8 +1,10 @@
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
+from app.adapters.ats.utils import normalize_source_datetime
 
 
 logger = logging.getLogger(__name__)
@@ -98,6 +100,8 @@ class RecruiteeAdapter(ATSAdapter):
         company_name = raw_job.get("company_name", "")
         if not company_name:
             company_name = slug.replace("-", " ").replace("_", " ").strip().title()
+        first_seen_at = normalize_source_datetime(raw_job.get("created_at")) or datetime.now(timezone.utc).isoformat()
+        salary_info = self.extract_salary(None)
 
         return {
             "job_id": f"recruitee:{slug}:{job_id}",
@@ -111,6 +115,8 @@ class RecruiteeAdapter(ATSAdapter):
             "source_url": url,
             "status": "new",
             "department": department,
+            "first_seen_at": first_seen_at,
+            **salary_info,
         }
 
     def probe_jobs(self, slug: str) -> Dict[str, Any]:

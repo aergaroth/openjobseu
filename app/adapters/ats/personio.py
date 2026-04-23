@@ -1,9 +1,11 @@
 import logging
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from typing import Any, Dict, Iterator, List, cast
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
+from app.adapters.ats.utils import normalize_source_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +97,8 @@ class PersonioAdapter(ATSAdapter):
         remote_source_flag = self.detect_remote(title, location, explicit_flag=is_remote_office)
 
         company_name = slug.replace("-", " ").replace("_", " ").strip().title()
+        first_seen_at = normalize_source_datetime(raw_job.get("createdAt")) or datetime.now(timezone.utc).isoformat()
+        salary_info = self.extract_salary(None)
 
         return {
             "job_id": f"personio:{slug}:{job_id}",
@@ -108,6 +112,8 @@ class PersonioAdapter(ATSAdapter):
             "source_url": "",  # No URL in Personio XML feed
             "status": "new",
             "department": raw_job.get("department", ""),
+            "first_seen_at": first_seen_at,
+            **salary_info,
         }
 
     def probe_jobs(self, slug: str) -> Dict[str, Any]:

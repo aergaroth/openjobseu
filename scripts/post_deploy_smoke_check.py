@@ -62,7 +62,7 @@ def http_check():
     """Checks the /health endpoint, allowing time for the service to start."""
     logger.info("→ Health check")
     retries = 10
-    delay = 10
+    delay = 15
 
     for attempt in range(1, retries + 1):
         try:
