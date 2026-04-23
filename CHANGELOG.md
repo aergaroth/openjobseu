@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.47.4](https://github.com/aergaroth/openjobseu/compare/v2.47.3...v2.47.4) (2026-04-23)
+
+
+### Bug Fixes
+
+* Add first_seen_at and salary_info to ATS adapter job data ([c1feffc](https://github.com/aergaroth/openjobseu/commit/c1feffc1bac67066cceb2c656283c1ba3ffb117a))
+
 ## [2.47.3](https://github.com/aergaroth/openjobseu/compare/v2.47.2...v2.47.3) (2026-04-22)
 
 
