@@ -1,10 +1,11 @@
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
-from app.adapters.ats.utils import sanitize_url
+from app.adapters.ats.utils import normalize_source_datetime, sanitize_url
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +172,11 @@ class TraffitAdapter(ATSAdapter):
             self._extract_company_name_from_job(raw_job)
             or str(slug).replace("-", " ").replace("_", " ").strip().title()
         )
+        first_seen_at = (
+            normalize_source_datetime(raw_job.get("valid_start") or raw_job.get("_incremental_at"))
+            or datetime.now(timezone.utc).isoformat()
+        )
+        salary_info = self.extract_salary(None)
 
         return {
             "job_id": f"traffit:{slug}:{job_id}",
@@ -184,6 +190,8 @@ class TraffitAdapter(ATSAdapter):
             "source_url": source_url,
             "status": "new",
             "department": department_str,
+            "first_seen_at": first_seen_at,
+            **salary_info,
         }
 
     def probe_jobs(self, slug: str) -> Dict[str, Any]:

@@ -1,9 +1,10 @@
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 from app.adapters.ats.base import ATSAdapter
 from app.adapters.ats.registry import register
-from app.adapters.ats.utils import sanitize_url
+from app.adapters.ats.utils import normalize_source_datetime, sanitize_url
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,16 @@ class BreezyAdapter(ATSAdapter):
             self._extract_company_name_from_job(raw_job)
             or str(slug).replace("-", " ").replace("_", " ").strip().title()
         )
+        first_seen_at = (
+            normalize_source_datetime(raw_job.get("published_date")) or datetime.now(timezone.utc).isoformat()
+        )
+        salary_info = self.extract_salary(
+            {
+                "min": raw_job.get("salary_min"),
+                "max": raw_job.get("salary_max"),
+                "currency": raw_job.get("salary_currency"),
+            }
+        )
 
         return {
             "job_id": f"breezy:{slug}:{job_id}",
@@ -111,6 +122,8 @@ class BreezyAdapter(ATSAdapter):
             "source_url": source_url,
             "status": "new",
             "department": department,
+            "first_seen_at": first_seen_at,
+            **salary_info,
         }
 
     def probe_jobs(self, slug: str) -> Dict[str, Any]:
