@@ -67,6 +67,12 @@ variable "google_cse_id" {
   sensitive   = true
 }
 
+variable "serper_api_key" {
+  type        = string
+  description = "Serper.dev API key (Google SERP proxy, fallback for dorking)"
+  sensitive   = true
+}
+
 variable "artifact_registry_repository_id" {
   type        = string
   description = "Artifact Registry repository used by GitHub Actions in prod"

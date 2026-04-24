@@ -40,6 +40,24 @@ resource "google_secret_manager_secret_iam_member" "cloud_run_google_cse_id" {
 }
 
 
+resource "google_secret_manager_secret" "serper_api_key" {
+  secret_id = "serper-api-key"
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "serper_api_key" {
+  secret      = google_secret_manager_secret.serper_api_key.id
+  secret_data = var.serper_api_key
+}
+
+resource "google_secret_manager_secret_iam_member" "cloud_run_serper_api_key" {
+  secret_id = google_secret_manager_secret.serper_api_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${data.google_service_account.cloud_run_runtime.email}"
+}
+
 resource "google_cloud_run_v2_service" "this" {
   name                = var.service_name
   location            = var.region
@@ -145,6 +163,15 @@ resource "google_cloud_run_v2_service" "this" {
         value_source {
           secret_key_ref {
             secret  = google_secret_manager_secret.google_cse_id.secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name = "SERPER_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.serper_api_key.secret_id
             version = "latest"
           }
         }
