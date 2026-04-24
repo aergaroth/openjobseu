@@ -19,7 +19,15 @@ from storage.repositories.discovery_repository import insert_discovered_slugs
 logger = logging.getLogger(__name__)
 
 # Providers whose slug is a subdomain of dorking_target (e.g. slug.traffit.com)
-SUBDOMAIN_PROVIDERS = {"traffit", "personio", "recruitee", "breezy"}
+SUBDOMAIN_PROVIDERS = {"traffit", "personio", "recruitee", "breezy", "teamtailor"}
+
+# CRT domain overrides for providers where dorking_target is intentionally None
+# but CT log discovery still reveals company subdomains (e.g. teamtailor uses
+# per-company API tokens, so Google dorking is excluded, but *.teamtailor.com
+# certs show which companies exist — promote marks them as needs_token).
+_CRT_DOMAIN_OVERRIDE = {
+    "teamtailor": "teamtailor.com",
+}
 
 # Subdomains that are infra/service noise, not company job boards
 _NOISE = {
@@ -85,7 +93,7 @@ def run_dorking_crt_discovery() -> dict[str, int]:
 
         try:
             adapter = get_adapter(provider_name)
-            dorking_target = getattr(adapter, "dorking_target", None)
+            dorking_target = getattr(adapter, "dorking_target", None) or _CRT_DOMAIN_OVERRIDE.get(provider_name)
             if not dorking_target:
                 continue
 

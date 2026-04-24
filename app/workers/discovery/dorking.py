@@ -5,10 +5,22 @@ from urllib.parse import urlparse
 
 from app.adapters.ats.registry import get_adapter, list_providers
 from app.utils.google_search import google_custom_search
+from app.utils.serper_search import serper_search
 from storage.db_engine import get_engine
 from storage.repositories.discovery_repository import insert_discovered_slugs
 
 logger = logging.getLogger(__name__)
+
+
+def _web_search(query: str, page: int) -> list[str]:
+    """Tries Google CSE first; falls back to Serper if Google returns nothing."""
+    start_index = (page - 1) * 10 + 1
+    urls = google_custom_search(query, num_results=10, start=start_index)
+    if not urls:
+        urls = serper_search(query, num_results=10, page=page)
+        if urls:
+            logger.info(f"Google returned no results for page {page}, Serper found {len(urls)} URLs")
+    return urls
 
 
 def _extract_slug_from_url(url: str, provider: str) -> str | None:
@@ -79,8 +91,7 @@ def run_dorking_discovery():
 
             # Paginate through a few pages of search results
             for page in range(1, 4):  # 3 pages, 10 results each = 30 total
-                start_index = (page - 1) * 10 + 1
-                urls = google_custom_search(query, num_results=10, start=start_index)
+                urls = _web_search(query, page)
 
                 if not urls:
                     break
