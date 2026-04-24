@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.48.0](https://github.com/aergaroth/openjobseu/compare/v2.47.4...v2.48.0) (2026-04-24)
+
+
+### Features
+
+* add Serper fallback search and teamtailor CRT support ([f95df01](https://github.com/aergaroth/openjobseu/commit/f95df0176a63819a92ce5a7fffdcc491ce3cf387))
+
 ## [2.47.4](https://github.com/aergaroth/openjobseu/compare/v2.47.3...v2.47.4) (2026-04-23)
 
 
