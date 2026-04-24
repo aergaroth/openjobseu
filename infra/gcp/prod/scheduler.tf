@@ -68,6 +68,24 @@ resource "google_cloud_scheduler_job" "ping_ingestion" {
   }
 }
 
+resource "google_cloud_scheduler_job" "ping_dorking" {
+  name             = "openjobseu-ping-dorking"
+  region           = var.scheduler_region
+  schedule         = "15 3 * * *" # at 03:15 AM — warms up the instance 5 min before dorking
+  time_zone        = "UTC"
+  attempt_deadline = "30s"
+
+  http_target {
+    http_method = "GET"
+    uri         = "${local.run_uri}/health"
+
+    oidc_token {
+      service_account_email = google_service_account.scheduler_sa.email
+      audience              = local.run_uri
+    }
+  }
+}
+
 resource "google_cloud_scheduler_job" "dorking_discovery" {
   name             = "openjobseu-dorking"
   region           = var.scheduler_region
