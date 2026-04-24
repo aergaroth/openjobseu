@@ -33,6 +33,7 @@ jobs:
       TF_VAR_allowed_auth_email: ${{ secrets.DEV_ALLOWED_AUTH_EMAIL }}
       TF_VAR_google_api_key: ${{ secrets.DEV_GOOGLE_API_KEY }}
       TF_VAR_google_cse_id: ${{ secrets.DEV_GOOGLE_CSE_ID }}
+      TF_VAR_serper_api_key: ${{ secrets.DEV_SERPER_API_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -67,6 +68,7 @@ jobs:
       TF_VAR_allowed_auth_email: ${{ secrets.PROD_ALLOWED_AUTH_EMAIL }}
       TF_VAR_google_api_key: ${{ secrets.PROD_GOOGLE_API_KEY }}
       TF_VAR_google_cse_id: ${{ secrets.PROD_GOOGLE_CSE_ID }}
+      TF_VAR_serper_api_key: ${{ secrets.PROD_SERPER_API_KEY }}
 
     steps:
       - uses: actions/checkout@v4
