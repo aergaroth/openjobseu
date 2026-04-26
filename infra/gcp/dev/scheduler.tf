@@ -200,6 +200,50 @@ resource "google_cloud_scheduler_job" "discovery_guess" {
   }
 }
 
+resource "google_cloud_scheduler_job" "discovery_slug_harvest" {
+  name             = "openjobseu-discovery-slug-harvest"
+  region           = var.scheduler_region
+  schedule         = "20 7 * * *" # o 07:20 rano każdego dnia
+  time_zone        = "UTC"
+  attempt_deadline = "30s"
+
+  http_target {
+    http_method = "POST"
+    uri         = "${local.run_uri}/internal/tasks/slug-harvest"
+
+    headers = {
+      Content-Type = "application/json"
+    }
+
+    oidc_token {
+      service_account_email = google_service_account.scheduler_sa.email
+      audience              = local.run_uri
+    }
+  }
+}
+
+resource "google_cloud_scheduler_job" "discovery_promote_discovered" {
+  name             = "openjobseu-discovery-promote-discovered"
+  region           = var.scheduler_region
+  schedule         = "30 7 * * *" # o 07:30 rano każdego dnia, po etapach produkujących pending
+  time_zone        = "UTC"
+  attempt_deadline = "30s"
+
+  http_target {
+    http_method = "POST"
+    uri         = "${local.run_uri}/internal/tasks/promote-discovered"
+
+    headers = {
+      Content-Type = "application/json"
+    }
+
+    oidc_token {
+      service_account_email = google_service_account.scheduler_sa.email
+      audience              = local.run_uri
+    }
+  }
+}
+
 resource "google_cloud_scheduler_job" "ping_discovery" {
   name             = "openjobseu-ping-discovery"
   region           = var.scheduler_region

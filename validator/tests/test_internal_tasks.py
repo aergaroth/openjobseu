@@ -60,6 +60,8 @@ def test_cloud_tasks_enqueuing_behavior(monkeypatch):
         ("careers", "/internal/tasks/careers"),
         ("ats-reverse", "/internal/tasks/ats-reverse"),
         ("guess", "/internal/tasks/guess"),
+        ("slug-harvest", "/internal/tasks/slug-harvest"),
+        ("promote-discovered", "/internal/tasks/promote-discovered"),
     ],
 )
 def test_discovery_task_endpoints_enqueue_expected_handlers(monkeypatch, task_name, path):
@@ -84,7 +86,14 @@ def test_discovery_task_endpoints_enqueue_expected_handlers(monkeypatch, task_na
 
 
 def test_task_map_includes_split_discovery_phases():
-    assert {"company-sources", "careers", "ats-reverse", "guess"}.issubset(tasks_api.TASK_MAP)
+    assert {
+        "company-sources",
+        "careers",
+        "ats-reverse",
+        "guess",
+        "slug-harvest",
+        "promote-discovered",
+    }.issubset(tasks_api.TASK_MAP)
 
 
 def test_cloud_tasks_enqueuing_error_handling(monkeypatch):
