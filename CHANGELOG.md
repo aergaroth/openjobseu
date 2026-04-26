@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.49.0](https://github.com/aergaroth/openjobseu/compare/v2.48.0...v2.49.0) (2026-04-26)
+
+
+### Features
+
+* add slug harvest and promote discovered phases to discovery API and scheduler ([0fd6749](https://github.com/aergaroth/openjobseu/commit/0fd67496007f56bf6ef4e83ea998dacac4763f57))
+
 ## [2.48.0](https://github.com/aergaroth/openjobseu/compare/v2.47.4...v2.48.0) (2026-04-24)
 
 
