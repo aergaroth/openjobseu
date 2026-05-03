@@ -53,7 +53,7 @@ cryptography==46.0.5
     #   joserfc
 dnspython==2.8.0
     # via cloud-sql-python-connector
-fastapi==0.136.0
+fastapi==0.136.1
     # via -r requirements.in
 frozenlist==1.8.0
     # via
@@ -174,7 +174,7 @@ typing-inspection==0.4.2
     #   pydantic
 urllib3==2.6.3
     # via requests
-uvicorn==0.44.0
+uvicorn==0.46.0
     # via -r requirements.in
 yarl==1.23.0
     # via aiohttp
