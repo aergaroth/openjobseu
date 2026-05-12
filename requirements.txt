@@ -26,7 +26,7 @@ asn1crypto==1.5.1
     # via scramp
 attrs==26.1.0
     # via aiohttp
-authlib==1.7.0
+authlib==1.7.2
     # via -r requirements.in
 beautifulsoup4==4.14.3
     # via -r requirements.in
@@ -63,7 +63,7 @@ google-api-core==2.30.0
     # via
     #   google-cloud-core
     #   google-cloud-storage
-google-auth==2.49.2
+google-auth==2.52.0
     # via
     #   -r requirements.in
     #   cloud-sql-python-connector
@@ -123,9 +123,9 @@ protobuf==6.33.6
     #   google-api-core
     #   googleapis-common-protos
     #   proto-plus
-psycopg[binary]==3.3.3
+psycopg[binary]==3.3.4
     # via -r requirements.in
-psycopg-binary==3.3.3
+psycopg-binary==3.3.4
     # via psycopg
 pyasn1==0.6.3
     # via pyasn1-modules
@@ -139,7 +139,7 @@ pydantic-core==2.41.5
     # via pydantic
 python-dateutil==2.9.0.post0
     # via pg8000
-requests==2.33.1
+requests==2.34.0
     # via
     #   -r requirements.in
     #   cloud-sql-python-connector
