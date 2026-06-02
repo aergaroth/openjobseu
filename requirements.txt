@@ -43,7 +43,7 @@ charset-normalizer==3.4.6
     # via requests
 click==8.3.1
     # via uvicorn
-cloud-sql-python-connector[pg8000]==1.20.2
+cloud-sql-python-connector[pg8000]==1.20.3
     # via -r requirements.in
 cryptography==46.0.5
     # via
@@ -155,7 +155,7 @@ sqlalchemy==2.0.50
     # via
     #   -r requirements.in
     #   alembic
-starlette==1.1.0
+starlette==1.2.1
     # via
     #   -r requirements.in
     #   fastapi
