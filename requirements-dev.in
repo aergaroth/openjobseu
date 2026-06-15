@@ -1,6 +1,6 @@
 -c requirements.txt
 
-pytest>=8.0.0
+pytest>=9.1.0
 pytest-faker>=1.0.0
 pytest-asyncio>=1.4.0
 pytest-cov>=3.0.0
