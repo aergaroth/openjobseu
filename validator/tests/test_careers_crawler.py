@@ -1,9 +1,19 @@
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
+
+import app.workers.discovery.careers_crawler as crawler_module
 from app.workers.discovery.careers_crawler import (
     _fetch_careers_page,
     run_careers_discovery,
 )
-import app.workers.discovery.careers_crawler as crawler_module
+
+
+def _recent_probe_result(jobs_total: int, remote_hits: int) -> dict:
+    return {
+        "jobs_total": jobs_total,
+        "remote_hits": remote_hits,
+        "recent_job_at": datetime.now(timezone.utc) - timedelta(days=5),
+    }
 
 
 def test_fetch_careers_page(monkeypatch):
@@ -145,11 +155,7 @@ def test_run_careers_discovery_happy_path(monkeypatch):
     monkeypatch.setattr(
         crawler_module,
         "probe_ats",
-        lambda p, s: {
-            "jobs_total": 2,
-            "remote_hits": 1,
-            "recent_job_at": "2026-03-01T00:00:00Z",
-        },
+        lambda p, s: _recent_probe_result(2, 1),
     )
 
     monkeypatch.setattr(crawler_module, "insert_discovered_company_ats", lambda *a, **kw: True)
@@ -241,7 +247,7 @@ def test_jobadder_discovery_with_token_probes_and_inserts(monkeypatch):
     monkeypatch.setattr(
         crawler_module,
         "probe_ats",
-        lambda p, s: {"jobs_total": 3, "remote_hits": 2, "recent_job_at": "2026-03-01T00:00:00Z"},
+        lambda p, s: _recent_probe_result(3, 2),
     )
     monkeypatch.setattr(crawler_module, "insert_discovered_company_ats", lambda *a, **kw: True)
 
@@ -301,7 +307,7 @@ def test_run_careers_discovery_handles_company_processing_error(monkeypatch):
     monkeypatch.setattr(
         crawler_module,
         "probe_ats",
-        lambda p, s: {"jobs_total": 2, "remote_hits": 1, "recent_job_at": "2026-03-01T00:00:00Z"},
+        lambda p, s: _recent_probe_result(2, 1),
     )
     monkeypatch.setattr(crawler_module, "insert_discovered_company_ats", lambda *a, **kw: True)
     monkeypatch.setattr(crawler_module, "update_discovery_last_checked_at", lambda *a, **kw: None)
