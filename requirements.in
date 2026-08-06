@@ -1,6 +1,6 @@
 requests>=2.34.2
-fastapi>=0.140.1
-uvicorn>=0.51.0
+fastapi>=0.141.1
+uvicorn>=0.52.0
 httpx>=0.24.0
 sqlalchemy>=2.0.51
 psycopg[binary]>=3.3.4
