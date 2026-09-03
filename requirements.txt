@@ -10,7 +10,7 @@ aiohttp==3.13.3
     # via cloud-sql-python-connector
 aiosignal==1.4.0
     # via aiohttp
-alembic==1.19.0
+alembic==1.19.1
     # via -r requirements.in
 annotated-doc==0.0.4
     # via fastapi
@@ -41,7 +41,7 @@ charset-normalizer==3.4.6
     # via requests
 click==8.3.1
     # via uvicorn
-cloud-sql-python-connector[pg8000]==1.21.0
+cloud-sql-python-connector[pg8000]==1.22.0
     # via -r requirements.in
 cryptography==46.0.5
     # via
@@ -61,7 +61,7 @@ google-api-core==2.30.0
     # via
     #   google-cloud-core
     #   google-cloud-storage
-google-auth==2.56.3
+google-auth==2.57.0
     # via
     #   -r requirements.in
     #   cloud-sql-python-connector
@@ -154,11 +154,11 @@ six==1.17.0
     # via python-dateutil
 soupsieve==2.8.3
     # via beautifulsoup4
-sqlalchemy==2.0.51
+sqlalchemy==2.0.52
     # via
     #   -r requirements.in
     #   alembic
-starlette==1.4.1
+starlette==1.6.0
     # via
     #   -r requirements.in
     #   fastapi
@@ -178,7 +178,7 @@ typing-inspection==0.4.2
     #   pydantic
 urllib3==2.6.3
     # via requests
-uvicorn==0.52.1
+uvicorn==0.52.4
     # via -r requirements.in
 yarl==1.23.0
     # via aiohttp
