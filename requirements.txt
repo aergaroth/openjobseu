@@ -10,7 +10,7 @@ aiohttp==3.13.3
     # via cloud-sql-python-connector
 aiosignal==1.4.0
     # via aiohttp
-alembic==1.19.1
+alembic==1.19.2
     # via -r requirements.in
 annotated-doc==0.0.4
     # via fastapi
@@ -61,7 +61,7 @@ google-api-core==2.30.0
     # via
     #   google-cloud-core
     #   google-cloud-storage
-google-auth==2.57.1
+google-auth==2.58.0
     # via
     #   -r requirements.in
     #   cloud-sql-python-connector
@@ -70,7 +70,7 @@ google-auth==2.57.1
     #   google-cloud-storage
 google-cloud-core==2.5.0
     # via google-cloud-storage
-google-cloud-storage==3.13.1
+google-cloud-storage==3.14.1
     # via -r requirements.in
 google-crc32c==1.8.0
     # via
