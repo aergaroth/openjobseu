@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.49.1](https://github.com/aergaroth/openjobseu/compare/v2.49.0...v2.49.1) (2026-10-01)
+
+
+### Bug Fixes
+
+* eliminate maintenance pipeline CPU/DB spikes from department backfill ([e11ed82](https://github.com/aergaroth/openjobseu/commit/e11ed82a6739ce2f2fc75d4ae03cdb50162b110c))
+* guard department backfill against empty queue and fix personio normalize crash ([3db7c19](https://github.com/aergaroth/openjobseu/commit/3db7c194cc59b4d4be67173a25b22ffa5fb6809f))
+
 ## [2.49.0](https://github.com/aergaroth/openjobseu/compare/v2.48.0...v2.49.0) (2026-04-26)
 
 
