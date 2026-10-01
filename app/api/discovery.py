@@ -15,6 +15,8 @@ from app.workers.discovery.pipeline import run_discovery_pipeline
 from app.workers.discovery.company_sources import run_company_source_discovery
 from app.workers.discovery.ats_reverse import run_ats_reverse_discovery
 from app.workers.discovery.dorking import run_dorking_discovery
+from app.workers.discovery.slug_harvest import run_slug_harvest
+from app.workers.discovery.promote_discovered_slugs import run_promote_discovered_slugs
 
 logger = logging.getLogger("openjobseu.runtime")
 
@@ -91,6 +93,18 @@ def run_ats_reverse():
 def run_dorking():
     metrics = run_dorking_discovery()
     return {"pipeline": "discovery", "phase": "dorking", "metrics": metrics}
+
+
+@discovery_ops_router.post("/slug-harvest", response_model=DiscoveryPhaseResponse)
+def run_slug_harvest_phase():
+    metrics = run_slug_harvest()
+    return {"pipeline": "discovery", "phase": "slug_harvest", "metrics": metrics}
+
+
+@discovery_ops_router.post("/promote-discovered", response_model=DiscoveryPhaseResponse)
+def run_promote_discovered_phase():
+    metrics = run_promote_discovered_slugs()
+    return {"pipeline": "discovery", "phase": "promote_discovered", "metrics": metrics}
 
 
 @discovery_ops_router.post("/run", response_model=DiscoveryRunResponse)

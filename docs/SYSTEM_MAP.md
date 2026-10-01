@@ -38,7 +38,7 @@ Goal:
 
 Automation path:
 - manual all-in-one run: `POST /internal/discovery/run`
-- scheduled async phases: `POST /internal/tasks/company-sources` -> `POST /internal/tasks/careers` -> `POST /internal/tasks/ats-reverse` -> `POST /internal/tasks/guess`
+- scheduled async phases: `POST /internal/tasks/company-sources` -> `POST /internal/tasks/careers` -> `POST /internal/tasks/ats-reverse` -> `POST /internal/tasks/guess` -> `POST /internal/tasks/slug-harvest` -> `POST /internal/tasks/promote-discovered`
 - all scheduled phases share the same Cloud Tasks queue and rely on staggered cron windows plus queue concurrency `1`
 
 ---

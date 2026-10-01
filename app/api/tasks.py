@@ -15,6 +15,8 @@ from app.workers.discovery.pipeline import run_discovery_pipeline
 from app.workers.discovery.company_sources import run_company_source_discovery
 from app.workers.discovery.ats_reverse import run_ats_reverse_discovery
 from app.workers.discovery.dorking import run_dorking_discovery
+from app.workers.discovery.slug_harvest import run_slug_harvest
+from app.workers.discovery.promote_discovered_slugs import run_promote_discovered_slugs
 from app.utils.backfill_compliance import backfill_missing_compliance_classes
 from app.utils.backfill_salary import backfill_missing_salary_fields
 from app.utils.backfill_department import backfill_missing_departments
@@ -75,6 +77,8 @@ TASK_MAP = {
     "ats-reverse": run_ats_reverse_discovery,
     "company-sources": run_company_source_discovery,
     "dorking": run_dorking_discovery,
+    "slug-harvest": run_slug_harvest,
+    "promote-discovered": run_promote_discovered_slugs,
     "backfill-department": backfill_missing_departments,
     "backfill-compliance": run_backfill_compliance_task,
     "backfill-salary": run_backfill_salary_task,

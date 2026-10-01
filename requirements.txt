@@ -4,15 +4,13 @@
 #
 #    pip-compile requirements.in
 #
-aiofiles==25.1.0
-    # via cloud-sql-python-connector
 aiohappyeyeballs==2.6.1
     # via aiohttp
 aiohttp==3.13.3
     # via cloud-sql-python-connector
 aiosignal==1.4.0
     # via aiohttp
-alembic==1.18.4
+alembic==1.20.0
     # via -r requirements.in
 annotated-doc==0.0.4
     # via fastapi
@@ -26,9 +24,9 @@ asn1crypto==1.5.1
     # via scramp
 attrs==26.1.0
     # via aiohttp
-authlib==1.7.0
+authlib==1.8.0
     # via -r requirements.in
-beautifulsoup4==4.14.3
+beautifulsoup4==4.15.0
     # via -r requirements.in
 brotli==1.2.0
     # via -r requirements.in
@@ -43,7 +41,7 @@ charset-normalizer==3.4.6
     # via requests
 click==8.3.1
     # via uvicorn
-cloud-sql-python-connector[pg8000]==1.20.2
+cloud-sql-python-connector[pg8000]==1.22.0
     # via -r requirements.in
 cryptography==46.0.5
     # via
@@ -53,7 +51,7 @@ cryptography==46.0.5
     #   joserfc
 dnspython==2.8.0
     # via cloud-sql-python-connector
-fastapi==0.136.0
+fastapi==0.141.1
     # via -r requirements.in
 frozenlist==1.8.0
     # via
@@ -63,7 +61,7 @@ google-api-core==2.30.0
     # via
     #   google-cloud-core
     #   google-cloud-storage
-google-auth==2.49.2
+google-auth==2.58.1
     # via
     #   -r requirements.in
     #   cloud-sql-python-connector
@@ -72,7 +70,7 @@ google-auth==2.49.2
     #   google-cloud-storage
 google-cloud-core==2.5.0
     # via google-cloud-storage
-google-cloud-storage==3.10.1
+google-cloud-storage==3.15.0
     # via -r requirements.in
 google-crc32c==1.8.0
     # via
@@ -81,9 +79,11 @@ google-crc32c==1.8.0
 google-resumable-media==2.8.0
     # via google-cloud-storage
 googleapis-common-protos==1.73.0
-    # via google-api-core
-greenlet==3.3.2
-    # via sqlalchemy
+    # via
+    #   cloud-sql-python-connector
+    #   google-api-core
+grpcio==1.83.0
+    # via cloud-sql-python-connector
 h11==0.16.0
     # via
     #   httpcore
@@ -120,12 +120,13 @@ proto-plus==1.27.1
     # via google-api-core
 protobuf==6.33.6
     # via
+    #   cloud-sql-python-connector
     #   google-api-core
     #   googleapis-common-protos
     #   proto-plus
-psycopg[binary]==3.3.3
+psycopg[binary]==3.3.6
     # via -r requirements.in
-psycopg-binary==3.3.3
+psycopg-binary==3.3.6
     # via psycopg
 pyasn1==0.6.3
     # via pyasn1-modules
@@ -139,7 +140,7 @@ pydantic-core==2.41.5
     # via pydantic
 python-dateutil==2.9.0.post0
     # via pg8000
-requests==2.33.1
+requests==2.34.2
     # via
     #   -r requirements.in
     #   cloud-sql-python-connector
@@ -151,11 +152,11 @@ six==1.17.0
     # via python-dateutil
 soupsieve==2.8.3
     # via beautifulsoup4
-sqlalchemy==2.0.49
+sqlalchemy==2.1.0
     # via
     #   -r requirements.in
     #   alembic
-starlette==1.0.0
+starlette==1.7.0
     # via
     #   -r requirements.in
     #   fastapi
@@ -164,6 +165,7 @@ typing-extensions==4.15.0
     #   alembic
     #   beautifulsoup4
     #   fastapi
+    #   grpcio
     #   pydantic
     #   pydantic-core
     #   sqlalchemy
@@ -174,7 +176,7 @@ typing-inspection==0.4.2
     #   pydantic
 urllib3==2.6.3
     # via requests
-uvicorn==0.44.0
+uvicorn==0.54.0
     # via -r requirements.in
 yarl==1.23.0
     # via aiohttp

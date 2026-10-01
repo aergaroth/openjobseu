@@ -166,6 +166,8 @@ Internal endpoints:
 - `POST /internal/discovery/guess`
 - `POST /internal/discovery/dorking`
 - `POST /internal/discovery/run`
+- `POST /internal/discovery/slug-harvest` *(triggers slug harvest discovery phase)*
+- `POST /internal/discovery/promote-discovered` *(promotes validated discovered slugs to `company_ats`)*
 - `GET /internal/discovery/slug-candidates` *(UI/API view for discovered slug candidates; defaults to `status=needs_token`)*
 
 Audit panel data shape:
@@ -372,8 +374,8 @@ Expanded path in code:
 
 Discovery orchestrator: `app/workers/discovery/pipeline.py`
 - manual operator entrypoint: `POST /internal/discovery/run` (synchronous end-to-end run)
-- automated scheduler entrypoints: `POST /internal/tasks/company-sources`, `POST /internal/tasks/careers`, `POST /internal/tasks/ats-reverse`, `POST /internal/tasks/guess`
-- scheduled order in `dev` and `prod`: `company-sources -> careers -> ats-reverse -> guess`
+- automated scheduler entrypoints: `POST /internal/tasks/company-sources`, `POST /internal/tasks/careers`, `POST /internal/tasks/ats-reverse`, `POST /internal/tasks/guess`, `POST /internal/tasks/slug-harvest`, `POST /internal/tasks/promote-discovered`
+- scheduled order in `dev` and `prod`: `company-sources -> careers -> ats-reverse -> guess -> slug-harvest -> promote-discovered`
 - shared Cloud Tasks queue is intentional; staggered scheduler windows preserve phase ordering without a separate discovery queue
 
 Discovery worker set:
@@ -575,7 +577,10 @@ Schema source: Alembic revisions under `storage/alembic/versions/` + repository 
 - `GET /internal/audit/stats/source-7d` – source compliance ratios (`jobs` + `job_sources`).
 - `POST /internal/audit/tick-dev` – tick endpoint with forced text output.
 - `POST /internal/backfill-compliance`, `POST /internal/backfill-salary`, `POST /internal/backfill-department`, `POST /internal/backfill-remote-ratio` – direct ops/backfill endpoints.
-- `POST /internal/discovery/*` – discovery phase triggers and admin discovery endpoints.
+- `POST /internal/discovery/company-sources`, `POST /internal/discovery/careers`, `POST /internal/discovery/ats-reverse`, `POST /internal/discovery/guess`, `POST /internal/discovery/dorking` – individual discovery phase triggers.
+- `POST /internal/discovery/slug-harvest` – triggers `run_slug_harvest()`, returns `{pipeline, phase: "slug_harvest", metrics}`.
+- `POST /internal/discovery/promote-discovered` – triggers `run_promote_discovered_slugs()`, returns `{pipeline, phase: "promote_discovered", metrics}`.
+- `POST /internal/discovery/run` – synchronous full discovery pipeline run (manual/operator use).
 - `POST /internal/tasks/{task_name}` – async worker triggers (Cloud Tasks).
 - `POST /internal/tasks/{task_name}/execute` – Cloud Tasks execution handlers.
 
