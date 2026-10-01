@@ -89,7 +89,7 @@ class PersonioAdapter(ATSAdapter):
 
         title = raw_job.get("name", "")
         description = raw_job.get("description", "")
-        location = raw_job.get("office", "")
+        location = raw_job.get("office") or ""
 
         normalized_remote_scope = self.normalize_remote_scope(location)
 

@@ -1,6 +1,8 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from sqlalchemy import text
+
 from storage.db_engine import get_engine
 from storage.repositories.ats_repository import load_active_ats_companies
 from app.domain.jobs.job_processing import process_ingested_job
@@ -74,6 +76,12 @@ def backfill_missing_departments() -> int:
     in a single bulk operation.
     """
     engine = get_engine()
+
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT 1 FROM jobs WHERE source_department IS NULL LIMIT 1")).fetchone()
+        if not row:
+            logger.info("backfill_department_skipped: no jobs with missing source_department")
+            return 0
 
     with engine.connect() as conn:
         companies = load_active_ats_companies(conn)
