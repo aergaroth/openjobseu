@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.49.2](https://github.com/aergaroth/openjobseu/compare/v2.49.1...v2.49.2) (2026-10-09)
+
+
+### Performance Improvements
+
+* **maintenance:** filter department backfill to companies with missing depts ([b09f941](https://github.com/aergaroth/openjobseu/commit/b09f941b13a3e07f9453ae8b040f550ea6f341d7))
+* **maintenance:** filter department backfill to only companies with missing departments ([26195de](https://github.com/aergaroth/openjobseu/commit/26195dea700852ac09fa74180bc3f86c2eaf5cb6))
+
 ## [2.49.1](https://github.com/aergaroth/openjobseu/compare/v2.49.0...v2.49.1) (2026-10-01)
 
 
