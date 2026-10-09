@@ -13,33 +13,36 @@ client = TestClient(app)
 def test_backfill_missing_departments(monkeypatch):
     engine = get_engine()
     company_id = str(uuid.uuid4())
+    company_ats_id = str(uuid.uuid4())
 
     # Przygotowanie danych w testowej bazie
     with engine.begin() as conn:
         conn.execute(
             text("""
-                INSERT INTO companies (company_id, legal_name, ats_provider, ats_slug, is_active, hq_country, remote_posture, created_at, updated_at) 
-                VALUES (:company_id, 'Dept Co', 'dummy_ats', 'dept-co', true, 'ZZ', 'UNKNOWN', NOW(), NOW()) 
+                INSERT INTO companies (company_id, legal_name, ats_provider, ats_slug, is_active, hq_country, remote_posture, created_at, updated_at)
+                VALUES (:company_id, 'Dept Co', 'dummy_ats', 'dept-co', true, 'ZZ', 'UNKNOWN', NOW(), NOW())
                 ON CONFLICT DO NOTHING
             """),
             {"company_id": company_id},
         )
         conn.execute(
             text("""
+                INSERT INTO company_ats (company_ats_id, company_id, provider, ats_slug, is_active, created_at, updated_at)
+                VALUES (:company_ats_id, :company_id, 'dummy_ats', 'dept-co', true, NOW(), NOW())
+                ON CONFLICT DO NOTHING
+            """),
+            {"company_ats_id": company_ats_id, "company_id": company_id},
+        )
+        conn.execute(
+            text("""
                 INSERT INTO jobs (job_id, job_uid, job_fingerprint, title, description, source, source_job_id, source_department, company_id, first_seen_at)
-                VALUES 
+                VALUES
                 ('job_dept_1', 'uid_dept_1', 'fp_dept_1', 'Backend Engineer', 'desc', 'dummy_ats:dept-co', 'src_1', NULL, :company_id, NOW()),
                 ('job_dept_2', 'uid_dept_2', 'fp_dept_2', 'Frontend', 'desc', 'dummy_ats:dept-co', 'src_2', 'Already Set', :company_id, NOW())
                 ON CONFLICT DO NOTHING
             """),
             {"company_id": company_id},
         )
-
-    monkeypatch.setattr(
-        backfill_department,
-        "load_active_ats_companies",
-        lambda conn: [{"company_id": company_id, "provider": "dummy_ats", "ats_slug": "dept-co"}],
-    )
 
     class DummyAdapter:
         def fetch(self, company, updated_since=None):

@@ -4,7 +4,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from sqlalchemy import text
 
 from storage.db_engine import get_engine
-from storage.repositories.ats_repository import load_active_ats_companies
 from app.domain.jobs.job_processing import process_ingested_job
 from storage.repositories.jobs_repository import update_job_department_and_taxonomy_bulk
 
@@ -74,17 +73,44 @@ def backfill_missing_departments() -> int:
     Refetches data from API for active companies concurrently and updates
     source_department and taxonomy for jobs that don't have this field populated yet
     in a single bulk operation.
+
+    Only fetches from companies that actually have jobs with missing source_department —
+    avoids scanning all 100+ companies when backfill is complete or nearly complete.
     """
     engine = get_engine()
 
     with engine.connect() as conn:
-        row = conn.execute(text("SELECT 1 FROM jobs WHERE source_department IS NULL LIMIT 1")).fetchone()
-        if not row:
-            logger.info("backfill_department_skipped: no jobs with missing source_department")
-            return 0
+        rows = (
+            conn.execute(
+                text("""
+                SELECT DISTINCT
+                    ca.company_ats_id,
+                    ca.company_id,
+                    c.legal_name,
+                    ca.provider,
+                    ca.provider AS ats_provider,
+                    ca.ats_slug,
+                    ca.ats_api_url,
+                    ca.careers_url,
+                    ca.last_sync_at
+                FROM jobs j
+                JOIN company_ats ca ON ca.company_id = j.company_id
+                JOIN companies c ON c.company_id = ca.company_id
+                WHERE j.source_department IS NULL
+                  AND c.is_active = TRUE
+                  AND ca.is_active = TRUE
+                  AND ca.provider IS NOT NULL
+                  AND ca.ats_slug IS NOT NULL
+            """)
+            )
+            .mappings()
+            .all()
+        )
+        companies = [dict(r) for r in rows]
 
-    with engine.connect() as conn:
-        companies = load_active_ats_companies(conn)
+    if not companies:
+        logger.info("backfill_department_skipped: no companies with jobs missing source_department")
+        return 0
 
     all_updates = []
     total_companies = len(companies)
