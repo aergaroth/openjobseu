@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.49.3](https://github.com/aergaroth/openjobseu/compare/v2.49.2...v2.49.3) (2026-10-10)
+
+
+### Performance Improvements
+
+* **maintenance:** skip department backfill for providers that never return department data ([41114b0](https://github.com/aergaroth/openjobseu/commit/41114b0905309122fbfa34bc0dedd9d0b9112815))
+* **maintenance:** skip department backfill for providers without department data ([d60a74e](https://github.com/aergaroth/openjobseu/commit/d60a74e8f65ea0200614e11b216e7720aa32f416))
+
 ## [2.49.2](https://github.com/aergaroth/openjobseu/compare/v2.49.1...v2.49.2) (2026-10-09)
 
 
