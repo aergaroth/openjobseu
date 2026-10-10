@@ -101,6 +101,11 @@ def backfill_missing_departments() -> int:
                   AND ca.is_active = TRUE
                   AND ca.provider IS NOT NULL
                   AND ca.ats_slug IS NOT NULL
+                  AND EXISTS (
+                      SELECT 1 FROM jobs j2
+                      WHERE j2.company_id = ca.company_id
+                        AND j2.source_department IS NOT NULL
+                  )
             """)
             )
             .mappings()
