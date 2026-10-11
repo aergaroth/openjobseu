@@ -68,14 +68,17 @@ def _fetch_and_process_company(company: dict) -> list[dict]:
     return updates_for_company
 
 
-def backfill_missing_departments() -> int:
+def backfill_missing_departments(max_companies: int = 20) -> dict:
     """
     Refetches data from API for active companies concurrently and updates
     source_department and taxonomy for jobs that don't have this field populated yet
     in a single bulk operation.
 
-    Only fetches from companies that actually have jobs with missing source_department —
-    avoids scanning all 100+ companies when backfill is complete or nearly complete.
+    Only fetches from companies that actually have jobs with missing source_department
+    AND whose ATS is proven to supply department data (EXISTS subquery).
+
+    Processes at most max_companies per call so a single tick stays within the
+    Cloud Run timeout. Returns {"updated": int, "companies_processed": int}.
     """
     engine = get_engine()
 
@@ -106,7 +109,10 @@ def backfill_missing_departments() -> int:
                       WHERE j2.company_id = ca.company_id
                         AND j2.source_department IS NOT NULL
                   )
-            """)
+                ORDER BY ca.last_sync_at NULLS FIRST
+                LIMIT :max_companies
+            """),
+                {"max_companies": max_companies},
             )
             .mappings()
             .all()
@@ -115,7 +121,7 @@ def backfill_missing_departments() -> int:
 
     if not companies:
         logger.info("backfill_department_skipped: no companies with jobs missing source_department")
-        return 0
+        return {"updated": 0, "companies_processed": 0}
 
     all_updates = []
     total_companies = len(companies)
@@ -140,7 +146,7 @@ def backfill_missing_departments() -> int:
 
     if not all_updates:
         logger.info("No department updates to perform.")
-        return 0
+        return {"updated": 0, "companies_processed": total_companies}
 
     logger.info(f"Collected a total of {len(all_updates)} job updates. Applying to database...")
 
@@ -152,4 +158,4 @@ def backfill_missing_departments() -> int:
         logger.error("Failed to perform bulk update for department backfill", exc_info=True)
 
     logger.info("backfill_department_completed", extra={"updated_count": updated_count})
-    return updated_count
+    return {"updated": updated_count, "companies_processed": total_companies}

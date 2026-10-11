@@ -61,8 +61,8 @@ def backfill_salary(limit: int = Query(1000, ge=1, le=10000)):
 
 @system_ops_router.post("/backfill-department", response_model=BackfillResponse)
 def backfill_department():
-    updated_count = backfill_missing_departments()
-    return {"status": "ok", "updated_jobs_count": updated_count}
+    result = backfill_missing_departments()
+    return {"status": "ok", "updated_jobs_count": result["updated"]}
 
 
 @system_ops_router.post("/backfill-remote-ratio", response_model=BackfillResponse)

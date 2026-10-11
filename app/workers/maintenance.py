@@ -63,11 +63,23 @@ def _run_backfill_salary() -> int:
     return result["updated"]
 
 
+_BACKFILL_DEPARTMENT_LIMIT = 20
+
+
 def _run_backfill_department() -> int:
     """
     Backfills missing department fields by re-fetching from ATS.
+    Processes at most _BACKFILL_DEPARTMENT_LIMIT companies per tick; enqueues
+    a continuation task when more remain (same pattern as salary backfill).
     """
-    return backfill_missing_departments()
+    result = backfill_missing_departments(max_companies=_BACKFILL_DEPARTMENT_LIMIT)
+    if (
+        result["companies_processed"] >= _BACKFILL_DEPARTMENT_LIMIT
+        and result["updated"] > 0
+        and is_tick_queue_configured()
+    ):
+        _enqueue_backfill_continuation("backfill-department", _BACKFILL_DEPARTMENT_LIMIT)
+    return result["updated"]
 
 
 _BACKFILL_COMPLIANCE_LIMIT = 5000

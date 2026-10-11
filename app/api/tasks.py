@@ -63,6 +63,23 @@ def run_backfill_salary_task(limit: int = 5000):
     return {"status": "completed", "processed_jobs_count": result["processed"], "updated_jobs_count": result["updated"]}
 
 
+def run_backfill_department_task(limit: int = 20):
+    result = backfill_missing_departments(max_companies=limit)
+    logger.info(
+        "backfill_department completed",
+        extra={
+            "updated_jobs_count": result["updated"],
+            "companies_processed": result["companies_processed"],
+            "limit": limit,
+        },
+    )
+    return {
+        "status": "completed",
+        "processed_jobs_count": result["companies_processed"],
+        "updated_jobs_count": result["updated"],
+    }
+
+
 def run_tick_task(incremental: bool = True, limit: int = 100):
     employer_worker.GLOBAL_INCREMENTAL_FETCH = incremental
     employer_worker.GLOBAL_COMPANIES_LIMIT = limit
@@ -79,7 +96,7 @@ TASK_MAP = {
     "dorking": run_dorking_discovery,
     "slug-harvest": run_slug_harvest,
     "promote-discovered": run_promote_discovered_slugs,
-    "backfill-department": backfill_missing_departments,
+    "backfill-department": run_backfill_department_task,
     "backfill-compliance": run_backfill_compliance_task,
     "backfill-salary": run_backfill_salary_task,
 }
@@ -182,7 +199,7 @@ def _enqueue_task_continuation(task_name: str, limit: int, request: Request) -> 
 
 
 # Tasks that support self-chaining when they hit their per-run record cap.
-_CHAINABLE_BACKFILL_TASKS = {"backfill-compliance", "backfill-salary"}
+_CHAINABLE_BACKFILL_TASKS = {"backfill-compliance", "backfill-salary", "backfill-department"}
 
 
 @tasks_execute_router.post("/{task_name}/execute", response_model=TaskExecuteResponse)
