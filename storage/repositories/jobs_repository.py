@@ -184,23 +184,44 @@ def update_job_department_and_taxonomy_bulk(conn: Connection, updates: list[dict
     """
     Bulk updates department and taxonomy fields for multiple jobs
     if the source_department is currently NULL.
-    Uses 'executemany' for efficiency.
-    Returns the total number of rows updated.
+    Uses a single unnest() UPDATE — one round-trip regardless of batch size,
+    with reliable rowcount (unlike executemany which returns 0 via psycopg3).
     """
     if not updates:
         return 0
 
-    stmt = text("""
-        UPDATE jobs
-        SET source_department = :source_department,
-            job_family = :job_family,
-            job_role = :job_role,
-            seniority = :seniority,
-            specialization = :specialization
-        WHERE source = :source AND source_job_id = :source_job_id
-          AND source_department IS NULL
-    """)
-    result = conn.execute(stmt, updates)
+    result = conn.execute(
+        text("""
+            UPDATE jobs
+            SET source_department = u.source_department,
+                job_family        = u.job_family,
+                job_role          = u.job_role,
+                seniority         = u.seniority,
+                specialization    = u.specialization
+            FROM (
+                SELECT
+                    unnest(CAST(:sources AS text[]))            AS source,
+                    unnest(CAST(:source_job_ids AS text[]))     AS source_job_id,
+                    unnest(CAST(:source_departments AS text[])) AS source_department,
+                    unnest(CAST(:job_families AS text[]))       AS job_family,
+                    unnest(CAST(:job_roles AS text[]))          AS job_role,
+                    unnest(CAST(:seniorities AS text[]))        AS seniority,
+                    unnest(CAST(:specializations AS text[]))    AS specialization
+            ) u
+            WHERE jobs.source = u.source
+              AND jobs.source_job_id = u.source_job_id
+              AND jobs.source_department IS NULL
+        """),
+        {
+            "sources": [u["source"] for u in updates],
+            "source_job_ids": [u["source_job_id"] for u in updates],
+            "source_departments": [u["source_department"] for u in updates],
+            "job_families": [u.get("job_family") for u in updates],
+            "job_roles": [u.get("job_role") for u in updates],
+            "seniorities": [u.get("seniority") for u in updates],
+            "specializations": [u.get("specialization") for u in updates],
+        },
+    )
     return result.rowcount
 
 

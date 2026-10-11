@@ -65,8 +65,9 @@ def test_backfill_missing_departments(monkeypatch):
 
     monkeypatch.setattr(backfill_department, "process_ingested_job", mock_process)
 
-    updated = backfill_missing_departments()
-    assert updated == 1
+    result = backfill_missing_departments()
+    assert result["updated"] == 1
+    assert result["companies_processed"] == 1
 
     with engine.connect() as conn:
         row = (
@@ -79,7 +80,7 @@ def test_backfill_missing_departments(monkeypatch):
 
 
 def test_backfill_department_endpoint(monkeypatch):
-    monkeypatch.setattr("app.api.system.backfill_missing_departments", lambda: 5)
+    monkeypatch.setattr("app.api.system.backfill_missing_departments", lambda: {"updated": 5, "companies_processed": 1})
     response = client.post("/internal/backfill-department")
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "updated_jobs_count": 5}

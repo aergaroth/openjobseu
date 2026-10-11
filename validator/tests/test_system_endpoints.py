@@ -66,7 +66,7 @@ def test_backfill_endpoints_forward_limit_and_return_payload(monkeypatch, path, 
 
 
 def test_backfill_department_endpoint_returns_response_payload(monkeypatch):
-    monkeypatch.setattr(system_api, "backfill_missing_departments", lambda: 3)
+    monkeypatch.setattr(system_api, "backfill_missing_departments", lambda: {"updated": 3, "companies_processed": 1})
 
     response = client.post("/internal/backfill-department")
 
