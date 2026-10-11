@@ -109,6 +109,7 @@ def backfill_missing_departments(max_companies: int = 20) -> dict:
                       WHERE j2.company_id = ca.company_id
                         AND j2.source_department IS NOT NULL
                   )
+                ORDER BY ca.last_sync_at NULLS FIRST
                 LIMIT :max_companies
             """),
                 {"max_companies": max_companies},
