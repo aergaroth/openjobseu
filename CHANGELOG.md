@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.49.4](https://github.com/aergaroth/openjobseu/compare/v2.49.3...v2.49.4) (2026-10-11)
+
+
+### Bug Fixes
+
+* **maintenance:** fix dept backfill continuation bugs ([2d78f93](https://github.com/aergaroth/openjobseu/commit/2d78f9315a7f9aeee51b24e4576e9b0945dc9024))
+
+
+### Performance Improvements
+
+* **maintenance:** fix dept backfill timeout regression ([eac141a](https://github.com/aergaroth/openjobseu/commit/eac141a295b9d507e9e21f7409c24f808be54c16))
+* **maintenance:** fix dept backfill timeout regression ([06afd84](https://github.com/aergaroth/openjobseu/commit/06afd84262ba669c185b32e954a4339650e94306))
+
 ## [2.49.3](https://github.com/aergaroth/openjobseu/compare/v2.49.2...v2.49.3) (2026-10-10)
 
 
