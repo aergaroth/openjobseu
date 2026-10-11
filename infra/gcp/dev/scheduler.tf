@@ -93,7 +93,7 @@ resource "google_cloud_scheduler_job" "dorking_discovery" {
 resource "google_cloud_scheduler_job" "tick_maintenance" {
   name             = "openjobseu-tick-maintenance"
   region           = var.scheduler_region
-  schedule         = "5 4 * * *" # o 04:05 rano każdego dnia
+  schedule         = "5 5 * * *" # o 05:05 rano każdego dnia (przesunięte +1h vs prod 04:05)
   time_zone        = "UTC"
   attempt_deadline = "30s"
 
@@ -115,7 +115,7 @@ resource "google_cloud_scheduler_job" "tick_maintenance" {
 resource "google_cloud_scheduler_job" "discovery_company_sources" {
   name             = "openjobseu-discovery-company-sources"
   region           = var.scheduler_region
-  schedule         = "10 6 * * *" # o 06:10 rano każdego dnia
+  schedule         = "10 7 * * *" # o 07:10 rano każdego dnia (przesunięte +1h vs prod 06:10)
   time_zone        = "UTC"
   attempt_deadline = "30s"
 
@@ -137,7 +137,7 @@ resource "google_cloud_scheduler_job" "discovery_company_sources" {
 resource "google_cloud_scheduler_job" "discovery_careers" {
   name             = "openjobseu-discovery-careers"
   region           = var.scheduler_region
-  schedule         = "30 6 * * *" # o 06:30 rano każdego dnia
+  schedule         = "30 7 * * *" # o 07:30 rano każdego dnia (przesunięte +1h vs prod 06:30)
   time_zone        = "UTC"
   attempt_deadline = "30s"
 
@@ -159,7 +159,7 @@ resource "google_cloud_scheduler_job" "discovery_careers" {
 resource "google_cloud_scheduler_job" "discovery_ats_reverse" {
   name             = "openjobseu-discovery-ats-reverse"
   region           = var.scheduler_region
-  schedule         = "50 6 * * *" # o 06:50 rano każdego dnia
+  schedule         = "50 7 * * *" # o 07:50 rano każdego dnia (przesunięte +1h vs prod 06:50)
   time_zone        = "UTC"
   attempt_deadline = "30s"
 
@@ -181,7 +181,7 @@ resource "google_cloud_scheduler_job" "discovery_ats_reverse" {
 resource "google_cloud_scheduler_job" "discovery_guess" {
   name             = "openjobseu-discovery-guess"
   region           = var.scheduler_region
-  schedule         = "10 7 * * *" # o 07:10 rano każdego dnia
+  schedule         = "10 8 * * *" # o 08:10 rano każdego dnia (przesunięte +1h vs prod 07:10)
   time_zone        = "UTC"
   attempt_deadline = "30s"
 
@@ -203,7 +203,7 @@ resource "google_cloud_scheduler_job" "discovery_guess" {
 resource "google_cloud_scheduler_job" "discovery_slug_harvest" {
   name             = "openjobseu-discovery-slug-harvest"
   region           = var.scheduler_region
-  schedule         = "20 7 * * *" # o 07:20 rano każdego dnia
+  schedule         = "20 8 * * *" # o 08:20 rano każdego dnia (przesunięte +1h vs prod 07:20)
   time_zone        = "UTC"
   attempt_deadline = "30s"
 
@@ -225,7 +225,7 @@ resource "google_cloud_scheduler_job" "discovery_slug_harvest" {
 resource "google_cloud_scheduler_job" "discovery_promote_discovered" {
   name             = "openjobseu-discovery-promote-discovered"
   region           = var.scheduler_region
-  schedule         = "30 7 * * *" # o 07:30 rano każdego dnia, po etapach produkujących pending
+  schedule         = "30 8 * * *" # o 08:30 rano każdego dnia (przesunięte +1h vs prod 07:30)
   time_zone        = "UTC"
   attempt_deadline = "30s"
 
@@ -247,7 +247,7 @@ resource "google_cloud_scheduler_job" "discovery_promote_discovered" {
 resource "google_cloud_scheduler_job" "ping_discovery" {
   name             = "openjobseu-ping-discovery"
   region           = var.scheduler_region
-  schedule         = "5 6 * * *" # o 06:05 rano każdego dnia
+  schedule         = "5 7 * * *" # o 07:05 rano każdego dnia (przesunięte +1h vs prod 06:05)
   time_zone        = "UTC"
   attempt_deadline = "30s"
 

@@ -71,7 +71,7 @@ resource "google_cloud_scheduler_job" "ping_ingestion" {
 resource "google_cloud_scheduler_job" "ping_dorking" {
   name             = "openjobseu-ping-dorking"
   region           = var.scheduler_region
-  schedule         = "15 3 * * *" # at 03:15 AM — warms up the instance 5 min before dorking
+  schedule         = "15 1 * * *" # at 01:15 AM — warms up the instance 5 min before dorking
   time_zone        = "UTC"
   attempt_deadline = "30s"
 
@@ -89,7 +89,7 @@ resource "google_cloud_scheduler_job" "ping_dorking" {
 resource "google_cloud_scheduler_job" "dorking_discovery" {
   name             = "openjobseu-dorking"
   region           = var.scheduler_region
-  schedule         = "20 3 * * *" # at 03:20 AM every day (off-peak, staggered)
+  schedule         = "20 1 * * *" # at 01:20 AM every day (off-peak, ~3h before maintenance at 04:05)
   time_zone        = "UTC"
   attempt_deadline = "30s"
 
