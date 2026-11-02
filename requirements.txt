@@ -10,7 +10,7 @@ aiohttp==3.13.3
     # via cloud-sql-python-connector
 aiosignal==1.4.0
     # via aiohttp
-alembic==1.20.0
+alembic==1.20.1
     # via -r requirements.in
 annotated-doc==0.0.4
     # via fastapi
@@ -28,7 +28,7 @@ authlib==1.9.1
     # via -r requirements.in
 beautifulsoup4==4.15.0
     # via -r requirements.in
-brotli==1.2.0
+brotli==1.2.1
     # via -r requirements.in
 certifi==2026.2.25
     # via
@@ -51,7 +51,7 @@ cryptography==46.0.5
     #   joserfc
 dnspython==2.8.0
     # via cloud-sql-python-connector
-fastapi==0.143.2
+fastapi==0.162.0
     # via -r requirements.in
 frozenlist==1.8.0
     # via
@@ -166,11 +166,11 @@ six==1.17.0
     # via python-dateutil
 soupsieve==2.8.3
     # via beautifulsoup4
-sqlalchemy==2.1.4
+sqlalchemy==2.1.6
     # via
     #   -r requirements.in
     #   alembic
-starlette==1.8.0
+starlette==1.10.0
     # via
     #   -r requirements.in
     #   fastapi
