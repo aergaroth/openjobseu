@@ -25,7 +25,7 @@ asn1crypto==1.5.1
     # via scramp
 attrs==26.1.0
     # via aiohttp
-authlib==1.9.5
+authlib==1.9.10
     # via -r requirements.in
 beautifulsoup4==4.15.0
     # via -r requirements.in
@@ -52,7 +52,7 @@ cryptography==46.0.5
     #   joserfc
 dnspython==2.8.0
     # via cloud-sql-python-connector
-fastapi==0.162.5
+fastapi==0.165.0
     # via -r requirements.in
 frozenlist==1.8.0
     # via
@@ -167,7 +167,7 @@ six==1.17.0
     # via python-dateutil
 soupsieve==2.8.3
     # via beautifulsoup4
-sqlalchemy==2.1.8
+sqlalchemy==2.1.9
     # via
     #   -r requirements.in
     #   alembic
